@@ -40,17 +40,15 @@ export default function Match() {
   const isFav = isPartidoFavorite(match.id)
 
   const p1 = isPadel
-    ? { name: match.equipo1?.nombre, flag: null }
+    ? { name: match.equipo1?.nombre }
     : {
         name: `${match.jugador1?.nombre || ''} ${match.jugador1?.apellido || ''}`.trim(),
-        flag: match.jugador1?.flag,
         ranking: match.jugador1?.ranking,
       }
   const p2 = isPadel
-    ? { name: match.equipo2?.nombre, flag: null }
+    ? { name: match.equipo2?.nombre }
     : {
         name: `${match.jugador2?.nombre || ''} ${match.jugador2?.apellido || ''}`.trim(),
-        flag: match.jugador2?.flag,
         ranking: match.jugador2?.ranking,
       }
 
@@ -155,7 +153,6 @@ function ScoreRow({ player, sets, isWinner, isLive }) {
   return (
     <div className='flex items-center gap-3'>
       <div className='flex items-center gap-2 flex-1 min-w-0'>
-        {player.flag && <span className='text-2xl'>{player.flag}</span>}
         <div>
           <p
             className='font-semibold'

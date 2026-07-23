@@ -25,9 +25,6 @@ export default function MatchCard({ match }) {
   const p2Name = isPadel
     ? match.equipo2?.nombre
     : `${match.jugador2?.nombre || ''} ${match.jugador2?.apellido || ''}`.trim()
-  const p1Flag = isPadel ? null : match.jugador1?.flag
-  const p2Flag = isPadel ? null : match.jugador2?.flag
-
   return (
     <Link to={`/match/${match.id}`}>
       <div className={cn('card-hover group', isLive && 'match-card-live')}>
@@ -75,20 +72,8 @@ export default function MatchCard({ match }) {
 
         {/* Jugadores + Scores */}
         <div className='px-4 py-3 space-y-2.5'>
-          <PlayerRow
-            flag={p1Flag}
-            name={p1Name}
-            sets={p1Sets}
-            isWinner={winner === 'jugador1'}
-            isLive={isLive}
-          />
-          <PlayerRow
-            flag={p2Flag}
-            name={p2Name}
-            sets={p2Sets}
-            isWinner={winner === 'jugador2'}
-            isLive={isLive}
-          />
+          <PlayerRow name={p1Name} sets={p1Sets} isWinner={winner === 'jugador1'} isLive={isLive} />
+          <PlayerRow name={p2Name} sets={p2Sets} isWinner={winner === 'jugador2'} isLive={isLive} />
         </div>
 
         {match.notas && (
@@ -108,10 +93,9 @@ export default function MatchCard({ match }) {
   )
 }
 
-function PlayerRow({ flag, name, sets, isWinner, isLive }) {
+function PlayerRow({ name, sets, isWinner, isLive }) {
   return (
     <div className='flex items-center gap-2'>
-      {flag && <span className='text-base leading-none'>{flag}</span>}
       <span
         className={cn('flex-1 text-sm truncate')}
         style={{

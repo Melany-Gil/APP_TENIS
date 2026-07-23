@@ -14,12 +14,10 @@ const MATCH_SELECT = `
     j1.id       AS j1_id,
     j1.nombre   AS j1_nombre,
     j1.apellido AS j1_apellido,
-    ct1.flag    AS j1_flag,
     st1.ranking AS j1_ranking,
     j2.id       AS j2_id,
     j2.nombre   AS j2_nombre,
     j2.apellido AS j2_apellido,
-    ct2.flag    AS j2_flag,
     st2.ranking AS j2_ranking,
     e1.id     AS e1_id,
     e1.nombre AS e1_nombre,
@@ -28,11 +26,9 @@ const MATCH_SELECT = `
   FROM partidos p
   LEFT JOIN categorias cat ON cat.id = p.categoria_id
   LEFT JOIN jugadores j1 ON j1.id = p.jugador1_id
-  LEFT JOIN countries ct1 ON ct1.id = j1.country_id
   LEFT JOIN jugador_stats st1
     ON st1.jugador_id = j1.id AND st1.temporada = YEAR(CURDATE())
   LEFT JOIN jugadores j2 ON j2.id = p.jugador2_id
-  LEFT JOIN countries ct2 ON ct2.id = j2.country_id
   LEFT JOIN jugador_stats st2
     ON st2.jugador_id = j2.id AND st2.temporada = YEAR(CURDATE())
   LEFT JOIN equipos_padel e1 ON e1.id = p.equipo1_id
@@ -356,14 +352,12 @@ function formatSummary(row) {
       id: row.j1_id,
       nombre: row.j1_nombre,
       apellido: row.j1_apellido,
-      flag: row.j1_flag,
       ranking: row.j1_ranking || null,
     }
     match.jugador2 = {
       id: row.j2_id,
       nombre: row.j2_nombre,
       apellido: row.j2_apellido,
-      flag: row.j2_flag,
       ranking: row.j2_ranking || null,
     }
   }
