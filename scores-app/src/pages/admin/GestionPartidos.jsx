@@ -4,8 +4,7 @@ import { Plus, Pencil, Trash2, X, Radio } from 'lucide-react'
 import { matchService } from '../../services/matchService'
 import { playerService } from '../../services/playerService'
 import { teamService } from '../../services/teamService'
-import { tournamentService } from '../../services/tournamentService'
-import { sedeService } from '../../services/sedeService'
+import { categoriaService } from '../../services/categoriaService'
 import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
@@ -31,15 +30,12 @@ export default function GestionPartidos() {
   const [partidos, setPartidos] = useState([])
   const [jugadores, setJugadores] = useState([])
   const [equipos, setEquipos] = useState([])
-  const [torneos, setTorneos] = useState([])
-  const [canchas, setCanchas] = useState([])
-  const [sedes, setSedes] = useState([])
+  const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showMarcador, setShowMarcador] = useState(null)
   const [editing, setEditing] = useState(null)
   const [filterTab, setFilterTab] = useState('todos')
-  const [deporte, setDeporte] = useState('tenis')
   const { addToast } = useUIStore()
 
   const {
@@ -56,7 +52,10 @@ export default function GestionPartidos() {
     formState: { isSubmitting: isSubmittingM },
   } = useForm()
 
-  const selectedDeporte = watch('deporte') || deporte
+  const selectedDeporte = watch('deporte') || 'tenis'
+  const categoriasDisponibles = categorias.filter(
+    (categoria) => categoria.deporte === selectedDeporte || categoria.deporte === 'ambos'
+  )
 
   const fetchAll = () => {
     setLoading(true)
@@ -64,31 +63,16 @@ export default function GestionPartidos() {
       matchService.getAll(),
       playerService.getAll(),
       teamService.getAll(),
-      tournamentService.getAll(),
-      sedeService.getAll(),
+      categoriaService.getAll(),
     ])
-      .then(([p, j, e, t, s]) => {
+      .then(([p, j, e, c]) => {
         setPartidos(p.data || [])
         setJugadores(j.data || [])
         setEquipos(e.data || [])
-        setTorneos(t.data || [])
-        setSedes(s.data || [])
+        setCategorias(c.data || [])
       })
       .catch(() => addToast({ type: 'error', title: 'Error al cargar datos' }))
       .finally(() => setLoading(false))
-  }
-
-  const fetchCanchas = async (sedeId) => {
-    if (!sedeId) {
-      setCanchas([])
-      return
-    }
-    try {
-      const res = await sedeService.getCanchasBySede(sedeId)
-      setCanchas(res.data || [])
-    } catch {
-      setCanchas([])
-    }
   }
 
   useEffect(() => {
@@ -96,7 +80,7 @@ export default function GestionPartidos() {
   }, [])
 
   const openCreate = () => {
-    reset({ deporte: 'tenis', estado: 'programado' })
+    reset({ deporte: 'tenis', categoria_id: '', estado: 'programado' })
     setEditing(null)
     setShowForm(true)
   }
@@ -105,17 +89,13 @@ export default function GestionPartidos() {
     setEditing(partido)
     reset({
       deporte: partido.deporte,
-      torneo_id: partido.torneo?.id || '',
-      cancha_id: partido.cancha?.id || '',
-      ronda: partido.ronda || '',
+      categoria_id: partido.categoria?.id || '',
       estado: partido.estado,
-      ganador: partido.ganador || '',
       fecha_inicio: partido.fecha_inicio ? partido.fecha_inicio.slice(0, 16) : '',
       jugador1_id: partido.jugador1?.id || '',
       jugador2_id: partido.jugador2?.id || '',
       equipo1_id: partido.equipo1?.id || '',
       equipo2_id: partido.equipo2?.id || '',
-      notas: partido.notas || '',
     })
     setShowForm(true)
   }
@@ -132,7 +112,16 @@ export default function GestionPartidos() {
 
   const onSubmit = async (data) => {
     try {
-      const payload = { ...data }
+      const payload = {
+        deporte: data.deporte,
+        categoria_id: data.categoria_id,
+        estado: data.estado,
+        fecha_inicio: data.fecha_inicio,
+        jugador1_id: data.jugador1_id,
+        jugador2_id: data.jugador2_id,
+        equipo1_id: data.equipo1_id,
+        equipo2_id: data.equipo2_id,
+      }
       if (data.deporte === 'padel') {
         delete payload.jugador1_id
         delete payload.jugador2_id
@@ -255,58 +244,39 @@ export default function GestionPartidos() {
             </div>
 
             <div className='form-group'>
-              <label className='form-label'>Torneo</label>
-              <select className='form-input' {...register('torneo_id')}>
-                <option value=''>Amistoso (sin torneo)</option>
-                {torneos.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombre}
+              <label className='form-label'>Categoría *</label>
+              <select
+                className='form-input'
+                {...register('categoria_id', { required: 'Selecciona una categoría' })}
+              >
+                <option value=''>Seleccionar</option>
+                {categoriasDisponibles.map((categoria) => (
+                  <option key={categoria.id} value={categoria.id}>
+                    {categoria.nombre}
                   </option>
                 ))}
               </select>
+              {errors.categoria_id && <p className='form-error'>{errors.categoria_id.message}</p>}
             </div>
 
             <Input
-              label='Ronda'
-              placeholder='Final, Semifinal, Ronda 1...'
-              {...register('ronda')}
+              label='Fecha y hora *'
+              type='datetime-local'
+              error={errors.fecha_inicio?.message}
+              {...register('fecha_inicio', { required: 'Selecciona la fecha y hora' })}
             />
-
-            {/* Sede → Cancha */}
-            <div className='form-group'>
-              <label className='form-label'>Sede</label>
-              <select className='form-input' onChange={(e) => fetchCanchas(e.target.value)}>
-                <option value=''>Sin sede</option>
-                {sedes.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className='form-group'>
-              <label className='form-label'>Cancha</label>
-              <select className='form-input' {...register('cancha_id')}>
-                <option value=''>Sin cancha</option>
-                {canchas.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className='sm:col-span-2'>
-              <Input label='Fecha y hora' type='datetime-local' {...register('fecha_inicio')} />
-            </div>
 
             {/* Participantes según deporte */}
             {selectedDeporte === 'tenis' ? (
               <>
                 <div className='form-group'>
                   <label className='form-label'>Jugador 1</label>
-                  <select className='form-input' {...register('jugador1_id')}>
+                  <select
+                    className='form-input'
+                    {...register('jugador1_id', {
+                      required: selectedDeporte === 'tenis' ? 'Selecciona un jugador' : false,
+                    })}
+                  >
                     <option value=''>Seleccionar</option>
                     {jugadores.map((j) => (
                       <option key={j.id} value={j.id}>
@@ -317,7 +287,12 @@ export default function GestionPartidos() {
                 </div>
                 <div className='form-group'>
                   <label className='form-label'>Jugador 2</label>
-                  <select className='form-input' {...register('jugador2_id')}>
+                  <select
+                    className='form-input'
+                    {...register('jugador2_id', {
+                      required: selectedDeporte === 'tenis' ? 'Selecciona un jugador' : false,
+                    })}
+                  >
                     <option value=''>Seleccionar</option>
                     {jugadores.map((j) => (
                       <option key={j.id} value={j.id}>
@@ -331,7 +306,12 @@ export default function GestionPartidos() {
               <>
                 <div className='form-group'>
                   <label className='form-label'>Equipo 1</label>
-                  <select className='form-input' {...register('equipo1_id')}>
+                  <select
+                    className='form-input'
+                    {...register('equipo1_id', {
+                      required: selectedDeporte === 'padel' ? 'Selecciona un equipo' : false,
+                    })}
+                  >
                     <option value=''>Seleccionar</option>
                     {equipos.map((e) => (
                       <option key={e.id} value={e.id}>
@@ -342,7 +322,12 @@ export default function GestionPartidos() {
                 </div>
                 <div className='form-group'>
                   <label className='form-label'>Equipo 2</label>
-                  <select className='form-input' {...register('equipo2_id')}>
+                  <select
+                    className='form-input'
+                    {...register('equipo2_id', {
+                      required: selectedDeporte === 'padel' ? 'Selecciona un equipo' : false,
+                    })}
+                  >
                     <option value=''>Seleccionar</option>
                     {equipos.map((e) => (
                       <option key={e.id} value={e.id}>
@@ -353,16 +338,6 @@ export default function GestionPartidos() {
                 </div>
               </>
             )}
-
-            <div className='sm:col-span-2 form-group'>
-              <label className='form-label'>Notas</label>
-              <textarea
-                className='form-input resize-none'
-                rows={2}
-                placeholder='Notas adicionales...'
-                {...register('notas')}
-              />
-            </div>
 
             <div className='sm:col-span-2 flex gap-3'>
               <Button type='submit' loading={isSubmitting}>
@@ -520,8 +495,7 @@ export default function GestionPartidos() {
                     {p.estado === 'en_vivo' && <LiveBadge />}
                   </div>
                   <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>
-                    {p.torneo?.nombre || 'Amistoso'}
-                    {p.ronda && ` · ${p.ronda}`}
+                    {p.categoria?.nombre || 'Sin categoría'}
                     {p.fecha_inicio &&
                       ` · ${formatDate(p.fecha_inicio)} ${formatTime(p.fecha_inicio)}`}
                   </p>

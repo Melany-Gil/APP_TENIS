@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import { tournamentService } from '../../services/tournamentService'
-import { categoriaService } from '../../services/categoriaService'
-import { sedeService } from '../../services/sedeService'
 import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
@@ -26,8 +24,6 @@ const ESTADO_BADGE = {
 
 export default function GestionTorneos() {
   const [torneos, setTorneos] = useState([])
-  const [categorias, setCategorias] = useState([])
-  const [sedes, setSedes] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -42,12 +38,9 @@ export default function GestionTorneos() {
 
   const fetchAll = () => {
     setLoading(true)
-    Promise.all([tournamentService.getAll(), categoriaService.getAll(), sedeService.getAll()])
-      .then(([t, c, s]) => {
-        setTorneos(t.data || [])
-        setCategorias(c.data || [])
-        setSedes(s.data || [])
-      })
+    tournamentService
+      .getAll()
+      .then((response) => setTorneos(response.data || []))
       .catch(() => addToast({ type: 'error', title: 'Error al cargar datos' }))
       .finally(() => setLoading(false))
   }
@@ -67,12 +60,6 @@ export default function GestionTorneos() {
     reset({
       nombre: torneo.nombre,
       deporte: torneo.deporte,
-      categoria_id: torneo.categoria?.id || '',
-      sede_id: torneo.sede?.id || '',
-      formato: torneo.formato || '',
-      descripcion: torneo.descripcion || '',
-      premio: torneo.premio || '',
-      cupo_max: torneo.cupo_max || '',
       fecha_inicio: torneo.fecha_inicio?.split('T')[0] || '',
       fecha_fin: torneo.fecha_fin?.split('T')[0] || '',
       estado: torneo.estado,
@@ -99,7 +86,7 @@ export default function GestionTorneos() {
   const handleDelete = async (torneo) => {
     const ok = await confirm({
       title: 'Eliminar torneo',
-      message: `Esta acción eliminará permanentemente el torneo "${torneo.nombre}", junto con sus inscripciones y partidos asociados. No se puede deshacer.`,
+      message: `Esta acción eliminará permanentemente el torneo "${torneo.nombre}". No se puede deshacer.`,
       confirmLabel: 'Eliminar',
       danger: true,
       requireText: torneo.nombre,
@@ -175,30 +162,6 @@ export default function GestionTorneos() {
               </select>
             </div>
 
-            <div className='form-group'>
-              <label className='form-label'>Categoría</label>
-              <select className='form-input' {...register('categoria_id')}>
-                <option value=''>Sin categoría</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className='form-group'>
-              <label className='form-label'>Sede</label>
-              <select className='form-input' {...register('sede_id')}>
-                <option value=''>Sin sede</option>
-                {sedes.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <Input
               label='Fecha inicio *'
               type='date'
@@ -211,24 +174,6 @@ export default function GestionTorneos() {
               error={errors.fecha_fin?.message}
               {...register('fecha_fin', { required: 'Requerido' })}
             />
-
-            <Input
-              label='Formato'
-              placeholder='Eliminación directa, Round Robin...'
-              {...register('formato')}
-            />
-            <Input label='Premio' placeholder='Trofeo + $500.000' {...register('premio')} />
-            <Input label='Cupo máximo' type='number' placeholder='16' {...register('cupo_max')} />
-
-            <div className='sm:col-span-2 form-group'>
-              <label className='form-label'>Descripción</label>
-              <textarea
-                className='form-input resize-none'
-                rows={3}
-                placeholder='Descripción del torneo...'
-                {...register('descripcion')}
-              />
-            </div>
 
             <div className='sm:col-span-2 flex gap-3 pt-2'>
               <Button type='submit' loading={isSubmitting}>

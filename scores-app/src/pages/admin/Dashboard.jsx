@@ -177,7 +177,7 @@ export default function Dashboard() {
                       {p1} <span style={{ color: 'var(--text-muted)' }}>vs</span> {p2}
                     </p>
                     <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>
-                      {m.torneo?.nombre || 'Amistoso'} · {m.ronda}
+                      {m.categoria?.nombre || 'Sin categoría'}
                     </p>
                   </div>
                   <div className='text-right shrink-0'>

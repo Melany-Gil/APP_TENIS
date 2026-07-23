@@ -1,231 +1,136 @@
 const db = require('../../config/db')
 
-// ── Listar todos ────────────────────────────────────────────────────────────────
-exports.getAll = async ({ deporte, estado }) => {
-  let query = `
-    SELECT
-      t.id,
-      t.nombre,
-      t.deporte,
-      t.formato,
-      t.descripcion,
-      t.premio,
-      t.cupo_max,
-      t.fecha_inicio,
-      t.fecha_fin,
-      t.estado,
-      cat.id     AS categoria_id,
-      cat.nombre AS categoria_nombre,
-      s.id       AS sede_id,
-      s.nombre   AS sede_nombre
-    FROM torneos t
-    LEFT JOIN categorias cat ON cat.id = t.categoria_id
-    LEFT JOIN sedes s        ON s.id   = t.sede_id
-    WHERE 1 = 1
-  `
+const FIELDS = 'id, nombre, deporte, fecha_inicio, fecha_fin, estado'
 
+exports.getAll = async ({ deporte, estado }) => {
+  let query = `SELECT ${FIELDS} FROM torneos WHERE 1 = 1`
   const params = []
 
   if (deporte) {
-    query += ' AND t.deporte = ?'
+    query += ' AND deporte = ?'
     params.push(deporte)
   }
-
   if (estado) {
-    query += ' AND t.estado = ?'
+    query += ' AND estado = ?'
     params.push(estado)
   }
 
-  query += ' ORDER BY t.fecha_inicio DESC'
-
+  query += ' ORDER BY fecha_inicio DESC'
   const [rows] = await db.query(query, params)
-
-  return rows.map(formatListItem)
+  return rows.map(formatTournament)
 }
 
-// ── Obtener por ID ──────────────────────────────────────────────────────────────
 exports.getById = async (id) => {
-  const [rows] = await db.query(
-    `SELECT
-      t.id,
-      t.nombre,
-      t.deporte,
-      t.formato,
-      t.descripcion,
-      t.premio,
-      t.cupo_max,
-      t.fecha_inicio,
-      t.fecha_fin,
-      t.estado,
-      cat.id     AS categoria_id,
-      cat.nombre AS categoria_nombre,
-      s.id       AS sede_id,
-      s.nombre   AS sede_nombre
-    FROM torneos t
-    LEFT JOIN categorias cat ON cat.id = t.categoria_id
-    LEFT JOIN sedes s        ON s.id   = t.sede_id
-    WHERE t.id = ?
-    LIMIT 1`,
-    [id]
-  )
-
-  if (!rows.length) {
-    throw { status: 404, message: 'Torneo no encontrado' }
-  }
-
-  // Contar inscripciones confirmadas
-  const [countRows] = await db.query(
-    `SELECT COUNT(*) AS inscritos FROM inscripciones WHERE torneo_id = ? AND estado = 'confirmado'`,
-    [id]
-  )
-
-  const inscritos = countRows[0].inscritos || 0
-
-  return formatDetail(rows[0], inscritos)
+  const [rows] = await db.query(`SELECT ${FIELDS} FROM torneos WHERE id = ? LIMIT 1`, [id])
+  if (!rows.length) throw { status: 404, message: 'Torneo no encontrado' }
+  return formatTournament(rows[0])
 }
 
-// ── Crear ────────────────────────────────────────────────────────────────────────
-exports.create = async (body) => {
-  const {
-    nombre,
-    deporte,
-    categoria_id,
-    sede_id,
-    formato,
-    descripcion,
-    premio,
-    cupo_max,
-    fecha_inicio,
-    fecha_fin,
-    estado,
-  } = body
-
+exports.create = async ({ nombre, deporte, fecha_inicio, fecha_fin, estado }) => {
+  const tournament = validateTournament({ nombre, deporte, fecha_inicio, fecha_fin, estado })
   const [result] = await db.query(
-    `INSERT INTO torneos
-       (nombre, deporte, categoria_id, sede_id, formato, descripcion, premio, cupo_max, fecha_inicio, fecha_fin, estado)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO torneos (nombre, deporte, fecha_inicio, fecha_fin, estado)
+     VALUES (?, ?, ?, ?, ?)`,
     [
-      nombre,
-      deporte,
-      categoria_id || null,
-      sede_id || null,
-      formato || null,
-      descripcion || null,
-      premio || null,
-      cupo_max || null,
-      fecha_inicio || null,
-      fecha_fin || null,
-      estado || 'proximo',
+      tournament.nombre,
+      tournament.deporte,
+      tournament.fecha_inicio,
+      tournament.fecha_fin,
+      tournament.estado,
     ]
   )
-
   return exports.getById(result.insertId)
 }
 
-// ── Actualizar ──────────────────────────────────────────────────────────────────
 exports.update = async (id, body) => {
   const [existing] = await db.query('SELECT id FROM torneos WHERE id = ?', [id])
-  if (!existing.length) {
-    throw { status: 404, message: 'Torneo no encontrado' }
-  }
+  if (!existing.length) throw { status: 404, message: 'Torneo no encontrado' }
 
-  const {
-    nombre,
-    deporte,
-    categoria_id,
-    sede_id,
-    formato,
-    descripcion,
-    premio,
-    cupo_max,
-    fecha_inicio,
-    fecha_fin,
-    estado,
-  } = body
-
+  const tournament = validateTournament(body)
   await db.query(
     `UPDATE torneos
-     SET nombre = ?, deporte = ?, categoria_id = ?, sede_id = ?, formato = ?,
-         descripcion = ?, premio = ?, cupo_max = ?, fecha_inicio = ?, fecha_fin = ?,
-         estado = ?
+     SET nombre = ?, deporte = ?, fecha_inicio = ?, fecha_fin = ?, estado = ?
      WHERE id = ?`,
     [
-      nombre,
-      deporte,
-      categoria_id || null,
-      sede_id || null,
-      formato || null,
-      descripcion || null,
-      premio || null,
-      cupo_max || null,
-      fecha_inicio || null,
-      fecha_fin || null,
-      estado || 'proximo',
+      tournament.nombre,
+      tournament.deporte,
+      tournament.fecha_inicio,
+      tournament.fecha_fin,
+      tournament.estado,
       id,
     ]
   )
-
   return exports.getById(id)
 }
 
-// ── Eliminar ────────────────────────────────────────────────────────────────────
 exports.remove = async (id) => {
   const [existing] = await db.query('SELECT id FROM torneos WHERE id = ?', [id])
-  if (!existing.length) {
-    throw { status: 404, message: 'Torneo no encontrado' }
-  }
+  if (!existing.length) throw { status: 404, message: 'Torneo no encontrado' }
 
-  await db.query('DELETE FROM torneos WHERE id = ?', [id])
+  const connection = await db.getConnection()
+  try {
+    await connection.beginTransaction()
+
+    const [columns] = await connection.query(
+      `SELECT COUNT(*) AS total
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'partidos'
+         AND COLUMN_NAME = 'torneo_id'`
+    )
+    if (Number(columns[0].total) > 0) {
+      await connection.query('UPDATE partidos SET torneo_id = NULL WHERE torneo_id = ?', [id])
+    }
+
+    await connection.query('DELETE FROM torneos WHERE id = ?', [id])
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
 
   return { message: 'Torneo eliminado correctamente' }
 }
 
-// ── Formateadores ───────────────────────────────────────────────────────────────
-function formatListItem(row) {
+function validateTournament({ nombre, deporte, fecha_inicio, fecha_fin, estado }) {
+  const normalizedName = String(nombre || '').trim()
+  const normalizedStatus = estado || 'proximo'
+
+  if (!normalizedName) throw { status: 400, message: 'El nombre es obligatorio' }
+  if (!['tenis', 'padel', 'ambos'].includes(deporte)) {
+    throw { status: 400, message: 'Selecciona un deporte válido' }
+  }
+  if (!fecha_inicio || Number.isNaN(new Date(fecha_inicio).getTime())) {
+    throw { status: 400, message: 'Selecciona una fecha inicial válida' }
+  }
+  if (!fecha_fin || Number.isNaN(new Date(fecha_fin).getTime())) {
+    throw { status: 400, message: 'Selecciona una fecha final válida' }
+  }
+  if (fecha_fin < fecha_inicio) {
+    throw { status: 400, message: 'La fecha final no puede ser anterior a la inicial' }
+  }
+  if (!['proximo', 'en_curso', 'finalizado', 'cancelado'].includes(normalizedStatus)) {
+    throw { status: 400, message: 'Selecciona un estado válido' }
+  }
+
   return {
-    id: row.id,
-    nombre: row.nombre,
-    deporte: row.deporte,
-    formato: row.formato || null,
-    descripcion: row.descripcion || null,
-    premio: row.premio || null,
-    cupo_max: row.cupo_max || null,
-    fecha_inicio: row.fecha_inicio || null,
-    fecha_fin: row.fecha_fin || null,
-    estado: row.estado,
-    inscripciones_abiertas: row.estado === 'proximo' || row.estado === 'en_curso',
-    categoria: {
-      id: row.categoria_id,
-      nombre: row.categoria_nombre,
-    },
-    sede: {
-      id: row.sede_id,
-      nombre: row.sede_nombre,
-    },
+    nombre: normalizedName,
+    deporte,
+    fecha_inicio,
+    fecha_fin,
+    estado: normalizedStatus,
   }
 }
 
-function formatDetail(row, inscritos) {
+function formatTournament(row) {
   return {
     id: row.id,
     nombre: row.nombre,
     deporte: row.deporte,
-    formato: row.formato || null,
-    descripcion: row.descripcion || null,
-    premio: row.premio || null,
-    cupo_max: row.cupo_max || null,
-    inscritos: inscritos,
-    inscripciones_abiertas: row.estado === 'proximo' || row.estado === 'en_curso',
     fecha_inicio: row.fecha_inicio || null,
     fecha_fin: row.fecha_fin || null,
     estado: row.estado,
-    categoria: {
-      id: row.categoria_id,
-      nombre: row.categoria_nombre,
-    },
-    sede: {
-      id: row.sede_id,
-      nombre: row.sede_nombre,
-    },
   }
 }

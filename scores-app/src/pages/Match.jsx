@@ -1,25 +1,16 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Star, Clock, MapPin } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowLeft, Star, CalendarDays } from 'lucide-react'
 import LiveBadge from '../components/match/LiveBadge'
-import Tabs from '../components/ui/Tabs'
 import { MatchCardSkeleton } from '../components/ui/Skeleton'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { useMatch } from '../hooks/useMatches'
-import { formatTime } from '../utils/formatDate'
+import { formatDate, formatTime } from '../utils/formatDate'
 import { cn } from '../utils/cn'
 import { useLoginRequired } from '../hooks/useLoginRequired'
-
-const TABS = [
-  { value: 'summary', label: 'Resumen' },
-  { value: 'stats', label: 'Estadísticas' },
-  { value: 'h2h', label: 'H2H' },
-]
 
 export default function Match() {
   const { id } = useParams()
   const { match, loading } = useMatch(id)
-  const [tab, setTab] = useState('summary')
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
 
@@ -38,7 +29,12 @@ export default function Match() {
     )
 
   const isLive = match.estado === 'en_vivo'
-  const statusLabel = match.estado === 'finalizado' ? 'FIN' : 'PROGRAMADO'
+  const statusLabel =
+    {
+      programado: 'PROGRAMADO',
+      finalizado: 'FIN',
+      cancelado: 'CANCELADO',
+    }[match.estado] || match.estado
   const winner = match.ganador
   const isPadel = match.deporte === 'padel'
   const isFav = isPartidoFavorite(match.id)
@@ -95,14 +91,7 @@ export default function Match() {
           className='flex items-center justify-center gap-2 mb-5 text-sm'
           style={{ color: 'var(--text-muted)' }}
         >
-          <span>{match.torneo?.nombre || 'Partido amistoso'}</span>
           {match.categoria?.nombre && <span className='badge-brand'>{match.categoria.nombre}</span>}
-          {match.ronda && (
-            <>
-              <span>·</span>
-              <span>{match.ronda}</span>
-            </>
-          )}
         </div>
 
         <div className='space-y-4'>
@@ -125,84 +114,14 @@ export default function Match() {
           className='flex items-center justify-center gap-4 mt-5 text-xs'
           style={{ color: 'var(--text-muted)' }}
         >
-          {match.cancha?.nombre && (
+          {match.fecha_inicio && (
             <span className='flex items-center gap-1'>
-              <MapPin className='w-3 h-3' />
-              {match.cancha.nombre}
+              <CalendarDays className='w-3 h-3' />
+              {formatDate(match.fecha_inicio)} · {formatTime(match.fecha_inicio)}
             </span>
           )}
-          {match.cancha?.sede && <span>{match.cancha.sede}</span>}
-          {match.duracion_min && (
-            <span className='flex items-center gap-1'>
-              <Clock className='w-3 h-3' />
-              {match.duracion_min} min
-            </span>
-          )}
-          {match.fecha_inicio && <span>{formatTime(match.fecha_inicio)}</span>}
         </div>
       </div>
-
-      <Tabs tabs={TABS} activeTab={tab} onChange={setTab} />
-
-      {tab === 'summary' && match.sets?.length > 0 && (
-        <div className='card p-4 overflow-x-auto'>
-          <table className='w-full text-sm'>
-            <thead>
-              <tr
-                style={{
-                  borderBottom: '1px solid var(--border-color)',
-                  color: 'var(--text-muted)',
-                }}
-              >
-                <th className='text-left py-2 font-medium'>Jugador</th>
-                {[1, 2, 3].map((setNumber) => (
-                  <th key={setNumber} className='text-center py-2 font-medium'>
-                    Set {setNumber}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { player: p1, sets: p1Sets, w: winner === 'jugador1' },
-                { player: p2, sets: p2Sets, w: winner === 'jugador2' },
-              ].map((row, i) => (
-                <tr
-                  key={i}
-                  style={{ borderBottom: i === 0 ? '1px solid var(--border-color)' : 'none' }}
-                >
-                  <td className='py-3 flex items-center gap-2'>
-                    {row.player.flag && <span>{row.player.flag}</span>}
-                    <span
-                      style={{
-                        color: row.w ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        fontWeight: row.w ? 600 : 400,
-                      }}
-                    >
-                      {row.player.name}
-                    </span>
-                  </td>
-                  {row.sets.map((s, j) => (
-                    <td
-                      key={j}
-                      className='text-center py-3 score-number'
-                      style={{ color: row.w ? 'var(--text-primary)' : 'var(--text-secondary)' }}
-                    >
-                      {s}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {(tab === 'stats' || tab === 'h2h') && (
-        <div className='card p-6 text-center text-sm' style={{ color: 'var(--text-muted)' }}>
-          Disponible próximamente
-        </div>
-      )}
     </div>
   )
 }

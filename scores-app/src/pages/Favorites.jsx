@@ -120,7 +120,7 @@ export default function Favorites() {
                       {p1} vs {p2}
                     </p>
                     <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>
-                      {p.torneo?.nombre} · {p.ronda}
+                      {p.categoria?.nombre || 'Sin categoría'}
                     </p>
                   </Link>
                   <button

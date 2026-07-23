@@ -7,6 +7,7 @@ const express = require('express')
 const cors = require('cors')
 const helmet = require('helmet')
 const { rateLimit } = require('express-rate-limit')
+const { ensureSchema } = require('./src/config/schema')
 
 const authRoutes = require('./src/modules/auth/auth.routes')
 const jugadoresRoutes = require('./src/modules/jugadores/jugadores.routes')
@@ -17,7 +18,6 @@ const anunciosRoutes = require('./src/modules/news/news.routes')
 const favoritosRoutes = require('./src/modules/favorites/favorites.routes')
 const categoriasRoutes = require('./src/modules/categorias/categorias.routes')
 const sedesRoutes = require('./src/modules/sedes/sedes.routes')
-const posicionesRoutes = require('./src/modules/posiciones/posiciones.routes')
 const usersRoutes = require('./src/modules/users/users.routes')
 const countriesRoutes = require('./src/modules/countries/countries.routes')
 
@@ -66,7 +66,6 @@ app.use('/api/anuncios', anunciosRoutes)
 app.use('/api/favoritos', favoritosRoutes)
 app.use('/api/categorias', categoriasRoutes)
 app.use('/api/sedes', sedesRoutes)
-app.use('/api/posiciones', posicionesRoutes)
 app.use('/api/users', usersRoutes)
 app.use('/api/countries', countriesRoutes)
 
@@ -126,9 +125,16 @@ app.use((error, _req, res, _next) => {
 
 const port = process.env.PORT || 3001
 if (require.main === module) {
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Tenis Club Unión API disponible en el puerto ${port}`)
-  })
+  ensureSchema()
+    .then(() => {
+      app.listen(port, '0.0.0.0', () => {
+        console.log(`Tenis Club Unión API disponible en el puerto ${port}`)
+      })
+    })
+    .catch((error) => {
+      console.error('❌  No fue posible actualizar el esquema:', error.message)
+      process.exitCode = 1
+    })
 }
 
 module.exports = app

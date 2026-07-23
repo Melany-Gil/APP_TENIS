@@ -7,15 +7,11 @@ const validate = require('../../middlewares/validate.middleware')
 // ── Validaciones ────────────────────────────────────────────────────────────────
 const torneoRules = [
   body('nombre').notEmpty().withMessage('El nombre es obligatorio'),
-  body('deporte').notEmpty().withMessage('El deporte es obligatorio'),
-  body('categoria_id').isInt({ min: 1 }).withMessage('categoria_id debe ser un entero válido'),
-  body('sede_id').isInt({ min: 1 }).withMessage('sede_id debe ser un entero válido'),
-  body('formato').optional().isString(),
-  body('descripcion').optional().isString(),
-  body('premio').optional().isString(),
-  body('cupo_max').optional().isInt({ min: 1 }).withMessage('cupo_max debe ser un entero positivo'),
-  body('fecha_inicio').optional().isDate().withMessage('fecha_inicio debe ser una fecha válida'),
-  body('fecha_fin').optional().isDate().withMessage('fecha_fin debe ser una fecha válida'),
+  body('deporte')
+    .isIn(['tenis', 'padel', 'ambos'])
+    .withMessage('El deporte debe ser tenis, padel o ambos'),
+  body('fecha_inicio').isDate().withMessage('fecha_inicio debe ser una fecha válida'),
+  body('fecha_fin').isDate().withMessage('fecha_fin debe ser una fecha válida'),
   body('estado')
     .optional()
     .isIn(['proximo', 'en_curso', 'finalizado', 'cancelado'])

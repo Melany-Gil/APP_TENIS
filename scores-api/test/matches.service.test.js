@@ -27,12 +27,9 @@ test('getAll devuelve sets, categoría y aplica los filtros del historial', asyn
             {
               id: 7,
               deporte: 'tenis',
-              ronda: 'Final',
               estado: 'finalizado',
               ganador: 'jugador1',
               fecha_inicio: new Date('2026-07-20T18:00:00Z'),
-              torneo_id: 2,
-              torneo_nombre: 'Copa Club Unión',
               categoria_id: 3,
               categoria_nombre: '4ta',
               j1_id: 10,
@@ -84,10 +81,20 @@ test('getAll devuelve sets, categoría y aplica los filtros del historial', asyn
       [2, 6, 4],
     ]
   )
-  assert.match(calls[0].sql, /COALESCE\(t\.categoria_id/)
+  assert.match(calls[0].sql, /LEFT JOIN categorias cat ON cat\.id = p\.categoria_id/)
+  assert.match(calls[0].sql, /p\.categoria_id = \?/)
   assert.match(calls[0].sql, /DATE\(p\.fecha_inicio\) = \?/)
   assert.match(calls[0].sql, /CONCAT_WS/)
-  assert.deepEqual(calls[0].params, ['finalizado', 'tenis', '3', '2026-07-20', '%Ana%', '%Ana%'])
+  assert.deepEqual(calls[0].params, [
+    'finalizado',
+    'tenis',
+    '3',
+    '2026-07-20',
+    '%Ana%',
+    '%Ana%',
+    '%Ana%',
+    '%Ana%',
+  ])
 })
 
 test('updateMarcador rechaza sets duplicados antes de escribir', async () => {
@@ -112,4 +119,57 @@ test('updateMarcador rechaza sets duplicados antes de escribir', async () => {
     }),
     (error) => error.status === 400
   )
+})
+
+test('create asigna la categoría directamente al partido', async () => {
+  const calls = []
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params })
+      if (calls.length === 1) return [[{ deporte: 'tenis' }]]
+      if (calls.length === 2) return [{ insertId: 15 }]
+      if (calls.length === 3) {
+        return [
+          [
+            {
+              id: 15,
+              deporte: 'tenis',
+              estado: 'programado',
+              ganador: null,
+              fecha_inicio: new Date('2026-08-01T14:00:00Z'),
+              categoria_id: 3,
+              categoria_nombre: '4ta',
+              j1_id: 10,
+              j1_nombre: 'Ana',
+              j1_apellido: 'Rojas',
+              j2_id: 11,
+              j2_nombre: 'Laura',
+              j2_apellido: 'Díaz',
+            },
+          ],
+        ]
+      }
+      return [[]]
+    },
+  }
+  const service = loadService(fakeDb)
+
+  const result = await service.create(
+    {
+      deporte: 'tenis',
+      categoria_id: '3',
+      jugador1_id: '10',
+      jugador2_id: '11',
+      estado: 'programado',
+      fecha_inicio: '2026-08-01T09:00',
+      torneo_id: '7',
+      ronda: 'Final',
+    },
+    2
+  )
+
+  assert.match(calls[1].sql, /deporte, categoria_id, jugador1_id, jugador2_id/)
+  assert.doesNotMatch(calls[1].sql, /torneo_id|ronda|cancha_id|notas/)
+  assert.equal(calls[1].params[1], 3)
+  assert.equal(result.categoria.nombre, '4ta')
 })

@@ -32,7 +32,6 @@ const GestionPartidos = lazy(() => import('../pages/admin/GestionPartidos'))
 const GestionAnuncios = lazy(() => import('../pages/admin/GestionAnuncios'))
 const GestionSedes = lazy(() => import('../pages/admin/GestionSedes'))
 const GestionCategorias = lazy(() => import('../pages/admin/GestionCategorias'))
-const GestionPosiciones = lazy(() => import('../pages/admin/GestionPosiciones'))
 const GestionUsuarios = lazy(() => import('../pages/admin/GestionUsuarios'))
 
 // NOTA: no hay <Suspense> aquí a propósito.
@@ -103,7 +102,6 @@ export default function AppRouter() {
         <Route path='/admin/anuncios' element={<GestionAnuncios />} />
         <Route path='/admin/sedes' element={<GestionSedes />} />
         <Route path='/admin/categorias' element={<GestionCategorias />} />
-        <Route path='/admin/posiciones' element={<GestionPosiciones />} />
         <Route path='/admin/usuarios' element={<GestionUsuarios />} />
       </Route>
 

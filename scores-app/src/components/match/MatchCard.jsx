@@ -37,23 +37,9 @@ export default function MatchCard({ match }) {
           style={{ borderBottom: '1px solid var(--border-color)' }}
         >
           <div className='flex items-center gap-2 min-w-0'>
-            <span
-              className='text-xs font-semibold truncate'
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              {match.torneo?.nombre || 'Partido amistoso'}
+            <span className='badge-brand shrink-0'>
+              {match.categoria?.nombre || 'Sin categoría'}
             </span>
-            {match.ronda && (
-              <>
-                <span style={{ color: 'var(--text-muted)' }}>·</span>
-                <span className='text-xs truncate' style={{ color: 'var(--text-muted)' }}>
-                  {match.ronda}
-                </span>
-              </>
-            )}
-            {match.categoria?.nombre && (
-              <span className='badge-brand shrink-0'>{match.categoria.nombre}</span>
-            )}
           </div>
           <div className='flex items-center gap-2 shrink-0 ml-2'>
             {isLive && <LiveBadge />}
@@ -99,16 +85,6 @@ export default function MatchCard({ match }) {
             isLive={isLive}
           />
         </div>
-
-        {/* Cancha */}
-        {match.cancha?.nombre && (
-          <div className='px-4 pb-2'>
-            <span className='text-[10px]' style={{ color: 'var(--text-muted)' }}>
-              {match.cancha.nombre}
-              {match.cancha.sede && ` — ${match.cancha.sede}`}
-            </span>
-          </div>
-        )}
       </div>
     </Link>
   )
