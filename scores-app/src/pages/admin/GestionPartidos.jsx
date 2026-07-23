@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { Plus, Pencil, Trash2, X, Radio } from 'lucide-react'
 import { matchService } from '../../services/matchService'
@@ -36,6 +36,7 @@ export default function GestionPartidos() {
   const [showMarcador, setShowMarcador] = useState(null)
   const [editing, setEditing] = useState(null)
   const [filterTab, setFilterTab] = useState('todos')
+  const marcadorRef = useRef(null)
   const { addToast } = useUIStore()
 
   const {
@@ -56,6 +57,7 @@ export default function GestionPartidos() {
   const categoriasDisponibles = categorias.filter(
     (categoria) => categoria.deporte === selectedDeporte || categoria.deporte === 'ambos'
   )
+  const [marcadorParticipante1, marcadorParticipante2] = getParticipantNames(showMarcador)
 
   const fetchAll = () => {
     setLoading(true)
@@ -78,6 +80,12 @@ export default function GestionPartidos() {
   useEffect(() => {
     fetchAll()
   }, [])
+
+  useEffect(() => {
+    if (showMarcador) {
+      marcadorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [showMarcador])
 
   const openCreate = () => {
     reset({ deporte: 'tenis', categoria_id: '', estado: 'programado' })
@@ -104,10 +112,12 @@ export default function GestionPartidos() {
 
   const openMarcador = (partido) => {
     setShowMarcador(partido)
+    setShowForm(false)
     const setsData = {}
     partido.sets?.forEach((s) => {
       setsData[`set_${s.numero_set}_j1`] = s.games_j1
       setsData[`set_${s.numero_set}_j2`] = s.games_j2
+      setsData[`set_${s.numero_set}_completado`] = s.completado ? 'true' : false
     })
     resetM({ estado: partido.estado, ganador: partido.ganador || '', ...setsData })
   }
@@ -361,20 +371,31 @@ export default function GestionPartidos() {
         </div>
       )}
 
-      {/* Marcador en vivo */}
+      {/* Editor de marcador */}
       {showMarcador && (
         <div
-          className='card p-5 animate-fade-up'
+          ref={marcadorRef}
+          className='card p-5 animate-fade-up scroll-mt-20'
           style={{ borderColor: 'var(--color-live)', borderWidth: '1px' }}
         >
           <div className='flex items-center justify-between mb-4'>
-            <div className='flex items-center gap-2'>
-              <LiveBadge />
-              <h2 className='text-base font-semibold' style={{ color: 'var(--text-primary)' }}>
-                Actualizar marcador
-              </h2>
+            <div>
+              <div className='flex items-center gap-2'>
+                <Radio className='w-4 h-4' style={{ color: 'var(--club-clay)' }} />
+                <h2 className='text-base font-semibold' style={{ color: 'var(--text-primary)' }}>
+                  Editar marcador
+                </h2>
+              </div>
+              <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
+                {marcadorParticipante1} vs {marcadorParticipante2}
+              </p>
             </div>
-            <button onClick={() => setShowMarcador(null)} className='btn-ghost p-1'>
+            <button
+              type='button'
+              onClick={() => setShowMarcador(null)}
+              className='btn-ghost p-1'
+              aria-label='Cerrar editor de marcador'
+            >
               <X className='w-4 h-4' />
             </button>
           </div>
@@ -395,15 +416,18 @@ export default function GestionPartidos() {
                 <label className='form-label'>Ganador</label>
                 <select className='form-input' {...regM('ganador')}>
                   <option value=''>Sin ganador</option>
-                  <option value='jugador1'>Jugador / Equipo 1</option>
-                  <option value='jugador2'>Jugador / Equipo 2</option>
+                  <option value='jugador1'>{marcadorParticipante1}</option>
+                  <option value='jugador2'>{marcadorParticipante2}</option>
                 </select>
               </div>
             </div>
 
             {/* Sets */}
             <div>
-              <p className='form-label mb-2'>Sets</p>
+              <p className='form-label mb-1'>Puntos por set</p>
+              <p className='text-xs mb-3' style={{ color: 'var(--text-muted)' }}>
+                Ingresa los games de cada jugador o equipo. Deja vacío el tercer set si no se jugó.
+              </p>
               <div className='space-y-2'>
                 {[1, 2, 3].map((num) => (
                   <div key={num} className='flex items-center gap-3'>
@@ -416,18 +440,20 @@ export default function GestionPartidos() {
                     <input
                       type='number'
                       min='0'
-                      max='7'
+                      max='99'
                       placeholder={num === 3 ? '/' : '0'}
                       className='form-input w-20 text-center'
+                      aria-label={`${marcadorParticipante1}, set ${num}`}
                       {...regM(`set_${num}_j1`)}
                     />
                     <span style={{ color: 'var(--text-muted)' }}>–</span>
                     <input
                       type='number'
                       min='0'
-                      max='7'
+                      max='99'
                       placeholder={num === 3 ? '/' : '0'}
                       className='form-input w-20 text-center'
+                      aria-label={`${marcadorParticipante2}, set ${num}`}
                       {...regM(`set_${num}_j2`)}
                     />
                     <div className='form-group flex-row items-center gap-2 m-0'>
@@ -516,22 +542,31 @@ export default function GestionPartidos() {
                   </p>
                 </div>
                 <div className='flex items-center gap-1 shrink-0'>
-                  {(p.estado === 'en_vivo' || p.estado === 'programado') && (
+                  {p.estado !== 'cancelado' && (
                     <button
                       onClick={() => openMarcador(p)}
-                      className='btn-ghost p-2 flex items-center gap-1 text-xs'
-                      style={{ color: '#ef4444' }}
+                      className='btn-secondary px-3 py-2 flex items-center gap-1.5 text-xs'
+                      style={{ color: 'var(--club-clay)' }}
+                      title='Editar marcador'
                     >
                       <Radio className='w-4 h-4' />
+                      <span>Marcador</span>
                     </button>
                   )}
-                  <button onClick={() => openEdit(p)} className='btn-ghost p-2'>
+                  <button
+                    onClick={() => openEdit(p)}
+                    className='btn-ghost p-2'
+                    title='Editar datos del partido'
+                    aria-label='Editar datos del partido'
+                  >
                     <Pencil className='w-4 h-4' />
                   </button>
                   <button
                     onClick={() => handleDelete(p)}
                     className='btn-ghost p-2'
                     style={{ color: '#ef4444' }}
+                    title='Eliminar partido'
+                    aria-label='Eliminar partido'
                   >
                     <Trash2 className='w-4 h-4' />
                   </button>
@@ -543,4 +578,15 @@ export default function GestionPartidos() {
       </div>
     </div>
   )
+}
+
+function getParticipantNames(partido) {
+  if (!partido) return ['Participante 1', 'Participante 2']
+  if (partido.deporte === 'padel') {
+    return [partido.equipo1?.nombre || 'Equipo 1', partido.equipo2?.nombre || 'Equipo 2']
+  }
+  return [
+    `${partido.jugador1?.nombre || ''} ${partido.jugador1?.apellido || ''}`.trim() || 'Jugador 1',
+    `${partido.jugador2?.nombre || ''} ${partido.jugador2?.apellido || ''}`.trim() || 'Jugador 2',
+  ]
 }
