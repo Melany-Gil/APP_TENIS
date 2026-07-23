@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, Radio, Trophy, Star, User, Settings, LogOut, ShieldCheck } from 'lucide-react'
+import { Home, Radio, Trophy, Star, User, Settings, LogOut, ShieldCheck, LogIn } from 'lucide-react'
 import { useEffect } from 'react'
 import useUIStore from '../../store/useUIStore'
 import useAuthStore from '../../store/useAuthStore'
@@ -170,18 +170,29 @@ export default function Sidebar() {
               </div>
             </div>
           )}
-          <button
-            onClick={async () => {
-              await authService.logout().catch(() => {})
-              logout()
-              navigate('/login')
-            }}
-            className='nav-item w-full'
-            style={{ color: '#ef4444' }}
-          >
-            <LogOut className='w-[18px] h-[18px] shrink-0' />
-            <span className='text-sm'>Cerrar sesión</span>
-          </button>
+          {user ? (
+            <button
+              onClick={async () => {
+                await authService.logout().catch(() => {})
+                logout()
+                navigate('/')
+              }}
+              className='nav-item w-full'
+              style={{ color: '#ef4444' }}
+            >
+              <LogOut className='w-[18px] h-[18px] shrink-0' />
+              <span className='text-sm'>Cerrar sesión</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className='nav-item w-full'
+              style={{ color: 'var(--color-brand)' }}
+            >
+              <LogIn className='w-[18px] h-[18px] shrink-0' />
+              <span className='text-sm'>Iniciar sesión</span>
+            </button>
+          )}
         </div>
       </aside>
     </>

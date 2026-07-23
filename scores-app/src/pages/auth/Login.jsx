@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { CreditCard, Eye, EyeOff, Lock } from 'lucide-react'
 import useAuthStore from '../../store/useAuthStore'
@@ -13,6 +13,8 @@ export default function Login() {
   const { login } = useAuthStore()
   const { addToast } = useUIStore()
   const navigate = useNavigate()
+  const location = useLocation()
+  const redirectTo = location.state?.from || '/'
   const {
     register,
     handleSubmit,
@@ -28,7 +30,7 @@ export default function Login() {
 
       login(user)
       addToast({ type: 'success', title: '¡Bienvenido!', message: `Hola, ${user.nombre}` })
-      navigate('/')
+      navigate(redirectTo, { replace: true })
     } catch (error) {
       setError('numero_documento', {
         message: error.message || 'Documento o contraseña incorrectos',
@@ -52,9 +54,18 @@ export default function Login() {
           Bienvenido
         </h1>
         <p className='text-sm' style={{ color: 'var(--text-muted)' }}>
-          Ingresa para consultar y administrar el torneo.
+          Inicia sesión para guardar favoritos, gestionar tu perfil y administrar el torneo.
         </p>
       </div>
+
+      {location.state?.message && (
+        <p
+          className='mb-5 rounded-lg px-3 py-2 text-sm'
+          style={{ backgroundColor: 'var(--color-brand-dim)', color: 'var(--color-brand)' }}
+        >
+          {location.state.message}
+        </p>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className='flex flex-col gap-5'>
         <div className='form-group'>
@@ -115,6 +126,14 @@ export default function Login() {
           Iniciar sesión
         </Button>
       </form>
+
+      <Link
+        to='/'
+        className='block text-center text-sm mt-5 font-medium'
+        style={{ color: 'var(--color-brand)' }}
+      >
+        Continuar sin iniciar sesión
+      </Link>
 
       <p className='text-center text-sm mt-7' style={{ color: 'var(--text-muted)' }}>
         ¿No tienes acceso? Solicítalo a un administrador.

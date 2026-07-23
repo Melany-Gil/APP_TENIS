@@ -5,9 +5,11 @@ import ScoreDisplay from './ScoreDisplay'
 import useFavoritesStore from '../../store/useFavoritesStore'
 import { formatTime } from '../../utils/formatDate'
 import { cn } from '../../utils/cn'
+import { useLoginRequired } from '../../hooks/useLoginRequired'
 
 export default function MatchCard({ match }) {
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
+  const requireLogin = useLoginRequired()
   const isFav = isPartidoFavorite(match.id)
   const isLive = match.estado === 'en_vivo'
   const isFinished = match.estado === 'finalizado'
@@ -68,7 +70,9 @@ export default function MatchCard({ match }) {
             <button
               onClick={(e) => {
                 e.preventDefault()
-                togglePartido(match)
+                if (requireLogin('Para guardar partidos en favoritos debes iniciar sesión.')) {
+                  togglePartido(match)
+                }
               }}
               className='p-1 transition-colors'
               style={{ color: isFav ? '#facc15' : 'var(--text-muted)' }}

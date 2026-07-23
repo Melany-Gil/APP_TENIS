@@ -20,9 +20,9 @@ const jugadorRules = [
   body('apodo').optional().isString(),
 ]
 
-// ── Rutas públicas (auth) ───────────────────────────────────────────────────────
-router.get('/', requireAuth, controller.getAll)
-router.get('/:id', requireAuth, controller.getById)
+// ── Consulta pública ─────────────────────────────────────────────────────────────
+router.get('/', controller.getAll)
+router.get('/:id', controller.getById)
 
 // ── Rutas admin ─────────────────────────────────────────────────────────────────
 router.post('/', requireAuth, requireAdmin, jugadorRules, validate, controller.create)

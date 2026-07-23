@@ -3,9 +3,9 @@ const controller = require('./matches.controller')
 const { requireAuth, requireAdmin } = require('../../middlewares/auth.middleware')
 
 // GET  /api/partidos?estado=en_vivo&deporte=tenis&torneo_id=1
-router.get('/', requireAuth, controller.getAll)
+router.get('/', controller.getAll)
 // GET  /api/partidos/:id
-router.get('/:id', requireAuth, controller.getById)
+router.get('/:id', controller.getById)
 // POST /api/partidos
 router.post('/', requireAuth, requireAdmin, controller.create)
 // PUT  /api/partidos/:id

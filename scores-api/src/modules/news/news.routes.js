@@ -3,7 +3,7 @@ const controller = require('./news.controller')
 const { requireAuth, requireAdmin } = require('../../middlewares/auth.middleware')
 
 // GET  /api/anuncios?tipo=evento
-router.get('/', requireAuth, controller.getAll)
+router.get('/', controller.getAll)
 // GET  /api/anuncios/:id
 router.get('/:id', requireAuth, controller.getById)
 // POST /api/anuncios  (solo admin)

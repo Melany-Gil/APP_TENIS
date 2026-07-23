@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Bell, Menu, CheckCheck } from 'lucide-react'
+import { Bell, Menu, CheckCheck, LogIn } from 'lucide-react'
 import useUIStore from '../../store/useUIStore'
 import useAuthStore from '../../store/useAuthStore'
 import ThemeToggle from '../common/ThemeToggle'
@@ -27,9 +27,7 @@ export default function Header() {
   const unread = MOCK_NOTIFS.filter((n) => !n.read).length
 
   return (
-    <header
-      className='app-header fixed top-0 left-0 right-0 z-50 flex items-center h-16 px-4 sm:px-6 gap-3'
-    >
+    <header className='app-header fixed top-0 left-0 right-0 z-50 flex items-center h-16 px-4 sm:px-6 gap-3'>
       {/* Hamburguesa */}
       <button
         onClick={toggleSidebar}
@@ -108,18 +106,29 @@ export default function Header() {
           )}
         </div>
 
-        {/* Avatar */}
-        <Link
-          to='/profile'
-          className='w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all'
-          style={{
-            backgroundColor: 'var(--color-brand-dim)',
-            color: 'var(--color-brand)',
-            border: '1px solid var(--border-focus)',
-          }}
-        >
-          {user?.nombre?.charAt(0)?.toUpperCase() || 'U'}
-        </Link>
+        {/* Cuenta */}
+        {user ? (
+          <Link
+            to='/profile'
+            className='w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all'
+            style={{
+              backgroundColor: 'var(--color-brand-dim)',
+              color: 'var(--color-brand)',
+              border: '1px solid var(--border-focus)',
+            }}
+          >
+            {user.nombre?.charAt(0)?.toUpperCase()}
+          </Link>
+        ) : (
+          <Link
+            to='/login'
+            className='inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold'
+            style={{ backgroundColor: 'var(--color-brand)', color: 'white' }}
+          >
+            <LogIn className='w-4 h-4' />
+            <span className='hidden sm:inline'>Iniciar sesión</span>
+          </Link>
+        )}
       </div>
     </header>
   )

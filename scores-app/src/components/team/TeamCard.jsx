@@ -2,9 +2,11 @@ import { Link } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import useFavoritesStore from '../../store/useFavoritesStore'
 import { cn } from '../../utils/cn'
+import { useLoginRequired } from '../../hooks/useLoginRequired'
 
 export default function TeamCard({ team }) {
   const { toggleEquipo, isEquipoFavorite } = useFavoritesStore()
+  const requireLogin = useLoginRequired()
   const isFav = isEquipoFavorite(team.id)
 
   return (
@@ -52,7 +54,9 @@ export default function TeamCard({ team }) {
           <button
             onClick={(e) => {
               e.preventDefault()
-              toggleEquipo(team)
+              if (requireLogin('Para guardar parejas en favoritos debes iniciar sesión.')) {
+                toggleEquipo(team)
+              }
             }}
             className='transition-colors shrink-0'
             style={{ color: isFav ? '#facc15' : 'var(--text-muted)' }}

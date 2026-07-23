@@ -8,6 +8,7 @@ import useFavoritesStore from '../store/useFavoritesStore'
 import { useMatch } from '../hooks/useMatches'
 import { formatTime } from '../utils/formatDate'
 import { cn } from '../utils/cn'
+import { useLoginRequired } from '../hooks/useLoginRequired'
 
 const TABS = [
   { value: 'summary', label: 'Resumen' },
@@ -20,6 +21,7 @@ export default function Match() {
   const { match, loading } = useMatch(id)
   const [tab, setTab] = useState('summary')
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
+  const requireLogin = useLoginRequired()
 
   if (loading)
     return (
@@ -72,7 +74,11 @@ export default function Match() {
           <ArrowLeft className='w-4 h-4' /> Volver
         </Link>
         <button
-          onClick={() => togglePartido(match)}
+          onClick={() => {
+            if (requireLogin('Para guardar partidos en favoritos debes iniciar sesión.')) {
+              togglePartido(match)
+            }
+          }}
           className={cn(
             'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all btn-ghost'
           )}

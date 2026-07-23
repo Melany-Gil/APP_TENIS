@@ -5,6 +5,7 @@ import Tabs from '../components/ui/Tabs'
 import { usePlayer } from '../hooks/usePlayers'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { cn } from '../utils/cn'
+import { useLoginRequired } from '../hooks/useLoginRequired'
 
 const TABS = [
   { value: 'overview', label: 'Perfil' },
@@ -16,6 +17,7 @@ export default function Player() {
   const { player, loading } = usePlayer(id)
   const [tab, setTab] = useState('overview')
   const { toggleJugador, isJugadorFavorite } = useFavoritesStore()
+  const requireLogin = useLoginRequired()
 
   if (loading) return <div className='skeleton h-48 w-full rounded-xl' />
   if (!player)
@@ -38,7 +40,11 @@ export default function Player() {
           <ArrowLeft className='w-4 h-4' /> Tenis
         </Link>
         <button
-          onClick={() => toggleJugador(player)}
+          onClick={() => {
+            if (requireLogin('Para guardar jugadores en favoritos debes iniciar sesión.')) {
+              toggleJugador(player)
+            }
+          }}
           className='btn-ghost flex items-center gap-1.5 px-3 py-1.5 text-sm'
           style={{ color: isFav ? '#facc15' : 'var(--text-muted)' }}
         >
@@ -118,7 +124,6 @@ export default function Player() {
             { label: 'Altura', value: player.altura_cm ? `${player.altura_cm} cm` : '—' },
             { label: 'Peso', value: player.peso_kg ? `${player.peso_kg} kg` : '—' },
             { label: 'Mano', value: player.mano || '—' },
-            { label: 'Teléfono', value: player.telefono || '—' },
             { label: 'País', value: player.country?.name || '—' },
             { label: 'Categoría', value: player.categoria?.nombre || '—' },
           ].map((item) => (

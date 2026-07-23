@@ -50,14 +50,8 @@ export default function AppRouter() {
         <Route path='/forgot-password' element={<ForgotPassword />} />
       </Route>
 
-      {/* App (miembros) */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
+      {/* Consulta pública de marcadores */}
+      <Route element={<AppLayout />}>
         <Route path='/' element={<Home />} />
         <Route path='/live' element={<Live />} />
         <Route path='/tennis' element={<Tennis />} />
@@ -65,9 +59,30 @@ export default function AppRouter() {
         <Route path='/match/:id' element={<Match />} />
         <Route path='/player/:id' element={<Player />} />
         <Route path='/team/:id' element={<Team />} />
-        <Route path='/favorites' element={<Favorites />} />
-        <Route path='/profile' element={<Profile />} />
-        <Route path='/settings' element={<Settings />} />
+        <Route
+          path='/favorites'
+          element={
+            <ProtectedRoute>
+              <Favorites />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/profile'
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/settings'
+          element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* Admin (solo rol admin) */}

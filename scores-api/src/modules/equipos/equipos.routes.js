@@ -12,9 +12,9 @@ const equipoRules = [
   body('categoria_id').isInt({ min: 1 }).withMessage('categoria_id debe ser un entero válido'),
 ]
 
-// ── Rutas públicas (auth) ───────────────────────────────────────────────────────
-router.get('/', requireAuth, controller.getAll)
-router.get('/:id', requireAuth, controller.getById)
+// ── Consulta pública ─────────────────────────────────────────────────────────────
+router.get('/', controller.getAll)
+router.get('/:id', controller.getById)
 
 // ── Rutas admin ─────────────────────────────────────────────────────────────────
 router.post('/', requireAuth, requireAdmin, equipoRules, validate, controller.create)

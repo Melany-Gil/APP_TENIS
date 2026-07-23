@@ -2,9 +2,11 @@ import { Link } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import useFavoritesStore from '../../store/useFavoritesStore'
 import { cn } from '../../utils/cn'
+import { useLoginRequired } from '../../hooks/useLoginRequired'
 
 export default function PlayerCard({ player }) {
   const { toggleJugador, isJugadorFavorite } = useFavoritesStore()
+  const requireLogin = useLoginRequired()
   const isFav = isJugadorFavorite(player.id)
 
   return (
@@ -51,7 +53,9 @@ export default function PlayerCard({ player }) {
           <button
             onClick={(e) => {
               e.preventDefault()
-              toggleJugador(player)
+              if (requireLogin('Para guardar jugadores en favoritos debes iniciar sesión.')) {
+                toggleJugador(player)
+              }
             }}
             className='transition-colors shrink-0'
             style={{ color: isFav ? '#facc15' : 'var(--text-muted)' }}

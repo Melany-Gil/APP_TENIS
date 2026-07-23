@@ -46,7 +46,7 @@ exports.getAll = async ({ deporte, categoria_id, activo }) => {
 }
 
 // ── Obtener por ID ──────────────────────────────────────────────────────────────
-exports.getById = async (id) => {
+exports.getById = async (id, { includePrivate = false } = {}) => {
   const [rows] = await db.query(
     `SELECT
       j.id,
@@ -82,7 +82,7 @@ exports.getById = async (id) => {
     throw { status: 404, message: 'Jugador no encontrado' }
   }
 
-  return formatDetail(rows[0])
+  return formatDetail(rows[0], includePrivate)
 }
 
 // ── Crear ────────────────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ exports.create = async (body) => {
     [result.insertId]
   )
 
-  return exports.getById(result.insertId)
+  return exports.getById(result.insertId, { includePrivate: true })
 }
 
 // ── Actualizar ──────────────────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ exports.update = async (id, body) => {
     ]
   )
 
-  return exports.getById(id)
+  return exports.getById(id, { includePrivate: true })
 }
 
 // ── Eliminar ────────────────────────────────────────────────────────────────────
@@ -184,14 +184,12 @@ function formatListItem(row) {
   }
 }
 
-function formatDetail(row) {
-  return {
+function formatDetail(row, includePrivate = false) {
+  const detail = {
     id: row.id,
     nombre: row.nombre,
     apellido: row.apellido,
     apodo: row.apodo || null,
-    fecha_nac: row.fecha_nac || null,
-    telefono: row.telefono || null,
     mano: row.mano || null,
     deporte: row.deporte,
     foto: row.foto || null,
@@ -212,4 +210,11 @@ function formatDetail(row) {
       ranking: row.ranking || 0,
     },
   }
+
+  if (includePrivate) {
+    detail.fecha_nac = row.fecha_nac || null
+    detail.telefono = row.telefono || null
+  }
+
+  return detail
 }

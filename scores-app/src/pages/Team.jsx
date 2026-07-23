@@ -4,12 +4,14 @@ import { ArrowLeft, Star } from 'lucide-react'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { teamService } from '../services/teamService'
 import { cn } from '../utils/cn'
+import { useLoginRequired } from '../hooks/useLoginRequired'
 
 export default function Team() {
   const { id } = useParams()
   const [team, setTeam] = useState(null)
   const [loading, setLoading] = useState(true)
   const { toggleEquipo, isEquipoFavorite } = useFavoritesStore()
+  const requireLogin = useLoginRequired()
 
   useEffect(() => {
     teamService
@@ -40,7 +42,11 @@ export default function Team() {
           <ArrowLeft className='w-4 h-4' /> Pádel
         </Link>
         <button
-          onClick={() => toggleEquipo(team)}
+          onClick={() => {
+            if (requireLogin('Para guardar parejas en favoritos debes iniciar sesión.')) {
+              toggleEquipo(team)
+            }
+          }}
           className='btn-ghost flex items-center gap-1.5 px-3 py-1.5 text-sm'
           style={{ color: isFav ? '#facc15' : 'var(--text-muted)' }}
         >
