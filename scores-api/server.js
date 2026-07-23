@@ -71,7 +71,12 @@ app.use('/api/users', usersRoutes)
 app.use('/api/countries', countriesRoutes)
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, message: 'API disponible', timestamp: new Date() })
+  res.json({
+    ok: true,
+    message: 'API disponible',
+    version: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || 'local',
+    timestamp: new Date(),
+  })
 })
 
 const frontendDist = path.resolve(__dirname, '..', 'scores-app', 'dist')
