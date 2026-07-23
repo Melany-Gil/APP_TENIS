@@ -80,14 +80,29 @@ app.get('/api/health', (_req, res) => {
 })
 
 const frontendDist = path.resolve(__dirname, '..', 'scores-app', 'dist')
+const setNoStoreHeaders = (res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  res.setHeader('Surrogate-Control', 'no-store')
+}
+
+const setHtmlHeaders = (res) => {
+  setNoStoreHeaders(res)
+  // Limpia únicamente archivos en caché de versiones anteriores; conserva cookies y sesión.
+  res.setHeader('Clear-Site-Data', '"cache"')
+}
+
 if (fs.existsSync(frontendDist)) {
   app.use(
     express.static(frontendDist, {
-      maxAge: '1d',
-      etag: true,
+      maxAge: 0,
+      etag: false,
+      lastModified: false,
       setHeaders(res, filePath) {
+        setNoStoreHeaders(res)
         if (filePath.endsWith('.html')) {
-          res.setHeader('Cache-Control', 'no-store')
+          setHtmlHeaders(res)
         }
       },
     })
@@ -98,7 +113,7 @@ app.use((req, res) => {
   if (req.path.startsWith('/api/') || !fs.existsSync(frontendDist)) {
     return res.status(404).json({ ok: false, message: 'Ruta no encontrada' })
   }
-  res.setHeader('Cache-Control', 'no-store')
+  setHtmlHeaders(res)
   return res.sendFile(path.join(frontendDist, 'index.html'))
 })
 
