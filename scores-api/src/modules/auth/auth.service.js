@@ -40,6 +40,12 @@ const escapeHtml = (value) =>
       })[character]
   )
 
+const mailFromAddress = () => {
+  const configured = String(process.env.MAIL_FROM || process.env.MAIL_USER || '').trim()
+  const addressBetweenBrackets = configured.match(/<([^<>]+)>/)
+  return (addressBetweenBrackets?.[1] || configured).trim()
+}
+
 exports.login = async ({ numero_documento, password }) => {
   const [rows] = await db.query(
     'SELECT * FROM users WHERE numero_documento = ? AND activo = TRUE LIMIT 1',
@@ -144,7 +150,10 @@ exports.forgotPassword = async ({ email }) => {
   }
 
   await mailer.sendMail({
-    from: `"Subcomité de Tenis · Club Unión" <${process.env.MAIL_FROM || process.env.MAIL_USER}>`,
+    from: {
+      name: 'Subcomité de Tenis · Club Unión',
+      address: mailFromAddress(),
+    },
     to: normalizedEmail,
     subject: 'Código para recuperar tu contraseña',
     html: `

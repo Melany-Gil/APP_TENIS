@@ -76,13 +76,24 @@ app.get('/api/health', (_req, res) => {
 
 const frontendDist = path.resolve(__dirname, '..', 'scores-app', 'dist')
 if (fs.existsSync(frontendDist)) {
-  app.use(express.static(frontendDist, { maxAge: '1d', etag: true }))
+  app.use(
+    express.static(frontendDist, {
+      maxAge: '1d',
+      etag: true,
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-store')
+        }
+      },
+    })
+  )
 }
 
 app.use((req, res) => {
   if (req.path.startsWith('/api/') || !fs.existsSync(frontendDist)) {
     return res.status(404).json({ ok: false, message: 'Ruta no encontrada' })
   }
+  res.setHeader('Cache-Control', 'no-store')
   return res.sendFile(path.join(frontendDist, 'index.html'))
 })
 

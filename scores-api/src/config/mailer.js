@@ -17,4 +17,11 @@ const transporter = nodemailer.createTransport({
   disableUrlAccess: true,
 })
 
+if (process.env.NODE_ENV === 'production' && process.env.MAIL_USER && process.env.MAIL_PASS) {
+  transporter
+    .verify()
+    .then(() => console.log('✅  Conexión SMTP establecida'))
+    .catch((error) => console.error('❌  Error al conectar con SMTP:', error.message))
+}
+
 module.exports = transporter
