@@ -87,24 +87,13 @@ exports.getById = async (id, { includePrivate = false } = {}) => {
 
 // ── Crear ────────────────────────────────────────────────────────────────────────
 exports.create = async (body) => {
-  const { nombre, apellido, apodo, country_id, fecha_nac, telefono, mano, deporte, categoria_id } =
-    body
+  const { nombre, apellido, deporte } = body
 
   const [result] = await db.query(
     `INSERT INTO jugadores
-       (nombre, apellido, apodo, country_id, fecha_nac, telefono, mano, deporte, categoria_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      nombre,
-      apellido,
-      apodo || null,
-      country_id || 1,
-      fecha_nac || null,
-      telefono || null,
-      mano || null,
-      deporte,
-      categoria_id,
-    ]
+       (nombre, apellido, country_id, deporte)
+     VALUES (?, ?, 1, ?)`,
+    [nombre.trim(), apellido.trim(), deporte]
   )
 
   // FIX: temporada es NOT NULL — se debe incluir con el año actual
@@ -124,26 +113,13 @@ exports.update = async (id, body) => {
     throw { status: 404, message: 'Jugador no encontrado' }
   }
 
-  const { nombre, apellido, apodo, country_id, fecha_nac, telefono, mano, deporte, categoria_id } =
-    body
+  const { nombre, apellido, deporte } = body
 
   await db.query(
     `UPDATE jugadores
-     SET nombre = ?, apellido = ?, apodo = ?, country_id = ?, fecha_nac = ?,
-         telefono = ?, mano = ?, deporte = ?, categoria_id = ?
+     SET nombre = ?, apellido = ?, deporte = ?
      WHERE id = ?`,
-    [
-      nombre,
-      apellido,
-      apodo || null,
-      country_id,
-      fecha_nac || null,
-      telefono || null,
-      mano || null,
-      deporte,
-      categoria_id,
-      id,
-    ]
+    [nombre.trim(), apellido.trim(), deporte, id]
   )
 
   return exports.getById(id, { includePrivate: true })

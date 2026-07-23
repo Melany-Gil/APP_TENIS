@@ -11,7 +11,7 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Tabs from '../../components/ui/Tabs'
 import LiveBadge from '../../components/match/LiveBadge'
-import { formatDate, formatTime } from '../../utils/formatDate'
+import { formatClockTime, formatDate } from '../../utils/formatDate'
 
 const ESTADOS = [
   { value: 'programado', label: 'Programado' },
@@ -91,7 +91,8 @@ export default function GestionPartidos() {
       deporte: partido.deporte,
       categoria_id: partido.categoria?.id || '',
       estado: partido.estado,
-      fecha_inicio: partido.fecha_inicio ? partido.fecha_inicio.slice(0, 16) : '',
+      fecha_inicio: partido.fecha_inicio ? partido.fecha_inicio.slice(0, 10) : '',
+      hora_inicio: partido.hora_inicio ? partido.hora_inicio.slice(0, 5) : '',
       jugador1_id: partido.jugador1?.id || '',
       jugador2_id: partido.jugador2?.id || '',
       equipo1_id: partido.equipo1?.id || '',
@@ -118,6 +119,7 @@ export default function GestionPartidos() {
         categoria_id: data.categoria_id,
         estado: data.estado,
         fecha_inicio: data.fecha_inicio,
+        hora_inicio: data.hora_inicio,
         jugador1_id: data.jugador1_id,
         jugador2_id: data.jugador2_id,
         equipo1_id: data.equipo1_id,
@@ -261,12 +263,8 @@ export default function GestionPartidos() {
               {errors.categoria_id && <p className='form-error'>{errors.categoria_id.message}</p>}
             </div>
 
-            <Input
-              label='Fecha y hora *'
-              type='datetime-local'
-              error={errors.fecha_inicio?.message}
-              {...register('fecha_inicio', { required: 'Selecciona la fecha y hora' })}
-            />
+            <Input label='Fecha' type='date' {...register('fecha_inicio')} />
+            <Input label='Hora' type='time' {...register('hora_inicio')} />
 
             {/* Participantes según deporte */}
             {selectedDeporte === 'tenis' ? (
@@ -508,8 +506,13 @@ export default function GestionPartidos() {
                   </div>
                   <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>
                     {p.categoria?.nombre || 'Sin categoría'}
-                    {p.fecha_inicio &&
-                      ` · ${formatDate(p.fecha_inicio)} ${formatTime(p.fecha_inicio)}`}
+                    {(p.fecha_inicio || p.hora_inicio) &&
+                      ` · ${[
+                        p.fecha_inicio && formatDate(p.fecha_inicio),
+                        formatClockTime(p.hora_inicio),
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}`}
                   </p>
                 </div>
                 <div className='flex items-center gap-1 shrink-0'>

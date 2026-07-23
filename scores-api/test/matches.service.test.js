@@ -30,7 +30,8 @@ test('getAll devuelve sets, categoría y aplica los filtros del historial', asyn
               estado: 'finalizado',
               ganador: 'jugador1',
               notas: 'Partido finalizado por retiro',
-              fecha_inicio: new Date('2026-07-20T18:00:00Z'),
+              fecha_inicio: '2026-07-20',
+              hora_inicio: '13:00:00',
               categoria_id: 3,
               categoria_nombre: '4ta',
               j1_id: 10,
@@ -85,7 +86,7 @@ test('getAll devuelve sets, categoría y aplica los filtros del historial', asyn
   )
   assert.match(calls[0].sql, /LEFT JOIN categorias cat ON cat\.id = p\.categoria_id/)
   assert.match(calls[0].sql, /p\.categoria_id = \?/)
-  assert.match(calls[0].sql, /DATE\(p\.fecha_inicio\) = \?/)
+  assert.match(calls[0].sql, /p\.fecha_inicio = \?/)
   assert.match(calls[0].sql, /CONCAT_WS/)
   assert.deepEqual(calls[0].params, [
     'finalizado',
@@ -138,7 +139,8 @@ test('create asigna la categoría directamente al partido', async () => {
               deporte: 'tenis',
               estado: 'programado',
               ganador: null,
-              fecha_inicio: new Date('2026-08-01T14:00:00Z'),
+              fecha_inicio: '2026-08-01',
+              hora_inicio: '09:00:00',
               categoria_id: 3,
               categoria_nombre: '4ta',
               j1_id: 10,
@@ -163,7 +165,8 @@ test('create asigna la categoría directamente al partido', async () => {
       jugador1_id: '10',
       jugador2_id: '11',
       estado: 'programado',
-      fecha_inicio: '2026-08-01T09:00',
+      fecha_inicio: '2026-08-01',
+      hora_inicio: '09:00',
       notas: 'Cancha húmeda',
       torneo_id: '7',
       ronda: 'Final',
@@ -172,9 +175,61 @@ test('create asigna la categoría directamente al partido', async () => {
   )
 
   assert.match(calls[1].sql, /deporte, categoria_id, jugador1_id, jugador2_id/)
-  assert.match(calls[1].sql, /fecha_inicio, notas, created_by/)
+  assert.match(calls[1].sql, /fecha_inicio, hora_inicio, notas, created_by/)
   assert.doesNotMatch(calls[1].sql, /torneo_id|ronda|cancha_id/)
   assert.equal(calls[1].params[1], 3)
-  assert.equal(calls[1].params[8], 'Cancha húmeda')
+  assert.equal(calls[1].params[7], '2026-08-01')
+  assert.equal(calls[1].params[8], '09:00')
+  assert.equal(calls[1].params[9], 'Cancha húmeda')
   assert.equal(result.categoria.nombre, '4ta')
+})
+
+test('create permite registrar una hora sin fecha', async () => {
+  const calls = []
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params })
+      if (calls.length === 1) return [[{ deporte: 'tenis' }]]
+      if (calls.length === 2) return [{ insertId: 16 }]
+      if (calls.length === 3) {
+        return [
+          [
+            {
+              id: 16,
+              deporte: 'tenis',
+              estado: 'programado',
+              fecha_inicio: null,
+              hora_inicio: '10:30:00',
+              categoria_id: 3,
+              categoria_nombre: '4ta',
+              j1_id: 10,
+              j1_nombre: 'Ana',
+              j1_apellido: 'Rojas',
+              j2_id: 11,
+              j2_nombre: 'Laura',
+              j2_apellido: 'Díaz',
+            },
+          ],
+        ]
+      }
+      return [[]]
+    },
+  }
+
+  const result = await loadService(fakeDb).create(
+    {
+      deporte: 'tenis',
+      categoria_id: '3',
+      jugador1_id: '10',
+      jugador2_id: '11',
+      fecha_inicio: '',
+      hora_inicio: '10:30',
+    },
+    2
+  )
+
+  assert.equal(calls[1].params[7], null)
+  assert.equal(calls[1].params[8], '10:30')
+  assert.equal(result.fecha_inicio, null)
+  assert.equal(result.hora_inicio, '10:30:00')
 })

@@ -162,18 +162,8 @@ export default function GestionTorneos() {
               </select>
             </div>
 
-            <Input
-              label='Fecha inicio *'
-              type='date'
-              error={errors.fecha_inicio?.message}
-              {...register('fecha_inicio', { required: 'Requerido' })}
-            />
-            <Input
-              label='Fecha fin *'
-              type='date'
-              error={errors.fecha_fin?.message}
-              {...register('fecha_fin', { required: 'Requerido' })}
-            />
+            <Input label='Fecha de inicio' type='date' {...register('fecha_inicio')} />
+            <Input label='Fecha de finalización' type='date' {...register('fecha_fin')} />
 
             <div className='sm:col-span-2 flex gap-3 pt-2'>
               <Button type='submit' loading={isSubmitting}>
@@ -217,9 +207,13 @@ export default function GestionTorneos() {
                   <span className={t.deporte === 'tenis' ? 'badge-atp' : 'badge-padel'}>
                     {t.deporte}
                   </span>
-                  {t.fecha_inicio && (
+                  {(t.fecha_inicio || t.fecha_fin) && (
                     <span className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                      {formatDate(t.fecha_inicio)} → {formatDate(t.fecha_fin)}
+                      {t.fecha_inicio && t.fecha_fin
+                        ? `${formatDate(t.fecha_inicio)} → ${formatDate(t.fecha_fin)}`
+                        : t.fecha_inicio
+                          ? `Desde ${formatDate(t.fecha_inicio)}`
+                          : `Hasta ${formatDate(t.fecha_fin)}`}
                     </span>
                   )}
                 </div>

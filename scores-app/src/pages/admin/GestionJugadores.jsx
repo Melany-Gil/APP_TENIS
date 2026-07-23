@@ -3,17 +3,14 @@ import { useForm } from 'react-hook-form'
 import { Plus, Pencil, Trash2, Search, X } from 'lucide-react'
 import { playerService } from '../../services/playerService'
 import { confirm } from '../../utils/confirm'
-import { categoriaService } from '../../services/categoriaService'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 
 const DEPORTES = ['tenis', 'padel', 'ambos']
-const MANOS = ['Diestro', 'Zurdo', 'Ambidiestro']
 
 export default function GestionJugadores() {
   const [jugadores, setJugadores] = useState([])
-  const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -24,17 +21,14 @@ export default function GestionJugadores() {
     register,
     handleSubmit,
     reset,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm()
 
   const fetchAll = () => {
     setLoading(true)
-    Promise.all([playerService.getAll(), categoriaService.getAll()])
-      .then(([j, c]) => {
-        setJugadores(j.data || [])
-        setCategorias(c.data || [])
-      })
+    playerService
+      .getAll()
+      .then((response) => setJugadores(response.data || []))
       .catch(() => addToast({ type: 'error', title: 'Error al cargar datos' }))
       .finally(() => setLoading(false))
   }
@@ -44,7 +38,7 @@ export default function GestionJugadores() {
   }, [])
 
   const openCreate = () => {
-    reset({})
+    reset({ deporte: 'tenis' })
     setEditing(null)
     setShowForm(true)
   }
@@ -54,21 +48,18 @@ export default function GestionJugadores() {
     reset({
       nombre: jugador.nombre,
       apellido: jugador.apellido,
-      apodo: jugador.apodo || '',
-      telefono: jugador.telefono || '',
-      mano: jugador.mano,
       deporte: jugador.deporte,
-      categoria_id: jugador.categoria?.id || '',
-      fecha_nac: jugador.fecha_nac?.split('T')[0] || '',
-      altura_cm: jugador.altura_cm || '',
-      peso_kg: jugador.peso_kg || '',
     })
     setShowForm(true)
   }
 
   const onSubmit = async (data) => {
     try {
-      const payload = { ...data, country_id: 1 }
+      const payload = {
+        nombre: data.nombre,
+        apellido: data.apellido,
+        deporte: data.deporte,
+      }
       if (editing) {
         await playerService.update(editing.id, payload)
         addToast({ type: 'success', title: 'Jugador actualizado' })
@@ -102,7 +93,7 @@ export default function GestionJugadores() {
   }
 
   const filtered = jugadores.filter((j) =>
-    `${j.nombre} ${j.apellido} ${j.apodo || ''}`.toLowerCase().includes(search.toLowerCase())
+    `${j.nombre} ${j.apellido}`.toLowerCase().includes(search.toLowerCase())
   )
 
   return (
@@ -147,10 +138,6 @@ export default function GestionJugadores() {
               error={errors.apellido?.message}
               {...register('apellido', { required: 'Requerido' })}
             />
-            <Input label='Apodo' placeholder='El Zurdo' {...register('apodo')} />
-            <Input label='Teléfono' placeholder='3001234567' {...register('telefono')} />
-            <Input label='Fecha de nacimiento' type='date' {...register('fecha_nac')} />
-
             <div className='form-group'>
               <label className='form-label'>Deporte *</label>
               <select className='form-input' {...register('deporte', { required: 'Requerido' })}>
@@ -162,32 +149,6 @@ export default function GestionJugadores() {
                 ))}
               </select>
             </div>
-
-            <div className='form-group'>
-              <label className='form-label'>Mano dominante</label>
-              <select className='form-input' {...register('mano')}>
-                {MANOS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className='form-group'>
-              <label className='form-label'>Categoría</label>
-              <select className='form-input' {...register('categoria_id')}>
-                <option value=''>Sin categoría</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre} ({c.deporte})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <Input label='Altura (cm)' type='number' placeholder='175' {...register('altura_cm')} />
-            <Input label='Peso (kg)' type='number' placeholder='70' {...register('peso_kg')} />
 
             <div className='sm:col-span-2 flex gap-3 pt-2'>
               <Button type='submit' loading={isSubmitting}>
@@ -244,14 +205,6 @@ export default function GestionJugadores() {
               <div className='flex-1 min-w-0'>
                 <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
                   {j.nombre} {j.apellido}
-                  {j.apodo && (
-                    <span
-                      className='ml-2 text-xs font-normal'
-                      style={{ color: 'var(--text-muted)' }}
-                    >
-                      "{j.apodo}"
-                    </span>
-                  )}
                 </p>
                 <div className='flex items-center gap-2 mt-0.5'>
                   <span
@@ -265,11 +218,6 @@ export default function GestionJugadores() {
                   >
                     {j.deporte}
                   </span>
-                  {j.categoria && (
-                    <span className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                      {j.categoria.nombre}
-                    </span>
-                  )}
                 </div>
               </div>
               <div className='flex items-center gap-1 shrink-0'>

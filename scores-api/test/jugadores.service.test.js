@@ -26,13 +26,13 @@ const playerRow = {
   ranking: 2,
 }
 
-const loadService = () => {
+const loadService = (fakeDb) => {
   delete require.cache[servicePath]
   require.cache[dbPath] = {
     id: dbPath,
     filename: dbPath,
     loaded: true,
-    exports: {
+    exports: fakeDb || {
       async query() {
         return [[playerRow]]
       },
@@ -54,4 +54,28 @@ test('las respuestas internas de administración conservan los datos editables',
 
   assert.equal(player.telefono, '3001234567')
   assert.deepEqual(player.fecha_nac, playerRow.fecha_nac)
+})
+
+test('crear jugador guarda únicamente nombre, apellido y deporte', async () => {
+  const calls = []
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params })
+      if (calls.length === 1) return [{ insertId: 9 }]
+      if (calls.length === 2) return [{}]
+      return [[{ ...playerRow, id: 9 }]]
+    },
+  }
+
+  await loadService(fakeDb).create({
+    nombre: ' Laura ',
+    apellido: ' Díaz ',
+    deporte: 'tenis',
+    telefono: 'No debe guardarse',
+    categoria_id: 3,
+  })
+
+  assert.match(calls[0].sql, /\(nombre, apellido, country_id, deporte\)/)
+  assert.doesNotMatch(calls[0].sql, /telefono|categoria_id|apodo|fecha_nac/)
+  assert.deepEqual(calls[0].params, ['Laura', 'Díaz', 'tenis'])
 })

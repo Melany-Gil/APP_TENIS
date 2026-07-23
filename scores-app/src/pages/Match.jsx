@@ -4,7 +4,7 @@ import LiveBadge from '../components/match/LiveBadge'
 import { MatchCardSkeleton } from '../components/ui/Skeleton'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { useMatch } from '../hooks/useMatches'
-import { formatDate, formatTime } from '../utils/formatDate'
+import { formatClockTime, formatDate } from '../utils/formatDate'
 import { cn } from '../utils/cn'
 import { useLoginRequired } from '../hooks/useLoginRequired'
 
@@ -114,10 +114,15 @@ export default function Match() {
           className='flex items-center justify-center gap-4 mt-5 text-xs'
           style={{ color: 'var(--text-muted)' }}
         >
-          {match.fecha_inicio && (
+          {(match.fecha_inicio || match.hora_inicio) && (
             <span className='flex items-center gap-1'>
               <CalendarDays className='w-3 h-3' />
-              {formatDate(match.fecha_inicio)} · {formatTime(match.fecha_inicio)}
+              {[
+                match.fecha_inicio && formatDate(match.fecha_inicio),
+                formatClockTime(match.hora_inicio),
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </span>
           )}
         </div>

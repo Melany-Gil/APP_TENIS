@@ -7,6 +7,7 @@ const MATCH_SELECT = `
     p.estado,
     p.ganador,
     p.fecha_inicio,
+    p.hora_inicio,
     p.notas,
     cat.id     AS categoria_id,
     cat.nombre AS categoria_nombre,
@@ -55,15 +56,15 @@ exports.getAll = async ({ estado, deporte, categoria_id, fecha, jugador, desde, 
     params.push(categoria_id)
   }
   if (fecha) {
-    query += ' AND DATE(p.fecha_inicio) = ?'
+    query += ' AND p.fecha_inicio = ?'
     params.push(fecha)
   }
   if (desde) {
-    query += ' AND DATE(p.fecha_inicio) >= ?'
+    query += ' AND p.fecha_inicio >= ?'
     params.push(desde)
   }
   if (hasta) {
-    query += ' AND DATE(p.fecha_inicio) <= ?'
+    query += ' AND p.fecha_inicio <= ?'
     params.push(hasta)
   }
   if (jugador) {
@@ -77,7 +78,7 @@ exports.getAll = async ({ estado, deporte, categoria_id, fecha, jugador, desde, 
     params.push(term, term, term, term)
   }
 
-  query += ' ORDER BY p.fecha_inicio DESC'
+  query += ' ORDER BY p.fecha_inicio IS NULL, p.fecha_inicio DESC, p.hora_inicio DESC, p.id DESC'
 
   const [rows] = await db.query(query, params)
   if (!rows.length) return []
@@ -127,8 +128,8 @@ exports.create = async (body, created_by) => {
   const [result] = await db.query(
     `INSERT INTO partidos
        (deporte, categoria_id, jugador1_id, jugador2_id, equipo1_id, equipo2_id,
-        estado, fecha_inicio, notas, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        estado, fecha_inicio, hora_inicio, notas, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       match.deporte,
       match.categoria_id,
@@ -138,6 +139,7 @@ exports.create = async (body, created_by) => {
       match.equipo2_id,
       match.estado,
       match.fecha_inicio,
+      match.hora_inicio,
       match.notas,
       created_by,
     ]
@@ -154,7 +156,7 @@ exports.update = async (id, body) => {
   await db.query(
     `UPDATE partidos
      SET deporte = ?, categoria_id = ?, jugador1_id = ?, jugador2_id = ?,
-         equipo1_id = ?, equipo2_id = ?, estado = ?, fecha_inicio = ?, notas = ?
+         equipo1_id = ?, equipo2_id = ?, estado = ?, fecha_inicio = ?, hora_inicio = ?, notas = ?
      WHERE id = ?`,
     [
       match.deporte,
@@ -165,6 +167,7 @@ exports.update = async (id, body) => {
       match.equipo2_id,
       match.estado,
       match.fecha_inicio,
+      match.hora_inicio,
       match.notas,
       id,
     ]
@@ -255,7 +258,8 @@ exports.remove = async (id) => {
 async function validateBasicMatch(body) {
   const deporte = body.deporte
   const categoriaId = Number(body.categoria_id)
-  const fechaInicio = body.fecha_inicio
+  const fechaInicio = normalizeOptionalDate(body.fecha_inicio)
+  const horaInicio = normalizeOptionalTime(body.hora_inicio)
   const estado = body.estado || 'programado'
 
   if (!['tenis', 'padel'].includes(deporte)) {
@@ -263,9 +267,6 @@ async function validateBasicMatch(body) {
   }
   if (!Number.isInteger(categoriaId) || categoriaId < 1) {
     throw { status: 400, message: 'Selecciona la categoría del partido' }
-  }
-  if (!fechaInicio || Number.isNaN(new Date(fechaInicio).getTime())) {
-    throw { status: 400, message: 'Selecciona una fecha válida' }
   }
   if (!['programado', 'en_vivo', 'finalizado', 'cancelado'].includes(estado)) {
     throw { status: 400, message: 'Selecciona un estado válido' }
@@ -302,8 +303,27 @@ async function validateBasicMatch(body) {
     equipo2_id: deporte === 'padel' ? equipo2Id : null,
     estado,
     fecha_inicio: fechaInicio,
+    hora_inicio: horaInicio,
     notas: String(body.notas || '').trim() || null,
   }
+}
+
+function normalizeOptionalDate(value) {
+  const date = String(value || '').trim()
+  if (!date) return null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(`${date}T00:00:00`).getTime())) {
+    throw { status: 400, message: 'La fecha del partido no es válida' }
+  }
+  return date
+}
+
+function normalizeOptionalTime(value) {
+  const time = String(value || '').trim()
+  if (!time) return null
+  if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) {
+    throw { status: 400, message: 'La hora del partido no es válida' }
+  }
+  return time
 }
 
 function positiveId(value) {
@@ -317,7 +337,8 @@ function formatSummary(row) {
     deporte: row.deporte,
     estado: row.estado,
     ganador: row.ganador,
-    fecha_inicio: row.fecha_inicio,
+    fecha_inicio: row.fecha_inicio || null,
+    hora_inicio: row.hora_inicio || null,
     notas: row.notas || null,
     categoria: row.categoria_id
       ? {

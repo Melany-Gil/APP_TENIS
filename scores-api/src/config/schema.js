@@ -12,6 +12,19 @@ const columnExists = async (tableName, columnName) => {
   return Number(rows[0].total) > 0
 }
 
+const getColumn = async (tableName, columnName) => {
+  const [rows] = await db.query(
+    `SELECT DATA_TYPE AS dataType, IS_NULLABLE AS isNullable
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?
+     LIMIT 1`,
+    [tableName, columnName]
+  )
+  return rows[0] || null
+}
+
 const columnIndexExists = async (tableName, columnName) => {
   const [rows] = await db.query(
     `SELECT COUNT(*) AS total
@@ -38,6 +51,32 @@ const columnForeignKeyExists = async (tableName, columnName) => {
 }
 
 exports.ensureSchema = async () => {
+  const tournamentStart = await getColumn('torneos', 'fecha_inicio')
+  const tournamentEnd = await getColumn('torneos', 'fecha_fin')
+  if (tournamentStart?.isNullable === 'NO') {
+    await db.query('ALTER TABLE torneos MODIFY fecha_inicio DATE NULL')
+  }
+  if (tournamentEnd?.isNullable === 'NO') {
+    await db.query('ALTER TABLE torneos MODIFY fecha_fin DATE NULL')
+  }
+
+  if (!(await columnExists('partidos', 'hora_inicio'))) {
+    await db.query('ALTER TABLE partidos ADD COLUMN hora_inicio TIME NULL AFTER fecha_inicio')
+  }
+
+  const matchStart = await getColumn('partidos', 'fecha_inicio')
+  if (['timestamp', 'datetime'].includes(matchStart?.dataType)) {
+    await db.query(
+      `UPDATE partidos
+       SET hora_inicio = TIME(fecha_inicio)
+       WHERE fecha_inicio IS NOT NULL
+         AND hora_inicio IS NULL`
+    )
+  }
+  if (matchStart && (matchStart.dataType !== 'date' || matchStart.isNullable === 'NO')) {
+    await db.query('ALTER TABLE partidos MODIFY fecha_inicio DATE NULL')
+  }
+
   if (!(await columnExists('partidos', 'categoria_id'))) {
     await db.query('ALTER TABLE partidos ADD COLUMN categoria_id INT NULL AFTER deporte')
   }

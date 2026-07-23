@@ -3,7 +3,7 @@ import { Star } from 'lucide-react'
 import LiveBadge from './LiveBadge'
 import ScoreDisplay from './ScoreDisplay'
 import useFavoritesStore from '../../store/useFavoritesStore'
-import { formatTime } from '../../utils/formatDate'
+import { formatClockTime, formatDate } from '../../utils/formatDate'
 import { cn } from '../../utils/cn'
 import { useLoginRequired } from '../../hooks/useLoginRequired'
 
@@ -48,9 +48,14 @@ export default function MatchCard({ match }) {
                 FIN
               </span>
             )}
-            {!isLive && !isFinished && match.fecha_inicio && (
+            {!isLive && !isFinished && (match.fecha_inicio || match.hora_inicio) && (
               <span className='text-[10px]' style={{ color: 'var(--text-muted)' }}>
-                {formatTime(match.fecha_inicio)}
+                {[
+                  match.fecha_inicio && formatDate(match.fecha_inicio),
+                  formatClockTime(match.hora_inicio),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
             )}
             <button

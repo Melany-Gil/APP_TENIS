@@ -15,7 +15,7 @@ exports.getAll = async ({ deporte, estado }) => {
     params.push(estado)
   }
 
-  query += ' ORDER BY fecha_inicio DESC'
+  query += ' ORDER BY fecha_inicio IS NULL, fecha_inicio DESC, id DESC'
   const [rows] = await db.query(query, params)
   return rows.map(formatTournament)
 }
@@ -97,18 +97,14 @@ exports.remove = async (id) => {
 function validateTournament({ nombre, deporte, fecha_inicio, fecha_fin, estado }) {
   const normalizedName = String(nombre || '').trim()
   const normalizedStatus = estado || 'proximo'
+  const normalizedStart = normalizeOptionalDate(fecha_inicio, 'inicial')
+  const normalizedEnd = normalizeOptionalDate(fecha_fin, 'final')
 
   if (!normalizedName) throw { status: 400, message: 'El nombre es obligatorio' }
   if (!['tenis', 'padel', 'ambos'].includes(deporte)) {
     throw { status: 400, message: 'Selecciona un deporte válido' }
   }
-  if (!fecha_inicio || Number.isNaN(new Date(fecha_inicio).getTime())) {
-    throw { status: 400, message: 'Selecciona una fecha inicial válida' }
-  }
-  if (!fecha_fin || Number.isNaN(new Date(fecha_fin).getTime())) {
-    throw { status: 400, message: 'Selecciona una fecha final válida' }
-  }
-  if (fecha_fin < fecha_inicio) {
+  if (normalizedStart && normalizedEnd && normalizedEnd < normalizedStart) {
     throw { status: 400, message: 'La fecha final no puede ser anterior a la inicial' }
   }
   if (!['proximo', 'en_curso', 'finalizado', 'cancelado'].includes(normalizedStatus)) {
@@ -118,10 +114,19 @@ function validateTournament({ nombre, deporte, fecha_inicio, fecha_fin, estado }
   return {
     nombre: normalizedName,
     deporte,
-    fecha_inicio,
-    fecha_fin,
+    fecha_inicio: normalizedStart,
+    fecha_fin: normalizedEnd,
     estado: normalizedStatus,
   }
+}
+
+function normalizeOptionalDate(value, label) {
+  const date = String(value || '').trim()
+  if (!date) return null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(`${date}T00:00:00`).getTime())) {
+    throw { status: 400, message: `Selecciona una fecha ${label} válida` }
+  }
+  return date
 }
 
 function formatTournament(row) {

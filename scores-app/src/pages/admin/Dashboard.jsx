@@ -184,9 +184,11 @@ export default function Dashboard() {
                     <p className='text-xs font-semibold' style={{ color: 'var(--color-brand)' }}>
                       🏆 {ganadorNombre}
                     </p>
-                    <p className='text-[10px]' style={{ color: 'var(--text-muted)' }}>
-                      {formatRelative(m.fecha_inicio)}
-                    </p>
+                    {m.fecha_inicio && (
+                      <p className='text-[10px]' style={{ color: 'var(--text-muted)' }}>
+                        {formatRelative(m.fecha_inicio)}
+                      </p>
+                    )}
                   </div>
                 </div>
               )

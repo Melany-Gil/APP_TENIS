@@ -27,8 +27,8 @@ test('crear torneo guarda únicamente la información básica', async () => {
             id: 4,
             nombre: 'Torneo interno',
             deporte: 'tenis',
-            fecha_inicio: '2026-08-01',
-            fecha_fin: '2026-08-03',
+            fecha_inicio: null,
+            fecha_fin: null,
             estado: 'proximo',
           },
         ],
@@ -39,8 +39,8 @@ test('crear torneo guarda únicamente la información básica', async () => {
   const result = await loadService(fakeDb).create({
     nombre: 'Torneo interno',
     deporte: 'tenis',
-    fecha_inicio: '2026-08-01',
-    fecha_fin: '2026-08-03',
+    fecha_inicio: '',
+    fecha_fin: '',
     estado: 'proximo',
     categoria_id: 99,
     premio: 'No debe guardarse',
@@ -48,13 +48,7 @@ test('crear torneo guarda únicamente la información básica', async () => {
 
   assert.match(calls[0].sql, /nombre, deporte, fecha_inicio, fecha_fin, estado/)
   assert.doesNotMatch(calls[0].sql, /categoria_id|premio/)
-  assert.deepEqual(calls[0].params, [
-    'Torneo interno',
-    'tenis',
-    '2026-08-01',
-    '2026-08-03',
-    'proximo',
-  ])
+  assert.deepEqual(calls[0].params, ['Torneo interno', 'tenis', null, null, 'proximo'])
   assert.deepEqual(Object.keys(result), [
     'id',
     'nombre',

@@ -10,8 +10,14 @@ const torneoRules = [
   body('deporte')
     .isIn(['tenis', 'padel', 'ambos'])
     .withMessage('El deporte debe ser tenis, padel o ambos'),
-  body('fecha_inicio').isDate().withMessage('fecha_inicio debe ser una fecha válida'),
-  body('fecha_fin').isDate().withMessage('fecha_fin debe ser una fecha válida'),
+  body('fecha_inicio')
+    .optional({ values: 'falsy' })
+    .isDate()
+    .withMessage('fecha_inicio debe ser una fecha válida'),
+  body('fecha_fin')
+    .optional({ values: 'falsy' })
+    .isDate()
+    .withMessage('fecha_fin debe ser una fecha válida'),
   body('estado')
     .optional()
     .isIn(['proximo', 'en_curso', 'finalizado', 'cancelado'])
