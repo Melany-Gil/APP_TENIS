@@ -119,11 +119,6 @@ export default function Login() {
       <p className='text-center text-sm mt-7' style={{ color: 'var(--text-muted)' }}>
         ¿No tienes acceso? Solicítalo a un administrador.
       </p>
-      <p className='text-center text-xs mt-2' style={{ color: 'var(--text-muted)' }}>
-        <Link to='/register' className='font-medium' style={{ color: 'var(--color-brand)' }}>
-          Configurar el primer administrador
-        </Link>
-      </p>
     </div>
   )
 }
