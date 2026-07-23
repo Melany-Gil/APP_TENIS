@@ -96,6 +96,7 @@ export default function GestionPartidos() {
       jugador2_id: partido.jugador2?.id || '',
       equipo1_id: partido.equipo1?.id || '',
       equipo2_id: partido.equipo2?.id || '',
+      notas: partido.notas || '',
     })
     setShowForm(true)
   }
@@ -121,6 +122,7 @@ export default function GestionPartidos() {
         jugador2_id: data.jugador2_id,
         equipo1_id: data.equipo1_id,
         equipo2_id: data.equipo2_id,
+        notas: data.notas,
       }
       if (data.deporte === 'padel') {
         delete payload.jugador1_id
@@ -338,6 +340,16 @@ export default function GestionPartidos() {
                 </div>
               </>
             )}
+
+            <div className='sm:col-span-2 form-group'>
+              <label className='form-label'>Observaciones</label>
+              <textarea
+                className='form-input resize-none'
+                rows={3}
+                placeholder='Ej.: partido suspendido por lluvia, retiro por lesión...'
+                {...register('notas')}
+              />
+            </div>
 
             <div className='sm:col-span-2 flex gap-3'>
               <Button type='submit' loading={isSubmitting}>

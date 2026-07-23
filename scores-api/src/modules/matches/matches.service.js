@@ -7,6 +7,7 @@ const MATCH_SELECT = `
     p.estado,
     p.ganador,
     p.fecha_inicio,
+    p.notas,
     cat.id     AS categoria_id,
     cat.nombre AS categoria_nombre,
     j1.id       AS j1_id,
@@ -126,8 +127,8 @@ exports.create = async (body, created_by) => {
   const [result] = await db.query(
     `INSERT INTO partidos
        (deporte, categoria_id, jugador1_id, jugador2_id, equipo1_id, equipo2_id,
-        estado, fecha_inicio, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        estado, fecha_inicio, notas, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       match.deporte,
       match.categoria_id,
@@ -137,6 +138,7 @@ exports.create = async (body, created_by) => {
       match.equipo2_id,
       match.estado,
       match.fecha_inicio,
+      match.notas,
       created_by,
     ]
   )
@@ -152,7 +154,7 @@ exports.update = async (id, body) => {
   await db.query(
     `UPDATE partidos
      SET deporte = ?, categoria_id = ?, jugador1_id = ?, jugador2_id = ?,
-         equipo1_id = ?, equipo2_id = ?, estado = ?, fecha_inicio = ?
+         equipo1_id = ?, equipo2_id = ?, estado = ?, fecha_inicio = ?, notas = ?
      WHERE id = ?`,
     [
       match.deporte,
@@ -163,6 +165,7 @@ exports.update = async (id, body) => {
       match.equipo2_id,
       match.estado,
       match.fecha_inicio,
+      match.notas,
       id,
     ]
   )
@@ -299,6 +302,7 @@ async function validateBasicMatch(body) {
     equipo2_id: deporte === 'padel' ? equipo2Id : null,
     estado,
     fecha_inicio: fechaInicio,
+    notas: String(body.notas || '').trim() || null,
   }
 }
 
@@ -314,6 +318,7 @@ function formatSummary(row) {
     estado: row.estado,
     ganador: row.ganador,
     fecha_inicio: row.fecha_inicio,
+    notas: row.notas || null,
     categoria: row.categoria_id
       ? {
           id: row.categoria_id,

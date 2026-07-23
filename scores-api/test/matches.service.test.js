@@ -29,6 +29,7 @@ test('getAll devuelve sets, categoría y aplica los filtros del historial', asyn
               deporte: 'tenis',
               estado: 'finalizado',
               ganador: 'jugador1',
+              notas: 'Partido finalizado por retiro',
               fecha_inicio: new Date('2026-07-20T18:00:00Z'),
               categoria_id: 3,
               categoria_nombre: '4ta',
@@ -74,6 +75,7 @@ test('getAll devuelve sets, categoría y aplica los filtros del historial', asyn
 
   assert.equal(result.length, 1)
   assert.equal(result[0].categoria.nombre, '4ta')
+  assert.equal(result[0].notas, 'Partido finalizado por retiro')
   assert.deepEqual(
     result[0].sets.map((set) => [set.numero_set, set.games_j1, set.games_j2]),
     [
@@ -162,6 +164,7 @@ test('create asigna la categoría directamente al partido', async () => {
       jugador2_id: '11',
       estado: 'programado',
       fecha_inicio: '2026-08-01T09:00',
+      notas: 'Cancha húmeda',
       torneo_id: '7',
       ronda: 'Final',
     },
@@ -169,7 +172,9 @@ test('create asigna la categoría directamente al partido', async () => {
   )
 
   assert.match(calls[1].sql, /deporte, categoria_id, jugador1_id, jugador2_id/)
-  assert.doesNotMatch(calls[1].sql, /torneo_id|ronda|cancha_id|notas/)
+  assert.match(calls[1].sql, /fecha_inicio, notas, created_by/)
+  assert.doesNotMatch(calls[1].sql, /torneo_id|ronda|cancha_id/)
   assert.equal(calls[1].params[1], 3)
+  assert.equal(calls[1].params[8], 'Cancha húmeda')
   assert.equal(result.categoria.nombre, '4ta')
 })

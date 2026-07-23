@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Star, CalendarDays } from 'lucide-react'
+import { ArrowLeft, Star, CalendarDays, MessageSquareText } from 'lucide-react'
 import LiveBadge from '../components/match/LiveBadge'
 import { MatchCardSkeleton } from '../components/ui/Skeleton'
 import useFavoritesStore from '../store/useFavoritesStore'
@@ -122,6 +122,26 @@ export default function Match() {
           )}
         </div>
       </div>
+
+      {match.notas && (
+        <div
+          className='card p-4 flex items-start gap-3'
+          style={{ borderColor: 'var(--club-clay)' }}
+        >
+          <MessageSquareText
+            className='w-4 h-4 mt-0.5 shrink-0'
+            style={{ color: 'var(--club-clay)' }}
+          />
+          <div>
+            <p className='text-xs font-semibold mb-1' style={{ color: 'var(--text-primary)' }}>
+              Observación del partido
+            </p>
+            <p className='text-sm leading-relaxed' style={{ color: 'var(--text-secondary)' }}>
+              {match.notas}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

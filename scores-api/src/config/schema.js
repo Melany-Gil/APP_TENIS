@@ -41,6 +41,9 @@ exports.ensureSchema = async () => {
   if (!(await columnExists('partidos', 'categoria_id'))) {
     await db.query('ALTER TABLE partidos ADD COLUMN categoria_id INT NULL AFTER deporte')
   }
+  if (!(await columnExists('partidos', 'notas'))) {
+    await db.query('ALTER TABLE partidos ADD COLUMN notas TEXT NULL AFTER fecha_inicio')
+  }
 
   const hasLegacyTournamentRelation = await columnExists('partidos', 'torneo_id')
   const hasLegacyTournamentCategory = await columnExists('torneos', 'categoria_id')

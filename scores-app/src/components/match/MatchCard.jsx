@@ -85,6 +85,19 @@ export default function MatchCard({ match }) {
             isLive={isLive}
           />
         </div>
+
+        {match.notas && (
+          <div
+            className='px-4 py-2 text-xs line-clamp-2'
+            style={{
+              color: 'var(--text-secondary)',
+              borderTop: '1px solid var(--border-color)',
+              backgroundColor: 'var(--bg-hover)',
+            }}
+          >
+            <span className='font-semibold'>Observación:</span> {match.notas}
+          </div>
+        )}
       </div>
     </Link>
   )

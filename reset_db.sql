@@ -202,6 +202,7 @@ CREATE TABLE partidos (
   estado       ENUM('programado','en_vivo','finalizado','cancelado') NOT NULL DEFAULT 'programado',
   ganador      ENUM('jugador1','jugador2') NULL,
   fecha_inicio TIMESTAMP   NOT NULL,
+  notas        TEXT            NULL,
   created_by   INT         NULL,
   created_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
