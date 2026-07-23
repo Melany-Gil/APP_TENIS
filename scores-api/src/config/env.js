@@ -8,6 +8,7 @@ const productionRequired = [
   'MAIL_HOST',
   'MAIL_USER',
   'MAIL_PASS',
+  'MAIL_FROM',
   'FRONTEND_URL',
 ]
 

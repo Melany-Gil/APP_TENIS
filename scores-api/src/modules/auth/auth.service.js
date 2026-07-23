@@ -43,7 +43,7 @@ const escapeHtml = (value) =>
 const mailFromAddress = () => {
   const configured = String(process.env.MAIL_FROM || process.env.MAIL_USER || '').trim()
   const addressBetweenBrackets = configured.match(/<([^<>]+)>/)
-  return (addressBetweenBrackets?.[1] || configured).trim()
+  return (addressBetweenBrackets?.[1] || configured.split(/[;,]/)[0]).trim()
 }
 
 exports.login = async ({ numero_documento, password }) => {
@@ -122,7 +122,10 @@ exports.forgotPassword = async ({ email }) => {
   )
 
   // La respuesta pública es idéntica aunque la cuenta no exista.
-  if (!rows.length) return
+  if (!rows.length) {
+    console.warn('⚠️  Recuperación solicitada para un correo no registrado')
+    return
+  }
 
   const user = rows[0]
   const otp = generateOTP()
@@ -149,7 +152,7 @@ exports.forgotPassword = async ({ email }) => {
     connection.release()
   }
 
-  await mailer.sendMail({
+  const delivery = await mailer.sendMail({
     from: {
       name: 'Subcomité de Tenis · Club Unión',
       address: mailFromAddress(),
@@ -168,7 +171,14 @@ exports.forgotPassword = async ({ email }) => {
         <p style="color:#647067;font-size:13px">Si no hiciste esta solicitud, ignora este mensaje.</p>
       </div>
     `,
+    text: `Hola ${user.nombre}. Tu código de verificación es ${otp}. Vence en 15 minutos.`,
   })
+
+  console.log(
+    `✅  Código OTP aceptado por SMTP para el usuario ${user.id}` +
+      ` · messageId=${delivery.messageId || 'no-disponible'}` +
+      ` · response=${delivery.response || 'sin-respuesta'}`
+  )
 }
 
 const findValidReset = async (email, otpCode, connection = db) => {

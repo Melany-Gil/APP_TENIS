@@ -35,6 +35,7 @@ exports.forgotPassword = async (req, res) => {
     return success(res, null)
     // Respuesta consistente sin revelar si el email existe
   } catch (err) {
+    console.error('❌  Error al enviar el código OTP:', err.message)
     return error(res, err.message || 'Error al enviar el OTP', err.status || 500)
   }
 }
