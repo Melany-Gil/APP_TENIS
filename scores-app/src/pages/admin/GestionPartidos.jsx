@@ -52,6 +52,7 @@ export default function GestionPartidos() {
     register: regM,
     handleSubmit: handleM,
     reset: resetM,
+    unregister: unregisterM,
     formState: { isSubmitting: isSubmittingM },
   } = useForm()
 
@@ -197,6 +198,18 @@ export default function GestionPartidos() {
     setSetNumbers((current) =>
       current.length < MAX_SETS ? [...current, current.length + 1] : current
     )
+  }
+
+  const removeLastSet = () => {
+    if (setNumbers.length <= 3) return
+
+    const lastSet = setNumbers[setNumbers.length - 1]
+    unregisterM([
+      `set_${lastSet}_j1`,
+      `set_${lastSet}_j2`,
+      `set_${lastSet}_completado`,
+    ])
+    setSetNumbers((current) => current.slice(0, -1))
   }
 
   const handleDelete = async (partido) => {
@@ -436,8 +449,8 @@ export default function GestionPartidos() {
             <div>
               <p className='form-label mb-1'>Puntos por set</p>
               <p className='text-xs mb-3' style={{ color: 'var(--text-muted)' }}>
-                Ingresa los games de cada jugador o equipo. Puedes añadir más sets cuando sea
-                necesario.
+                Ingresa los games de cada jugador o equipo. Los tres primeros sets son fijos; los
+                sets adicionales se pueden agregar o quitar.
               </p>
               <div className='space-y-2'>
                 {setNumbers.map((num) => (
@@ -486,14 +499,26 @@ export default function GestionPartidos() {
                   </div>
                 ))}
               </div>
-              <button
-                type='button'
-                onClick={addSet}
-                disabled={setNumbers.length >= MAX_SETS}
-                className='btn-secondary mt-3 text-sm'
-              >
-                <Plus className='w-4 h-4' /> Agregar set
-              </button>
+              <div className='flex flex-wrap gap-2 mt-3'>
+                <button
+                  type='button'
+                  onClick={addSet}
+                  disabled={setNumbers.length >= MAX_SETS}
+                  className='btn-secondary text-sm'
+                >
+                  <Plus className='w-4 h-4' /> Agregar set
+                </button>
+                {setNumbers.length > 3 && (
+                  <button
+                    type='button'
+                    onClick={removeLastSet}
+                    className='btn-secondary text-sm'
+                    style={{ color: '#dc2626' }}
+                  >
+                    <Trash2 className='w-4 h-4' /> Quitar último set
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className='flex gap-3'>

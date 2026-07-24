@@ -126,6 +126,7 @@ test('updateMarcador rechaza sets duplicados antes de escribir', async () => {
 
 test('updateMarcador permite guardar más de tres sets', async () => {
   const writtenSets = []
+  const connectionCalls = []
   let queryCount = 0
   const fakeDb = {
     async query() {
@@ -138,6 +139,7 @@ test('updateMarcador permite guardar más de tres sets', async () => {
       return {
         async beginTransaction() {},
         async query(sql, params) {
+          connectionCalls.push({ sql, params })
           if (/INSERT INTO sets_partido/.test(sql)) writtenSets.push(params[1])
         },
         async commit() {},
@@ -159,6 +161,9 @@ test('updateMarcador permite guardar más de tres sets', async () => {
   })
 
   assert.deepEqual(writtenSets, [1, 2, 3, 4])
+  const deleteCall = connectionCalls.find((call) => /DELETE FROM sets_partido/.test(call.sql))
+  assert.ok(deleteCall)
+  assert.deepEqual(deleteCall.params, [7, 1, 2, 3, 4])
 })
 
 test('create asigna la categoría directamente al partido', async () => {

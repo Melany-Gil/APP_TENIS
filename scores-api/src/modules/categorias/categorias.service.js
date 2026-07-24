@@ -4,8 +4,8 @@ exports.getAll = async ({ deporte } = {}) => {
   let sql = 'SELECT id, nombre, deporte, orden FROM categorias WHERE 1 = 1'
   const params = []
   if (deporte) {
-    sql += ' AND (deporte = ? OR deporte = "ambos")'
-    params.push(deporte)
+    sql += ' AND (deporte = ? OR deporte = ?)'
+    params.push(deporte, 'ambos')
   }
   sql += ' ORDER BY orden ASC, nombre ASC'
   const [rows] = await db.query(sql, params)

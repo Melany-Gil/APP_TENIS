@@ -210,6 +210,13 @@ exports.updateMarcador = async (id, { sets, estado, ganador }) => {
       id,
     ])
 
+    const setPlaceholders = sets.map(() => '?').join(',')
+    await connection.query(
+      `DELETE FROM sets_partido
+       WHERE partido_id = ? AND numero_set NOT IN (${setPlaceholders})`,
+      [id, ...sets.map((set) => set.numero_set)]
+    )
+
     for (const set of sets) {
       await connection.query(
         `INSERT INTO sets_partido
