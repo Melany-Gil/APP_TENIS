@@ -1,5 +1,7 @@
 const db = require('../../config/db')
 
+const MAX_SETS = 127
+
 const MATCH_SELECT = `
   SELECT
     p.id,
@@ -176,8 +178,8 @@ exports.updateMarcador = async (id, { sets, estado, ganador }) => {
   const [existing] = await db.query('SELECT id FROM partidos WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
 
-  if (!Array.isArray(sets) || sets.length < 1 || sets.length > 3) {
-    throw { status: 400, message: 'El marcador debe contener entre uno y tres sets' }
+  if (!Array.isArray(sets) || sets.length < 1 || sets.length > MAX_SETS) {
+    throw { status: 400, message: `El marcador debe contener entre uno y ${MAX_SETS} sets` }
   }
   if (!['programado', 'en_vivo', 'finalizado', 'cancelado'].includes(estado)) {
     throw { status: 400, message: 'Estado de partido inválido' }
@@ -188,7 +190,8 @@ exports.updateMarcador = async (id, { sets, estado, ganador }) => {
 
   const seen = new Set()
   for (const set of sets) {
-    const validSet = Number.isInteger(set.numero_set) && set.numero_set >= 1 && set.numero_set <= 3
+    const validSet =
+      Number.isInteger(set.numero_set) && set.numero_set >= 1 && set.numero_set <= MAX_SETS
     const validScores = [set.games_j1, set.games_j2].every(
       (score) => Number.isInteger(score) && score >= 0 && score <= 99
     )

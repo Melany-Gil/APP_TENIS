@@ -124,6 +124,43 @@ test('updateMarcador rechaza sets duplicados antes de escribir', async () => {
   )
 })
 
+test('updateMarcador permite guardar más de tres sets', async () => {
+  const writtenSets = []
+  let queryCount = 0
+  const fakeDb = {
+    async query() {
+      queryCount += 1
+      if (queryCount === 1) return [[{ id: 7 }]]
+      if (queryCount === 2) return [[{ id: 7, deporte: 'tenis', estado: 'finalizado' }]]
+      return [[]]
+    },
+    async getConnection() {
+      return {
+        async beginTransaction() {},
+        async query(sql, params) {
+          if (/INSERT INTO sets_partido/.test(sql)) writtenSets.push(params[1])
+        },
+        async commit() {},
+        async rollback() {},
+        release() {},
+      }
+    },
+  }
+
+  await loadService(fakeDb).updateMarcador(7, {
+    estado: 'finalizado',
+    ganador: 'jugador1',
+    sets: [
+      { numero_set: 1, games_j1: 6, games_j2: 4 },
+      { numero_set: 2, games_j1: 4, games_j2: 6 },
+      { numero_set: 3, games_j1: 7, games_j2: 5 },
+      { numero_set: 4, games_j1: 6, games_j2: 2 },
+    ],
+  })
+
+  assert.deepEqual(writtenSets, [1, 2, 3, 4])
+})
+
 test('create asigna la categoría directamente al partido', async () => {
   const calls = []
   const fakeDb = {

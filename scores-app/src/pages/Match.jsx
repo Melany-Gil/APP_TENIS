@@ -54,8 +54,9 @@ export default function Match() {
 
   const p1Scores = match.sets?.map((set) => set.games_j1) ?? []
   const p2Scores = match.sets?.map((set) => set.games_j2) ?? []
-  const p1Sets = Array.from({ length: 3 }, (_, index) => p1Scores[index] ?? '/')
-  const p2Sets = Array.from({ length: 3 }, (_, index) => p2Scores[index] ?? '/')
+  const setCount = Math.max(3, p1Scores.length, p2Scores.length)
+  const p1Sets = Array.from({ length: setCount }, (_, index) => p1Scores[index] ?? '/')
+  const p2Sets = Array.from({ length: setCount }, (_, index) => p2Scores[index] ?? '/')
 
   return (
     <div className='space-y-5 animate-fade-up'>
@@ -167,7 +168,7 @@ function ScoreRow({ player, sets, isWinner, isLive }) {
           )}
         </div>
       </div>
-      <div className='flex items-center gap-3 shrink-0'>
+      <div className='flex items-center gap-3 max-w-[55%] overflow-x-auto pb-1'>
         {sets.map((s, i) => (
           <span
             key={i}

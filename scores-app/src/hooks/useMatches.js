@@ -1,23 +1,27 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { matchService } from '../services/matchService'
 
 export function useMatches(filters = {}) {
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const requestIdRef = useRef(0)
   const key = JSON.stringify(filters)
 
   const fetch = useCallback(
     async ({ silent = false } = {}) => {
+      const requestId = ++requestIdRef.current
       try {
         if (!silent) setLoading(true)
         setError(null)
         const res = await matchService.getAll(JSON.parse(key))
+        if (requestId !== requestIdRef.current) return
         setMatches(res.data || [])
       } catch (err) {
+        if (requestId !== requestIdRef.current) return
         setError(err.message || 'Error al cargar partidos')
       } finally {
-        setLoading(false)
+        if (requestId === requestIdRef.current) setLoading(false)
       }
     },
     [key]

@@ -25,6 +25,7 @@ const FILTER_TABS = [
   { value: 'programado', label: 'Programados' },
   { value: 'finalizado', label: 'Finalizados' },
 ]
+const MAX_SETS = 127
 
 export default function GestionPartidos() {
   const [partidos, setPartidos] = useState([])
@@ -36,6 +37,7 @@ export default function GestionPartidos() {
   const [showMarcador, setShowMarcador] = useState(null)
   const [editing, setEditing] = useState(null)
   const [filterTab, setFilterTab] = useState('todos')
+  const [setNumbers, setSetNumbers] = useState([1, 2, 3])
   const marcadorRef = useRef(null)
   const { addToast } = useUIStore()
 
@@ -113,6 +115,8 @@ export default function GestionPartidos() {
   const openMarcador = (partido) => {
     setShowMarcador(partido)
     setShowForm(false)
+    const highestExistingSet = Math.max(3, ...(partido.sets?.map((set) => set.numero_set) || []))
+    setSetNumbers(Array.from({ length: highestExistingSet }, (_, index) => index + 1))
     const setsData = {}
     partido.sets?.forEach((s) => {
       setsData[`set_${s.numero_set}_j1`] = s.games_j1
@@ -160,7 +164,7 @@ export default function GestionPartidos() {
   const onMarcador = async (data) => {
     try {
       const sets = []
-      for (let i = 1; i <= 3; i += 1) {
+      for (const i of setNumbers) {
         const rawJ1 = data[`set_${i}_j1`]
         const rawJ2 = data[`set_${i}_j2`]
         const isBlank = rawJ1 === '' && rawJ2 === ''
@@ -187,6 +191,12 @@ export default function GestionPartidos() {
     } catch (err) {
       addToast({ type: 'error', title: 'Error', message: err.message })
     }
+  }
+
+  const addSet = () => {
+    setSetNumbers((current) =>
+      current.length < MAX_SETS ? [...current, current.length + 1] : current
+    )
   }
 
   const handleDelete = async (partido) => {
@@ -426,10 +436,11 @@ export default function GestionPartidos() {
             <div>
               <p className='form-label mb-1'>Puntos por set</p>
               <p className='text-xs mb-3' style={{ color: 'var(--text-muted)' }}>
-                Ingresa los games de cada jugador o equipo. Deja vacío el tercer set si no se jugó.
+                Ingresa los games de cada jugador o equipo. Puedes añadir más sets cuando sea
+                necesario.
               </p>
               <div className='space-y-2'>
-                {[1, 2, 3].map((num) => (
+                {setNumbers.map((num) => (
                   <div key={num} className='flex items-center gap-3'>
                     <span
                       className='text-xs font-medium w-12 shrink-0'
@@ -441,7 +452,7 @@ export default function GestionPartidos() {
                       type='number'
                       min='0'
                       max='99'
-                      placeholder={num === 3 ? '/' : '0'}
+                      placeholder={num > 2 ? '/' : '0'}
                       className='form-input w-20 text-center'
                       aria-label={`${marcadorParticipante1}, set ${num}`}
                       {...regM(`set_${num}_j1`)}
@@ -451,7 +462,7 @@ export default function GestionPartidos() {
                       type='number'
                       min='0'
                       max='99'
-                      placeholder={num === 3 ? '/' : '0'}
+                      placeholder={num > 2 ? '/' : '0'}
                       className='form-input w-20 text-center'
                       aria-label={`${marcadorParticipante2}, set ${num}`}
                       {...regM(`set_${num}_j2`)}
@@ -475,6 +486,14 @@ export default function GestionPartidos() {
                   </div>
                 ))}
               </div>
+              <button
+                type='button'
+                onClick={addSet}
+                disabled={setNumbers.length >= MAX_SETS}
+                className='btn-secondary mt-3 text-sm'
+              >
+                <Plus className='w-4 h-4' /> Agregar set
+              </button>
             </div>
 
             <div className='flex gap-3'>
