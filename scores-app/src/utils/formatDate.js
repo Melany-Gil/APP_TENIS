@@ -1,7 +1,16 @@
-const parseDate = (dateString) =>
-  /^\d{4}-\d{2}-\d{2}$/.test(String(dateString))
-    ? new Date(`${dateString}T00:00:00`)
-    : new Date(dateString)
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:T00:00:00(?:\.000)?Z)?$/
+
+const parseDate = (dateString) => {
+  const value = String(dateString)
+  const dateOnly = value.match(DATE_ONLY_PATTERN)
+
+  if (dateOnly) {
+    const [, year, month, day] = dateOnly
+    return new Date(Number(year), Number(month) - 1, Number(day))
+  }
+
+  return new Date(value)
+}
 
 export const formatDate = (dateString) =>
   parseDate(dateString).toLocaleDateString('es-ES', {

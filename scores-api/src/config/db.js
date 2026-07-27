@@ -21,6 +21,9 @@ const pool = mysql.createPool({
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
+  // Los campos DATE representan un día del calendario, no un instante UTC.
+  // Mantenerlos como texto evita que el navegador en Colombia muestre el día anterior.
+  dateStrings: ['DATE'],
   ssl,
 })
 
