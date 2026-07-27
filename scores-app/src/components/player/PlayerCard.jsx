@@ -4,13 +4,15 @@ import useFavoritesStore from '../../store/useFavoritesStore'
 import { cn } from '../../utils/cn'
 import { useLoginRequired } from '../../hooks/useLoginRequired'
 
-export default function PlayerCard({ player }) {
+export default function PlayerCard({ player, categoryId }) {
   const { toggleJugador, isJugadorFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
   const isFav = isJugadorFavorite(player.id)
+  const initials = `${player.nombre?.[0] || ''}${player.apellido?.[0] || ''}`.toUpperCase()
+  const playerUrl = `/player/${player.id}${categoryId ? `?categoria_id=${categoryId}` : ''}`
 
   return (
-    <Link to={`/player/${player.id}`}>
+    <Link to={playerUrl}>
       <div className='card-hover p-4'>
         <div className='flex items-center gap-3'>
           <span
@@ -23,10 +25,14 @@ export default function PlayerCard({ player }) {
           </span>
 
           <div
-            className='w-11 h-11 rounded-full flex items-center justify-center text-xl shrink-0 border'
-            style={{ backgroundColor: 'var(--bg-hover)', borderColor: 'var(--border-color)' }}
+            className='w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border'
+            style={{
+              backgroundColor: 'var(--bg-hover)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--color-brand)',
+            }}
           >
-            {player.country?.flag || '👤'}
+            {initials || 'JG'}
           </div>
 
           <div className='flex-1 min-w-0'>
@@ -34,17 +40,14 @@ export default function PlayerCard({ player }) {
               {player.nombre} {player.apellido}
             </p>
             <div className='flex items-center gap-2 mt-0.5'>
-              <span className={player.deporte === 'tenis' ? 'badge-atp' : 'badge-padel'}>
-                {player.deporte}
-              </span>
-              {player.categoria && (
+              {player.stats?.categoria?.nombre && (
                 <span className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                  {player.categoria.nombre}
+                  {player.stats.categoria.nombre}
                 </span>
               )}
               {player.stats && (
                 <span className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                  {player.stats.puntos?.toLocaleString()} pts
+                  {player.stats.puntos} pts · {player.stats.victorias}V/{player.stats.derrotas}D
                 </span>
               )}
             </div>

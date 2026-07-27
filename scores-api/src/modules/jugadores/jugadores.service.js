@@ -1,37 +1,24 @@
 const db = require('../../config/db')
+const { getPlayerStats } = require('../../utils/playerStats')
 
-// ── Listar todos ────────────────────────────────────────────────────────────────
+// Las categorías pertenecen a los partidos, no al perfil del jugador.
+// Por eso las estadísticas se calculan desde los resultados finalizados.
 exports.getAll = async ({ deporte, categoria_id, activo }) => {
   let query = `
     SELECT
       j.id,
       j.nombre,
       j.apellido,
-      j.apodo,
       j.deporte,
-      j.mano,
-      j.activo,
-      c.code   AS country_code,
-      c.name AS country_name,
-      c.flag   AS country_flag,
-      cat.id     AS categoria_id,
-      cat.nombre AS categoria_nombre
+      j.activo
     FROM jugadores j
-    LEFT JOIN countries c    ON c.id   = j.country_id
-    LEFT JOIN categorias cat ON cat.id = j.categoria_id
     WHERE 1 = 1
   `
-
   const params = []
 
   if (deporte) {
-    query += ' AND j.deporte = ?'
-    params.push(deporte)
-  }
-
-  if (categoria_id) {
-    query += ' AND j.categoria_id = ?'
-    params.push(categoria_id)
+    query += deporte === 'tenis' ? " AND j.deporte IN ('tenis', 'ambos')" : ' AND j.deporte = ?'
+    if (deporte !== 'tenis') params.push(deporte)
   }
 
   if (activo !== undefined) {
@@ -39,42 +26,24 @@ exports.getAll = async ({ deporte, categoria_id, activo }) => {
     params.push(activo === 'true' || activo === '1' ? 1 : 0)
   }
 
-  query += ' ORDER BY j.nombre ASC'
-
+  query += ' ORDER BY j.apellido ASC, j.nombre ASC'
   const [rows] = await db.query(query, params)
-  return rows.map(formatListItem)
+
+  const categoryId = positiveId(categoria_id)
+  const stats = await getPlayerStats(db, { categoriaId: categoryId })
+  const statsByPlayer = new Map(stats.map((entry) => [entry.jugador_id, entry]))
+
+  return rows
+    .map((row) => formatListItem(row, statsByPlayer.get(row.id)))
+    .filter((player) => !categoryId || player.stats)
 }
 
-// ── Obtener por ID ──────────────────────────────────────────────────────────────
-exports.getById = async (id, { includePrivate = false } = {}) => {
+exports.getById = async (id) => {
   const [rows] = await db.query(
-    `SELECT
-      j.id,
-      j.nombre,
-      j.apellido,
-      j.apodo,
-      j.fecha_nac,
-      j.telefono,
-      j.mano,
-      j.deporte,
-      j.foto,
-      j.activo,
-      c.code   AS country_code,
-      c.name AS country_name,
-      c.flag   AS country_flag,
-      cat.id     AS categoria_id,
-      cat.nombre AS categoria_nombre,
-      s.victorias,
-      s.derrotas,
-      s.puntos,
-      s.ranking
-    FROM jugadores j
-    LEFT JOIN countries c    ON c.id   = j.country_id
-    LEFT JOIN categorias cat ON cat.id = j.categoria_id
-    LEFT JOIN jugador_stats s ON s.jugador_id = j.id
-      AND s.temporada = YEAR(CURDATE())
-    WHERE j.id = ?
-    LIMIT 1`,
+    `SELECT id, nombre, apellido, deporte, activo
+     FROM jugadores
+     WHERE id = ?
+     LIMIT 1`,
     [id]
   )
 
@@ -82,10 +51,15 @@ exports.getById = async (id, { includePrivate = false } = {}) => {
     throw { status: 404, message: 'Jugador no encontrado' }
   }
 
-  return formatDetail(rows[0], includePrivate)
+  const allStats = await getPlayerStats(db)
+  const playerStats = allStats.filter((entry) => entry.jugador_id === Number(id))
+
+  return {
+    ...formatListItem(rows[0]),
+    estadisticas: playerStats,
+  }
 }
 
-// ── Crear ────────────────────────────────────────────────────────────────────────
 exports.create = async (body) => {
   const { nombre, apellido, deporte } = body
 
@@ -96,17 +70,9 @@ exports.create = async (body) => {
     [nombre.trim(), apellido.trim(), deporte]
   )
 
-  // FIX: temporada es NOT NULL — se debe incluir con el año actual
-  await db.query(
-    `INSERT INTO jugador_stats (jugador_id, temporada, victorias, derrotas, puntos, ranking)
-     VALUES (?, YEAR(CURDATE()), 0, 0, 0, 0)`,
-    [result.insertId]
-  )
-
-  return exports.getById(result.insertId, { includePrivate: true })
+  return exports.getById(result.insertId)
 }
 
-// ── Actualizar ──────────────────────────────────────────────────────────────────
 exports.update = async (id, body) => {
   const [existing] = await db.query('SELECT id FROM jugadores WHERE id = ?', [id])
   if (!existing.length) {
@@ -114,7 +80,6 @@ exports.update = async (id, body) => {
   }
 
   const { nombre, apellido, deporte } = body
-
   await db.query(
     `UPDATE jugadores
      SET nombre = ?, apellido = ?, deporte = ?
@@ -122,10 +87,9 @@ exports.update = async (id, body) => {
     [nombre.trim(), apellido.trim(), deporte, id]
   )
 
-  return exports.getById(id, { includePrivate: true })
+  return exports.getById(id)
 }
 
-// ── Eliminar ────────────────────────────────────────────────────────────────────
 exports.remove = async (id) => {
   const [existing] = await db.query('SELECT id FROM jugadores WHERE id = ?', [id])
   if (!existing.length) {
@@ -138,59 +102,18 @@ exports.remove = async (id) => {
   return { message: 'Jugador eliminado correctamente' }
 }
 
-// ── Formateadores ───────────────────────────────────────────────────────────────
-function formatListItem(row) {
+function formatListItem(row, stats) {
   return {
     id: row.id,
     nombre: row.nombre,
     apellido: row.apellido,
-    apodo: row.apodo || null,
     deporte: row.deporte,
-    mano: row.mano || null,
     activo: !!row.activo,
-    country: {
-      code: row.country_code,
-      name: row.country_name,
-      flag: row.country_flag,
-    },
-    categoria: {
-      id: row.categoria_id,
-      nombre: row.categoria_nombre,
-    },
+    stats: stats || null,
   }
 }
 
-function formatDetail(row, includePrivate = false) {
-  const detail = {
-    id: row.id,
-    nombre: row.nombre,
-    apellido: row.apellido,
-    apodo: row.apodo || null,
-    mano: row.mano || null,
-    deporte: row.deporte,
-    foto: row.foto || null,
-    activo: !!row.activo,
-    country: {
-      code: row.country_code,
-      name: row.country_name,
-      flag: row.country_flag,
-    },
-    categoria: {
-      id: row.categoria_id,
-      nombre: row.categoria_nombre,
-    },
-    stats: {
-      victorias: row.victorias || 0,
-      derrotas: row.derrotas || 0,
-      puntos: row.puntos || 0,
-      ranking: row.ranking || 0,
-    },
-  }
-
-  if (includePrivate) {
-    detail.fecha_nac = row.fecha_nac || null
-    detail.telefono = row.telefono || null
-  }
-
-  return detail
+function positiveId(value) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
