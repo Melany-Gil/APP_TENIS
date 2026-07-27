@@ -83,6 +83,14 @@ exports.ensureSchema = async () => {
   if (!(await columnExists('partidos', 'notas'))) {
     await db.query('ALTER TABLE partidos ADD COLUMN notas TEXT NULL AFTER fecha_inicio')
   }
+  if (!(await columnExists('partidos', 'origen_partido1_id'))) {
+    await db.query('ALTER TABLE partidos ADD COLUMN origen_partido1_id INT NULL AFTER equipo2_id')
+  }
+  if (!(await columnExists('partidos', 'origen_partido2_id'))) {
+    await db.query(
+      'ALTER TABLE partidos ADD COLUMN origen_partido2_id INT NULL AFTER origen_partido1_id'
+    )
+  }
 
   const hasLegacyTournamentRelation = await columnExists('partidos', 'torneo_id')
   const hasLegacyTournamentCategory = await columnExists('torneos', 'categoria_id')
@@ -120,6 +128,27 @@ exports.ensureSchema = async () => {
       `ALTER TABLE partidos
        ADD CONSTRAINT fk_partidos_categoria
        FOREIGN KEY (categoria_id) REFERENCES categorias(id)`
+    )
+  }
+
+  if (!(await columnIndexExists('partidos', 'origen_partido1_id'))) {
+    await db.query('CREATE INDEX idx_partidos_origen1 ON partidos (origen_partido1_id)')
+  }
+  if (!(await columnIndexExists('partidos', 'origen_partido2_id'))) {
+    await db.query('CREATE INDEX idx_partidos_origen2 ON partidos (origen_partido2_id)')
+  }
+  if (!(await columnForeignKeyExists('partidos', 'origen_partido1_id'))) {
+    await db.query(
+      `ALTER TABLE partidos
+       ADD CONSTRAINT fk_partidos_origen1
+       FOREIGN KEY (origen_partido1_id) REFERENCES partidos(id) ON DELETE SET NULL`
+    )
+  }
+  if (!(await columnForeignKeyExists('partidos', 'origen_partido2_id'))) {
+    await db.query(
+      `ALTER TABLE partidos
+       ADD CONSTRAINT fk_partidos_origen2
+       FOREIGN KEY (origen_partido2_id) REFERENCES partidos(id) ON DELETE SET NULL`
     )
   }
 

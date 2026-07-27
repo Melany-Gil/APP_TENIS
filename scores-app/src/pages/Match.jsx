@@ -7,6 +7,7 @@ import { useMatch } from '../hooks/useMatches'
 import { formatClockTime, formatDate } from '../utils/formatDate'
 import { cn } from '../utils/cn'
 import { useLoginRequired } from '../hooks/useLoginRequired'
+import { getParticipantName } from '../utils/matchParticipants'
 
 export default function Match() {
   const { id } = useParams()
@@ -40,15 +41,15 @@ export default function Match() {
   const isFav = isPartidoFavorite(match.id)
 
   const p1 = isPadel
-    ? { name: match.equipo1?.nombre }
+    ? { name: getParticipantName(match, 1) }
     : {
-        name: `${match.jugador1?.nombre || ''} ${match.jugador1?.apellido || ''}`.trim(),
+        name: getParticipantName(match, 1),
         ranking: match.jugador1?.ranking,
       }
   const p2 = isPadel
-    ? { name: match.equipo2?.nombre }
+    ? { name: getParticipantName(match, 2) }
     : {
-        name: `${match.jugador2?.nombre || ''} ${match.jugador2?.apellido || ''}`.trim(),
+        name: getParticipantName(match, 2),
         ranking: match.jugador2?.ranking,
       }
 

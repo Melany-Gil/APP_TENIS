@@ -131,7 +131,18 @@ test('updateMarcador permite guardar más de tres sets', async () => {
   const fakeDb = {
     async query() {
       queryCount += 1
-      if (queryCount === 1) return [[{ id: 7 }]]
+      if (queryCount === 1) {
+        return [
+          [
+            {
+              id: 7,
+              deporte: 'tenis',
+              jugador1_id: 10,
+              jugador2_id: 11,
+            },
+          ],
+        ]
+      }
       if (queryCount === 2) return [[{ id: 7, deporte: 'tenis', estado: 'finalizado' }]]
       return [[]]
     },
@@ -164,6 +175,10 @@ test('updateMarcador permite guardar más de tres sets', async () => {
   const deleteCall = connectionCalls.find((call) => /DELETE FROM sets_partido/.test(call.sql))
   assert.ok(deleteCall)
   assert.deepEqual(deleteCall.params, [7, 1, 2, 3, 4])
+  const propagationCalls = connectionCalls.filter((call) => /origen_partido[12]_id/.test(call.sql))
+  assert.equal(propagationCalls.length, 2)
+  assert.deepEqual(propagationCalls[0].params, [10, 7])
+  assert.deepEqual(propagationCalls[1].params, [10, 7])
 })
 
 test('create asigna la categoría directamente al partido', async () => {
@@ -217,7 +232,10 @@ test('create asigna la categoría directamente al partido', async () => {
   )
 
   assert.match(calls[1].sql, /deporte, categoria_id, jugador1_id, jugador2_id/)
-  assert.match(calls[1].sql, /fecha_inicio, hora_inicio, notas, created_by/)
+  assert.match(
+    calls[1].sql,
+    /fecha_inicio, hora_inicio, notas, origen_partido1_id, origen_partido2_id/
+  )
   assert.doesNotMatch(calls[1].sql, /torneo_id|ronda|cancha_id/)
   assert.equal(calls[1].params[1], 3)
   assert.equal(calls[1].params[7], '2026-08-01')
@@ -274,4 +292,72 @@ test('create permite registrar una hora sin fecha', async () => {
   assert.equal(calls[1].params[8], '10:30')
   assert.equal(result.fecha_inicio, null)
   assert.equal(result.hora_inicio, '10:30:00')
+})
+
+test('create permite usar el ganador pendiente de otro partido como participante', async () => {
+  const calls = []
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params })
+      if (/SELECT deporte FROM categorias/.test(sql)) return [[{ deporte: 'tenis' }]]
+      if (/SELECT id, deporte, categoria_id, estado, ganador/.test(sql)) {
+        return [
+          [
+            {
+              id: 20,
+              deporte: 'tenis',
+              categoria_id: 3,
+              estado: 'programado',
+              ganador: null,
+              jugador1_id: 8,
+              jugador2_id: 9,
+            },
+          ],
+        ]
+      }
+      if (/INSERT INTO partidos/.test(sql)) return [{ insertId: 21 }]
+      if (/WHERE p\.id = \? LIMIT 1/.test(sql)) {
+        return [
+          [
+            {
+              id: 21,
+              deporte: 'tenis',
+              estado: 'programado',
+              categoria_id: 3,
+              categoria_nombre: '4ta',
+              jugador1_id: null,
+              j2_id: 11,
+              j2_nombre: 'Laura',
+              j2_apellido: 'Díaz',
+              origen_partido1_id: 20,
+              op1_j1_nombre: 'Ana',
+              op1_j1_apellido: 'Rojas',
+              op1_j2_nombre: 'Marta',
+              op1_j2_apellido: 'León',
+            },
+          ],
+        ]
+      }
+      return [[]]
+    },
+  }
+
+  const result = await loadService(fakeDb).create(
+    {
+      deporte: 'tenis',
+      categoria_id: '3',
+      origen_partido1_id: '20',
+      jugador2_id: '11',
+      estado: 'programado',
+    },
+    2
+  )
+
+  const insert = calls.find((call) => /INSERT INTO partidos/.test(call.sql))
+  assert.equal(insert.params[2], null)
+  assert.equal(insert.params[3], 11)
+  assert.equal(insert.params[10], 20)
+  assert.equal(result.origen_partido1.id, 20)
+  assert.equal(result.origen_partido1.participante1, 'Ana Rojas')
+  assert.equal(result.origen_partido1.participante2, 'Marta León')
 })

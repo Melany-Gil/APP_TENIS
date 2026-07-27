@@ -6,6 +6,7 @@ import useFavoritesStore from '../../store/useFavoritesStore'
 import { formatClockTime, formatDate } from '../../utils/formatDate'
 import { cn } from '../../utils/cn'
 import { useLoginRequired } from '../../hooks/useLoginRequired'
+import { getParticipantName } from '../../utils/matchParticipants'
 
 export default function MatchCard({ match }) {
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
@@ -14,17 +15,12 @@ export default function MatchCard({ match }) {
   const isLive = match.estado === 'en_vivo'
   const isFinished = match.estado === 'finalizado'
   const winner = match.ganador
-  const isPadel = match.deporte === 'padel'
 
   const p1Sets = match.sets?.map((s) => s.games_j1) ?? []
   const p2Sets = match.sets?.map((s) => s.games_j2) ?? []
 
-  const p1Name = isPadel
-    ? match.equipo1?.nombre
-    : `${match.jugador1?.nombre || ''} ${match.jugador1?.apellido || ''}`.trim()
-  const p2Name = isPadel
-    ? match.equipo2?.nombre
-    : `${match.jugador2?.nombre || ''} ${match.jugador2?.apellido || ''}`.trim()
+  const p1Name = getParticipantName(match, 1)
+  const p2Name = getParticipantName(match, 2)
   return (
     <Link to={`/match/${match.id}`}>
       <div className={cn('card-hover group', isLive && 'match-card-live')}>

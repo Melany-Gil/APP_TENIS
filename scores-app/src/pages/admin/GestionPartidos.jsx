@@ -12,6 +12,7 @@ import Input from '../../components/ui/Input'
 import Tabs from '../../components/ui/Tabs'
 import LiveBadge from '../../components/match/LiveBadge'
 import { formatClockTime, formatDate } from '../../utils/formatDate'
+import { getMatchupLabel, getParticipantName } from '../../utils/matchParticipants'
 
 const ESTADOS = [
   { value: 'programado', label: 'Programado' },
@@ -47,7 +48,7 @@ export default function GestionPartidos() {
     reset,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm()
+  } = useForm({ shouldUnregister: true })
   const {
     register: regM,
     handleSubmit: handleM,
@@ -57,8 +58,17 @@ export default function GestionPartidos() {
   } = useForm()
 
   const selectedDeporte = watch('deporte') || 'tenis'
+  const selectedCategoryId = String(watch('categoria_id') || '')
+  const participant1Mode = watch('participante1_tipo') || 'fijo'
+  const participant2Mode = watch('participante2_tipo') || 'fijo'
   const categoriasDisponibles = categorias.filter(
     (categoria) => categoria.deporte === selectedDeporte || categoria.deporte === 'ambos'
+  )
+  const sourceMatches = partidos.filter(
+    (partido) =>
+      partido.deporte === selectedDeporte &&
+      String(partido.categoria?.id || '') === selectedCategoryId &&
+      (!editing || partido.id < editing.id)
   )
   const [marcadorParticipante1, marcadorParticipante2] = getParticipantNames(showMarcador)
 
@@ -91,7 +101,13 @@ export default function GestionPartidos() {
   }, [showMarcador])
 
   const openCreate = () => {
-    reset({ deporte: 'tenis', categoria_id: '', estado: 'programado' })
+    reset({
+      deporte: 'tenis',
+      categoria_id: '',
+      estado: 'programado',
+      participante1_tipo: 'fijo',
+      participante2_tipo: 'fijo',
+    })
     setEditing(null)
     setShowForm(true)
   }
@@ -108,6 +124,10 @@ export default function GestionPartidos() {
       jugador2_id: partido.jugador2?.id || '',
       equipo1_id: partido.equipo1?.id || '',
       equipo2_id: partido.equipo2?.id || '',
+      participante1_tipo: partido.origen_partido1 ? 'ganador' : 'fijo',
+      participante2_tipo: partido.origen_partido2 ? 'ganador' : 'fijo',
+      origen_partido1_id: partido.origen_partido1?.id || '',
+      origen_partido2_id: partido.origen_partido2?.id || '',
       notas: partido.notas || '',
     })
     setShowForm(true)
@@ -139,6 +159,8 @@ export default function GestionPartidos() {
         jugador2_id: data.jugador2_id,
         equipo1_id: data.equipo1_id,
         equipo2_id: data.equipo2_id,
+        origen_partido1_id: data.participante1_tipo === 'ganador' ? data.origen_partido1_id : null,
+        origen_partido2_id: data.participante2_tipo === 'ganador' ? data.origen_partido2_id : null,
         notas: data.notas,
       }
       if (data.deporte === 'padel') {
@@ -204,11 +226,7 @@ export default function GestionPartidos() {
     if (setNumbers.length <= 3) return
 
     const lastSet = setNumbers[setNumbers.length - 1]
-    unregisterM([
-      `set_${lastSet}_j1`,
-      `set_${lastSet}_j2`,
-      `set_${lastSet}_completado`,
-    ])
+    unregisterM([`set_${lastSet}_j1`, `set_${lastSet}_j2`, `set_${lastSet}_completado`])
     setSetNumbers((current) => current.slice(0, -1))
   }
 
@@ -302,73 +320,69 @@ export default function GestionPartidos() {
             {/* Participantes según deporte */}
             {selectedDeporte === 'tenis' ? (
               <>
-                <div className='form-group'>
-                  <label className='form-label'>Jugador 1</label>
-                  <select
-                    className='form-input'
-                    {...register('jugador1_id', {
-                      required: selectedDeporte === 'tenis' ? 'Selecciona un jugador' : false,
-                    })}
-                  >
-                    <option value=''>Seleccionar</option>
-                    {jugadores.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.nombre} {j.apellido}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className='form-group'>
-                  <label className='form-label'>Jugador 2</label>
-                  <select
-                    className='form-input'
-                    {...register('jugador2_id', {
-                      required: selectedDeporte === 'tenis' ? 'Selecciona un jugador' : false,
-                    })}
-                  >
-                    <option value=''>Seleccionar</option>
-                    {jugadores.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.nombre} {j.apellido}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <ParticipantSelector
+                  label='Participante 1'
+                  mode={participant1Mode}
+                  modeField='participante1_tipo'
+                  fixedField='jugador1_id'
+                  sourceField='origen_partido1_id'
+                  fixedLabel='Jugador'
+                  fixedOptions={jugadores.map((jugador) => ({
+                    id: jugador.id,
+                    label: `${jugador.nombre} ${jugador.apellido}`,
+                  }))}
+                  sourceMatches={sourceMatches}
+                  register={register}
+                  error={errors.jugador1_id || errors.origen_partido1_id}
+                />
+                <ParticipantSelector
+                  label='Participante 2'
+                  mode={participant2Mode}
+                  modeField='participante2_tipo'
+                  fixedField='jugador2_id'
+                  sourceField='origen_partido2_id'
+                  fixedLabel='Jugador'
+                  fixedOptions={jugadores.map((jugador) => ({
+                    id: jugador.id,
+                    label: `${jugador.nombre} ${jugador.apellido}`,
+                  }))}
+                  sourceMatches={sourceMatches}
+                  register={register}
+                  error={errors.jugador2_id || errors.origen_partido2_id}
+                />
               </>
             ) : (
               <>
-                <div className='form-group'>
-                  <label className='form-label'>Equipo 1</label>
-                  <select
-                    className='form-input'
-                    {...register('equipo1_id', {
-                      required: selectedDeporte === 'padel' ? 'Selecciona un equipo' : false,
-                    })}
-                  >
-                    <option value=''>Seleccionar</option>
-                    {equipos.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className='form-group'>
-                  <label className='form-label'>Equipo 2</label>
-                  <select
-                    className='form-input'
-                    {...register('equipo2_id', {
-                      required: selectedDeporte === 'padel' ? 'Selecciona un equipo' : false,
-                    })}
-                  >
-                    <option value=''>Seleccionar</option>
-                    {equipos.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <ParticipantSelector
+                  label='Participante 1'
+                  mode={participant1Mode}
+                  modeField='participante1_tipo'
+                  fixedField='equipo1_id'
+                  sourceField='origen_partido1_id'
+                  fixedLabel='Equipo'
+                  fixedOptions={equipos.map((equipo) => ({
+                    id: equipo.id,
+                    label: equipo.nombre,
+                  }))}
+                  sourceMatches={sourceMatches}
+                  register={register}
+                  error={errors.equipo1_id || errors.origen_partido1_id}
+                />
+                <ParticipantSelector
+                  label='Participante 2'
+                  mode={participant2Mode}
+                  modeField='participante2_tipo'
+                  fixedField='equipo2_id'
+                  sourceField='origen_partido2_id'
+                  fixedLabel='Equipo'
+                  fixedOptions={equipos.map((equipo) => ({
+                    id: equipo.id,
+                    label: equipo.nombre,
+                  }))}
+                  sourceMatches={sourceMatches}
+                  register={register}
+                  error={errors.equipo2_id || errors.origen_partido2_id}
+                />
               </>
             )}
 
@@ -548,13 +562,8 @@ export default function GestionPartidos() {
           </p>
         ) : (
           filtered.map((p, i) => {
-            const isPadel = p.deporte === 'padel'
-            const p1 = isPadel
-              ? p.equipo1?.nombre
-              : `${p.jugador1?.nombre || ''} ${p.jugador1?.apellido || ''}`.trim()
-            const p2 = isPadel
-              ? p.equipo2?.nombre
-              : `${p.jugador2?.nombre || ''} ${p.jugador2?.apellido || ''}`.trim()
+            const p1 = getParticipantName(p, 1)
+            const p2 = getParticipantName(p, 2)
 
             return (
               <div
@@ -626,11 +635,62 @@ export default function GestionPartidos() {
 
 function getParticipantNames(partido) {
   if (!partido) return ['Participante 1', 'Participante 2']
-  if (partido.deporte === 'padel') {
-    return [partido.equipo1?.nombre || 'Equipo 1', partido.equipo2?.nombre || 'Equipo 2']
-  }
-  return [
-    `${partido.jugador1?.nombre || ''} ${partido.jugador1?.apellido || ''}`.trim() || 'Jugador 1',
-    `${partido.jugador2?.nombre || ''} ${partido.jugador2?.apellido || ''}`.trim() || 'Jugador 2',
-  ]
+  return [getParticipantName(partido, 1), getParticipantName(partido, 2)]
+}
+
+function ParticipantSelector({
+  label,
+  mode,
+  modeField,
+  fixedField,
+  sourceField,
+  fixedLabel,
+  fixedOptions,
+  sourceMatches,
+  register,
+  error,
+}) {
+  return (
+    <div className='form-group'>
+      <label className='form-label'>{label}</label>
+      <select className='form-input' {...register(modeField)}>
+        <option value='fijo'>{fixedLabel} definido</option>
+        <option value='ganador'>Ganador de otro partido</option>
+      </select>
+
+      {mode === 'ganador' ? (
+        <>
+          <select
+            className='form-input'
+            {...register(sourceField, { required: 'Selecciona el partido de origen' })}
+          >
+            <option value=''>Seleccionar partido</option>
+            {sourceMatches.map((match) => (
+              <option key={match.id} value={match.id}>
+                Gdor: {getMatchupLabel(match)}
+              </option>
+            ))}
+          </select>
+          {sourceMatches.length === 0 && (
+            <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
+              Primero crea otro partido de la misma categoría.
+            </p>
+          )}
+        </>
+      ) : (
+        <select
+          className='form-input'
+          {...register(fixedField, { required: `Selecciona un ${fixedLabel.toLowerCase()}` })}
+        >
+          <option value=''>Seleccionar</option>
+          {fixedOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      )}
+      {error && <p className='form-error'>{error.message}</p>}
+    </div>
+  )
 }

@@ -12,6 +12,7 @@ Aplicación web para el Subcomité de Tenis del Club Unión en Bucaramanga. Incl
 - Actualización de partidos en vivo cada 5 segundos.
 - Historial filtrable por fecha, jugador y categoría.
 - Marcador con tres sets fijos y posibilidad de agregar o quitar sets adicionales.
+- Partidos encadenados: un participante puede ser el ganador de otro partido de la misma categoría.
 - Estadísticas y ranking de jugadores calculados por categoría desde los partidos finalizados.
 
 ## Puntuación de la clasificación interna

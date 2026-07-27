@@ -199,6 +199,8 @@ CREATE TABLE partidos (
   jugador2_id  INT         NULL,
   equipo1_id   INT         NULL,
   equipo2_id   INT         NULL,
+  origen_partido1_id INT    NULL,
+  origen_partido2_id INT    NULL,
   estado       ENUM('programado','en_vivo','finalizado','cancelado') NOT NULL DEFAULT 'programado',
   ganador      ENUM('jugador1','jugador2') NULL,
   fecha_inicio DATE            NULL,
@@ -211,11 +213,15 @@ CREATE TABLE partidos (
   KEY idx_partidos_estado_fecha (estado, fecha_inicio),
   KEY idx_partidos_jugador1 (jugador1_id),
   KEY idx_partidos_jugador2 (jugador2_id),
+  KEY idx_partidos_origen1 (origen_partido1_id),
+  KEY idx_partidos_origen2 (origen_partido2_id),
   FOREIGN KEY (categoria_id) REFERENCES categorias(id),
   FOREIGN KEY (jugador1_id) REFERENCES jugadores(id),
   FOREIGN KEY (jugador2_id) REFERENCES jugadores(id),
   FOREIGN KEY (equipo1_id)  REFERENCES equipos_padel(id),
   FOREIGN KEY (equipo2_id)  REFERENCES equipos_padel(id),
+  FOREIGN KEY (origen_partido1_id) REFERENCES partidos(id) ON DELETE SET NULL,
+  FOREIGN KEY (origen_partido2_id) REFERENCES partidos(id) ON DELETE SET NULL,
   FOREIGN KEY (created_by)  REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

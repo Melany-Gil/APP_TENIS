@@ -11,6 +11,8 @@ const MATCH_SELECT = `
     p.fecha_inicio,
     p.hora_inicio,
     p.notas,
+    p.origen_partido1_id,
+    p.origen_partido2_id,
     cat.id     AS categoria_id,
     cat.nombre AS categoria_nombre,
     j1.id       AS j1_id,
@@ -22,13 +24,35 @@ const MATCH_SELECT = `
     e1.id     AS e1_id,
     e1.nombre AS e1_nombre,
     e2.id     AS e2_id,
-    e2.nombre AS e2_nombre
+    e2.nombre AS e2_nombre,
+    op1j1.nombre   AS op1_j1_nombre,
+    op1j1.apellido AS op1_j1_apellido,
+    op1j2.nombre   AS op1_j2_nombre,
+    op1j2.apellido AS op1_j2_apellido,
+    op1e1.nombre   AS op1_e1_nombre,
+    op1e2.nombre   AS op1_e2_nombre,
+    op2j1.nombre   AS op2_j1_nombre,
+    op2j1.apellido AS op2_j1_apellido,
+    op2j2.nombre   AS op2_j2_nombre,
+    op2j2.apellido AS op2_j2_apellido,
+    op2e1.nombre   AS op2_e1_nombre,
+    op2e2.nombre   AS op2_e2_nombre
   FROM partidos p
   LEFT JOIN categorias cat ON cat.id = p.categoria_id
   LEFT JOIN jugadores j1 ON j1.id = p.jugador1_id
   LEFT JOIN jugadores j2 ON j2.id = p.jugador2_id
   LEFT JOIN equipos_padel e1 ON e1.id = p.equipo1_id
   LEFT JOIN equipos_padel e2 ON e2.id = p.equipo2_id
+  LEFT JOIN partidos op1 ON op1.id = p.origen_partido1_id
+  LEFT JOIN jugadores op1j1 ON op1j1.id = op1.jugador1_id
+  LEFT JOIN jugadores op1j2 ON op1j2.id = op1.jugador2_id
+  LEFT JOIN equipos_padel op1e1 ON op1e1.id = op1.equipo1_id
+  LEFT JOIN equipos_padel op1e2 ON op1e2.id = op1.equipo2_id
+  LEFT JOIN partidos op2 ON op2.id = p.origen_partido2_id
+  LEFT JOIN jugadores op2j1 ON op2j1.id = op2.jugador1_id
+  LEFT JOIN jugadores op2j2 ON op2j2.id = op2.jugador2_id
+  LEFT JOIN equipos_padel op2e1 ON op2e1.id = op2.equipo1_id
+  LEFT JOIN equipos_padel op2e2 ON op2e2.id = op2.equipo2_id
 `
 
 exports.getAll = async ({ estado, deporte, categoria_id, fecha, jugador, desde, hasta }) => {
@@ -120,8 +144,9 @@ exports.create = async (body, created_by) => {
   const [result] = await db.query(
     `INSERT INTO partidos
        (deporte, categoria_id, jugador1_id, jugador2_id, equipo1_id, equipo2_id,
-        estado, fecha_inicio, hora_inicio, notas, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        estado, fecha_inicio, hora_inicio, notas, origen_partido1_id, origen_partido2_id,
+        created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       match.deporte,
       match.categoria_id,
@@ -133,6 +158,8 @@ exports.create = async (body, created_by) => {
       match.fecha_inicio,
       match.hora_inicio,
       match.notas,
+      match.origen_partido1_id,
+      match.origen_partido2_id,
       created_by,
     ]
   )
@@ -144,11 +171,12 @@ exports.update = async (id, body) => {
   const [existing] = await db.query('SELECT id FROM partidos WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
 
-  const match = await validateBasicMatch(body)
+  const match = await validateBasicMatch(body, Number(id))
   await db.query(
     `UPDATE partidos
      SET deporte = ?, categoria_id = ?, jugador1_id = ?, jugador2_id = ?,
-         equipo1_id = ?, equipo2_id = ?, estado = ?, fecha_inicio = ?, hora_inicio = ?, notas = ?
+         equipo1_id = ?, equipo2_id = ?, estado = ?, fecha_inicio = ?, hora_inicio = ?, notas = ?,
+         origen_partido1_id = ?, origen_partido2_id = ?
      WHERE id = ?`,
     [
       match.deporte,
@@ -161,6 +189,8 @@ exports.update = async (id, body) => {
       match.fecha_inicio,
       match.hora_inicio,
       match.notas,
+      match.origen_partido1_id,
+      match.origen_partido2_id,
       id,
     ]
   )
@@ -169,7 +199,12 @@ exports.update = async (id, body) => {
 }
 
 exports.updateMarcador = async (id, { sets, estado, ganador }) => {
-  const [existing] = await db.query('SELECT id FROM partidos WHERE id = ?', [id])
+  const [existing] = await db.query(
+    `SELECT id, deporte, jugador1_id, jugador2_id, equipo1_id, equipo2_id
+     FROM partidos
+     WHERE id = ?`,
+    [id]
+  )
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
 
   if (!Array.isArray(sets) || sets.length < 1 || sets.length > MAX_SETS) {
@@ -180,6 +215,12 @@ exports.updateMarcador = async (id, { sets, estado, ganador }) => {
   }
   if (ganador && !['jugador1', 'jugador2'].includes(ganador)) {
     throw { status: 400, message: 'Ganador inválido' }
+  }
+  if (estado === 'finalizado' && (!ganador || !getWinnerParticipantId(existing[0], ganador))) {
+    throw {
+      status: 400,
+      message: 'No se puede finalizar el partido hasta conocer ambos participantes y el ganador',
+    }
   }
 
   const seen = new Set()
@@ -234,6 +275,7 @@ exports.updateMarcador = async (id, { sets, estado, ganador }) => {
       )
     }
 
+    await propagateWinner(connection, existing[0], estado, ganador)
     await connection.commit()
   } catch (error) {
     await connection.rollback()
@@ -249,13 +291,27 @@ exports.remove = async (id) => {
   const [existing] = await db.query('SELECT id FROM partidos WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
 
+  const [dependents] = await db.query(
+    `SELECT id
+     FROM partidos
+     WHERE origen_partido1_id = ? OR origen_partido2_id = ?
+     LIMIT 1`,
+    [id, id]
+  )
+  if (dependents.length) {
+    throw {
+      status: 409,
+      message: 'No puedes eliminar este partido porque su ganador participa en otro encuentro',
+    }
+  }
+
   await db.query('DELETE FROM sets_partido WHERE partido_id = ?', [id])
   await db.query('DELETE FROM partidos WHERE id = ?', [id])
 
   return { message: 'Partido eliminado correctamente' }
 }
 
-async function validateBasicMatch(body) {
+async function validateBasicMatch(body, currentMatchId = null) {
   const deporte = body.deporte
   const categoriaId = Number(body.categoria_id)
   const fechaInicio = normalizeOptionalDate(body.fecha_inicio)
@@ -286,21 +342,52 @@ async function validateBasicMatch(body) {
   const jugador2Id = positiveId(body.jugador2_id)
   const equipo1Id = positiveId(body.equipo1_id)
   const equipo2Id = positiveId(body.equipo2_id)
+  const source1Id = positiveId(body.origen_partido1_id)
+  const source2Id = positiveId(body.origen_partido2_id)
 
-  if (deporte === 'tenis' && (!jugador1Id || !jugador2Id || jugador1Id === jugador2Id)) {
-    throw { status: 400, message: 'Selecciona dos jugadores diferentes' }
+  if (source1Id && source2Id && source1Id === source2Id) {
+    throw { status: 400, message: 'Cada participante debe provenir de un partido diferente' }
   }
-  if (deporte === 'padel' && (!equipo1Id || !equipo2Id || equipo1Id === equipo2Id)) {
-    throw { status: 400, message: 'Selecciona dos equipos diferentes' }
+
+  const source1 = source1Id
+    ? await resolveMatchSource(source1Id, deporte, categoriaId, currentMatchId)
+    : null
+  const source2 = source2Id
+    ? await resolveMatchSource(source2Id, deporte, categoriaId, currentMatchId)
+    : null
+
+  const resolvedPlayer1 =
+    deporte === 'tenis' ? (source1Id ? source1.participantId : jugador1Id) : null
+  const resolvedPlayer2 =
+    deporte === 'tenis' ? (source2Id ? source2.participantId : jugador2Id) : null
+  const resolvedTeam1 = deporte === 'padel' ? (source1Id ? source1.participantId : equipo1Id) : null
+  const resolvedTeam2 = deporte === 'padel' ? (source2Id ? source2.participantId : equipo2Id) : null
+
+  if (
+    deporte === 'tenis' &&
+    ((!resolvedPlayer1 && !source1Id) || (!resolvedPlayer2 && !source2Id))
+  ) {
+    throw { status: 400, message: 'Selecciona un jugador o un partido de origen para cada lado' }
+  }
+  if (deporte === 'padel' && ((!resolvedTeam1 && !source1Id) || (!resolvedTeam2 && !source2Id))) {
+    throw { status: 400, message: 'Selecciona un equipo o un partido de origen para cada lado' }
+  }
+  if (resolvedPlayer1 && resolvedPlayer2 && resolvedPlayer1 === resolvedPlayer2) {
+    throw { status: 400, message: 'Los jugadores del partido deben ser diferentes' }
+  }
+  if (resolvedTeam1 && resolvedTeam2 && resolvedTeam1 === resolvedTeam2) {
+    throw { status: 400, message: 'Los equipos del partido deben ser diferentes' }
   }
 
   return {
     deporte,
     categoria_id: categoriaId,
-    jugador1_id: deporte === 'tenis' ? jugador1Id : null,
-    jugador2_id: deporte === 'tenis' ? jugador2Id : null,
-    equipo1_id: deporte === 'padel' ? equipo1Id : null,
-    equipo2_id: deporte === 'padel' ? equipo2Id : null,
+    jugador1_id: resolvedPlayer1,
+    jugador2_id: resolvedPlayer2,
+    equipo1_id: resolvedTeam1,
+    equipo2_id: resolvedTeam2,
+    origen_partido1_id: source1Id,
+    origen_partido2_id: source2Id,
     estado,
     fecha_inicio: fechaInicio,
     hora_inicio: horaInicio,
@@ -331,6 +418,66 @@ function positiveId(value) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
+async function resolveMatchSource(sourceId, deporte, categoriaId, currentMatchId) {
+  if (currentMatchId && sourceId >= currentMatchId) {
+    throw { status: 400, message: 'El partido de origen debe ser anterior al partido actual' }
+  }
+
+  const [rows] = await db.query(
+    `SELECT id, deporte, categoria_id, estado, ganador,
+            jugador1_id, jugador2_id, equipo1_id, equipo2_id
+     FROM partidos
+     WHERE id = ?
+     LIMIT 1`,
+    [sourceId]
+  )
+  if (!rows.length) {
+    throw { status: 400, message: `El partido de origen #${sourceId} no existe` }
+  }
+
+  const source = rows[0]
+  if (source.deporte !== deporte || Number(source.categoria_id) !== categoriaId) {
+    throw {
+      status: 400,
+      message: 'El partido de origen debe pertenecer al mismo deporte y categoría',
+    }
+  }
+
+  return {
+    participantId:
+      source.estado === 'finalizado' && source.ganador
+        ? getWinnerParticipantId(source, source.ganador)
+        : null,
+  }
+}
+
+function getWinnerParticipantId(match, winner) {
+  const position = winner === 'jugador1' ? 1 : winner === 'jugador2' ? 2 : null
+  if (!position) return null
+  return match.deporte === 'padel'
+    ? match[`equipo${position}_id`] || null
+    : match[`jugador${position}_id`] || null
+}
+
+async function propagateWinner(connection, match, estado, ganador) {
+  const participantId =
+    estado === 'finalizado' && ganador ? getWinnerParticipantId(match, ganador) : null
+  const participantColumn = match.deporte === 'padel' ? 'equipo' : 'jugador'
+
+  await connection.query(
+    `UPDATE partidos
+     SET ${participantColumn}1_id = ?
+     WHERE origen_partido1_id = ?`,
+    [participantId, match.id]
+  )
+  await connection.query(
+    `UPDATE partidos
+     SET ${participantColumn}2_id = ?
+     WHERE origen_partido2_id = ?`,
+    [participantId, match.id]
+  )
+}
+
 function formatSummary(row) {
   const match = {
     id: row.id,
@@ -340,6 +487,8 @@ function formatSummary(row) {
     fecha_inicio: row.fecha_inicio || null,
     hora_inicio: row.hora_inicio || null,
     notas: row.notas || null,
+    origen_partido1: formatMatchSource(row, 1),
+    origen_partido2: formatMatchSource(row, 2),
     categoria: row.categoria_id
       ? {
           id: row.categoria_id,
@@ -375,5 +524,26 @@ function formatSet(set) {
     tiebreak_j1: set.tiebreak_j1 ?? null,
     tiebreak_j2: set.tiebreak_j2 ?? null,
     completado: Boolean(set.completado),
+  }
+}
+
+function formatMatchSource(row, position) {
+  const sourceId = row[`origen_partido${position}_id`]
+  if (!sourceId) return null
+
+  const prefix = `op${position}`
+  const participant1 =
+    row.deporte === 'padel'
+      ? row[`${prefix}_e1_nombre`]
+      : [row[`${prefix}_j1_nombre`], row[`${prefix}_j1_apellido`]].filter(Boolean).join(' ')
+  const participant2 =
+    row.deporte === 'padel'
+      ? row[`${prefix}_e2_nombre`]
+      : [row[`${prefix}_j2_nombre`], row[`${prefix}_j2_apellido`]].filter(Boolean).join(' ')
+
+  return {
+    id: sourceId,
+    participante1: participant1 || null,
+    participante2: participant2 || null,
   }
 }
