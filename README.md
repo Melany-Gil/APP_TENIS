@@ -11,7 +11,19 @@ Aplicación web para el Subcomité de Tenis del Club Unión en Bucaramanga. Incl
 - Gestión de usuarios, jugadores, categorías, torneos, sedes, partidos y marcadores.
 - Actualización de partidos en vivo cada 5 segundos.
 - Historial filtrable por fecha, jugador y categoría.
-- Marcador de tres sets; el tercero aparece como `/` cuando no se juega.
+- Marcador con tres sets fijos y posibilidad de agregar o quitar sets adicionales.
+- Estadísticas y ranking de jugadores calculados por categoría desde los partidos finalizados.
+
+## Puntuación de la clasificación interna
+
+El tenis no define un sistema universal de puntos para ligas internas. Para el Club Unión se
+adopta esta regla:
+
+- Victoria sin ceder sets: 3 puntos para el ganador y 0 para el perdedor.
+- Victoria en la que el rival gana al menos un set: 2 puntos para el ganador y 1 para el perdedor.
+- Los partidos cancelados, no finalizados o sin ganador no generan estadísticas.
+- Las posiciones se calculan por categoría con todos los partidos finalizados registrados.
+- Desempates: puntos, victorias, porcentaje de sets ganados y porcentaje de games ganados.
 
 ## Estructura
 

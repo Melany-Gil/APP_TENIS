@@ -1,33 +1,34 @@
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Star } from 'lucide-react'
-import { useState } from 'react'
-import Tabs from '../components/ui/Tabs'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, Star, Trophy } from 'lucide-react'
 import { usePlayer } from '../hooks/usePlayers'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { cn } from '../utils/cn'
 import { useLoginRequired } from '../hooks/useLoginRequired'
 
-const TABS = [
-  { value: 'overview', label: 'Perfil' },
-  { value: 'stats', label: 'Estadísticas' },
-]
-
 export default function Player() {
   const { id } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { player, loading } = usePlayer(id)
-  const [tab, setTab] = useState('overview')
   const { toggleJugador, isJugadorFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
 
   if (loading) return <div className='skeleton h-48 w-full rounded-xl' />
-  if (!player)
+  if (!player) {
     return (
       <p className='text-center py-16 text-sm' style={{ color: 'var(--text-muted)' }}>
         Jugador no encontrado
       </p>
     )
+  }
 
+  const statsByCategory = player.estadisticas || []
+  const requestedCategoryId = searchParams.get('categoria_id')
+  const selectedStats =
+    statsByCategory.find((stats) => String(stats.categoria.id) === requestedCategoryId) ||
+    statsByCategory[0] ||
+    null
   const isFav = isJugadorFavorite(player.id)
+  const initials = `${player.nombre?.[0] || ''}${player.apellido?.[0] || ''}`.toUpperCase()
 
   return (
     <div className='space-y-5 animate-fade-up'>
@@ -40,6 +41,7 @@ export default function Player() {
           <ArrowLeft className='w-4 h-4' /> Tenis
         </Link>
         <button
+          type='button'
           onClick={() => {
             if (requireLogin('Para guardar jugadores en favoritos debes iniciar sesión.')) {
               toggleJugador(player)
@@ -53,117 +55,110 @@ export default function Player() {
         </button>
       </div>
 
-      {/* Header */}
       <div className='card p-5'>
         <div className='flex items-center gap-4'>
           <div
-            className='w-20 h-20 rounded-full border-2 flex items-center justify-center text-4xl shrink-0'
-            style={{ backgroundColor: 'var(--bg-hover)', borderColor: 'var(--border-color)' }}
+            className='w-16 h-16 rounded-2xl border flex items-center justify-center text-lg font-bold shrink-0'
+            style={{
+              backgroundColor: 'var(--bg-hover)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--color-brand)',
+            }}
           >
-            {player.country?.flag || '👤'}
+            {initials || 'JG'}
           </div>
           <div className='flex-1 min-w-0'>
+            <p
+              className='text-xs font-semibold uppercase tracking-wider mb-1'
+              style={{ color: 'var(--color-brand)' }}
+            >
+              Estadísticas del jugador
+            </p>
             <h1 className='text-xl font-bold' style={{ color: 'var(--text-primary)' }}>
               {player.nombre} {player.apellido}
             </h1>
-            {player.apodo && (
-              <p className='text-sm' style={{ color: 'var(--text-muted)' }}>
-                "{player.apodo}"
-              </p>
-            )}
-            <div className='flex items-center gap-2 mt-1'>
-              <span className={player.deporte === 'tenis' ? 'badge-atp' : 'badge-padel'}>
-                {player.deporte}
-              </span>
-              {player.categoria && <span className='badge-brand'>{player.categoria.nombre}</span>}
-              <span className='text-sm' style={{ color: 'var(--text-muted)' }}>
-                {player.country?.name}
-              </span>
-            </div>
-            {player.stats && (
-              <div className='flex items-center gap-4 mt-3'>
-                <div>
-                  <p className='text-2xl font-bold' style={{ color: 'var(--color-brand)' }}>
-                    #{player.stats.ranking}
-                  </p>
-                  <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                    Ranking
-                  </p>
-                </div>
-                <div className='w-px h-8' style={{ backgroundColor: 'var(--border-color)' }} />
-                <div>
-                  <p className='text-lg font-semibold' style={{ color: 'var(--text-primary)' }}>
-                    {player.stats.puntos?.toLocaleString()}
-                  </p>
-                  <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                    Puntos
-                  </p>
-                </div>
-                <div className='w-px h-8' style={{ backgroundColor: 'var(--border-color)' }} />
-                <div>
-                  <p className='text-lg font-semibold' style={{ color: 'var(--text-primary)' }}>
-                    <span style={{ color: '#22c55e' }}>{player.stats.victorias}V</span>
-                    {' / '}
-                    <span style={{ color: '#ef4444' }}>{player.stats.derrotas}D</span>
-                  </p>
-                  <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                    Balance
-                  </p>
-                </div>
-              </div>
-            )}
+            <span className='badge-atp mt-2 inline-block'>{player.deporte}</span>
           </div>
         </div>
       </div>
 
-      <Tabs tabs={TABS} activeTab={tab} onChange={setTab} />
-
-      {tab === 'overview' && (
-        <div className='grid grid-cols-2 sm:grid-cols-3 gap-3'>
-          {[
-            { label: 'Altura', value: player.altura_cm ? `${player.altura_cm} cm` : '—' },
-            { label: 'Peso', value: player.peso_kg ? `${player.peso_kg} kg` : '—' },
-            { label: 'Mano', value: player.mano || '—' },
-            { label: 'País', value: player.country?.name || '—' },
-            { label: 'Categoría', value: player.categoria?.nombre || '—' },
-          ].map((item) => (
-            <div key={item.label} className='card p-3'>
-              <p className='text-xs mb-1' style={{ color: 'var(--text-muted)' }}>
-                {item.label}
-              </p>
-              <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab === 'stats' && player.stats && (
-        <div className='card overflow-hidden'>
-          {[
-            { label: 'Victorias', value: player.stats.victorias },
-            { label: 'Derrotas', value: player.stats.derrotas },
-            { label: 'Puntos', value: player.stats.puntos?.toLocaleString() },
-            { label: 'Ranking', value: `#${player.stats.ranking}` },
-          ].map((s, i, arr) => (
-            <div
-              key={s.label}
-              className='flex items-center justify-between px-4 py-3'
-              style={{
-                borderBottom: i < arr.length - 1 ? '1px solid var(--border-color)' : 'none',
-              }}
+      {statsByCategory.length > 0 ? (
+        <>
+          <div className='card p-4'>
+            <label className='form-label' htmlFor='player-category'>
+              Categoría
+            </label>
+            <select
+              id='player-category'
+              className='form-input'
+              value={String(selectedStats.categoria.id)}
+              onChange={(event) =>
+                setSearchParams({ categoria_id: event.target.value }, { replace: true })
+              }
             >
-              <span className='text-sm' style={{ color: 'var(--text-muted)' }}>
-                {s.label}
-              </span>
-              <span className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
-                {s.value ?? '—'}
-              </span>
-            </div>
-          ))}
+              {statsByCategory.map((stats) => (
+                <option key={stats.categoria.id} value={stats.categoria.id}>
+                  {stats.categoria.nombre}
+                </option>
+              ))}
+            </select>
+            <p className='text-xs mt-2' style={{ color: 'var(--text-muted)' }}>
+              Puntos de clasificación: 3 para el ganador y 0 para el perdedor si no cede sets; 2 y
+              1, respectivamente, si el perdedor gana al menos un set.
+            </p>
+          </div>
+
+          <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
+            <StatCard label='Ranking' value={`#${selectedStats.ranking}`} accent />
+            <StatCard label='Puntos' value={selectedStats.puntos} accent />
+            <StatCard label='Partidos' value={selectedStats.partidos_jugados} />
+            <StatCard
+              label='Balance'
+              value={`${selectedStats.victorias}V / ${selectedStats.derrotas}D`}
+            />
+            <StatCard
+              label='Sets'
+              value={`${selectedStats.sets_ganados}–${selectedStats.sets_perdidos}`}
+            />
+            <StatCard
+              label='Games'
+              value={`${selectedStats.games_ganados}–${selectedStats.games_perdidos}`}
+            />
+            <StatCard label='% de sets' value={formatPercentage(selectedStats.porcentaje_sets)} />
+            <StatCard label='% de games' value={formatPercentage(selectedStats.porcentaje_games)} />
+          </div>
+        </>
+      ) : (
+        <div className='card p-10 text-center'>
+          <Trophy className='w-10 h-10 mx-auto mb-3' style={{ color: 'var(--text-muted)' }} />
+          <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
+            Sin estadísticas todavía
+          </p>
+          <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
+            Se mostrarán cuando el jugador tenga partidos finalizados.
+          </p>
         </div>
       )}
     </div>
   )
+}
+
+function StatCard({ label, value, accent = false }) {
+  return (
+    <div className='card p-4'>
+      <p className='text-xs mb-1' style={{ color: 'var(--text-muted)' }}>
+        {label}
+      </p>
+      <p
+        className='text-lg font-bold'
+        style={{ color: accent ? 'var(--color-brand)' : 'var(--text-primary)' }}
+      >
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function formatPercentage(value) {
+  return `${Math.round((Number(value) || 0) * 100)}%`
 }

@@ -22,12 +22,18 @@ export default function Tennis() {
   const [date, setDate] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [categories, setCategories] = useState([])
+  const [playerCategoryId, setPlayerCategoryId] = useState('')
+  const [playerOrder, setPlayerOrder] = useState('ranking')
   const debouncedPlayer = useDebounce(playerSearch.trim(), 350)
 
   useEffect(() => {
     categoriaService
       .getAll({ deporte: 'tenis' })
-      .then((response) => setCategories(response.data || []))
+      .then((response) => {
+        const loadedCategories = response.data || []
+        setCategories(loadedCategories)
+        setPlayerCategoryId((current) => current || String(loadedCategories[0]?.id || ''))
+      })
       .catch(() => setCategories([]))
   }, [])
 
@@ -44,7 +50,28 @@ export default function Tennis() {
   )
   const { matches: finished, loading: lf } = useMatches(historyFilters)
   const { matches: upcoming } = useMatches({ estado: 'programado', deporte: 'tenis' })
-  const { players, loading: lp } = usePlayers({ deporte: 'tenis' })
+  const { players, loading: lp } = usePlayers({
+    deporte: 'tenis',
+    ...(playerCategoryId && { categoria_id: playerCategoryId }),
+  })
+  const sortedPlayers = useMemo(() => {
+    const byName = (a, b) =>
+      `${a.apellido || ''} ${a.nombre || ''}`.localeCompare(
+        `${b.apellido || ''} ${b.nombre || ''}`,
+        'es'
+      )
+
+    return [...players].sort((a, b) => {
+      if (playerOrder === 'ranking') {
+        return (
+          (a.stats?.ranking || Number.MAX_SAFE_INTEGER) -
+            (b.stats?.ranking || Number.MAX_SAFE_INTEGER) || byName(a, b)
+        )
+      }
+      if (playerOrder === 'alphabetical_desc') return byName(b, a)
+      return byName(a, b)
+    })
+  }, [players, playerOrder])
   const hasFilters = Boolean(playerSearch || date || categoryId)
 
   const clearFilters = () => {
@@ -159,11 +186,54 @@ export default function Tennis() {
 
       {view === 'players' && (
         <div className='space-y-3'>
-          {lp
-            ? Array(4)
-                .fill(0)
-                .map((_, i) => <div key={i} className='skeleton h-16 rounded-xl' />)
-            : players.map((p) => <PlayerCard key={p.id} player={p} />)}
+          <div className='card p-4 space-y-3'>
+            <div>
+              <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
+                Estadísticas por categoría
+              </p>
+              <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
+                Puntos de clasificación: 3 para el ganador y 0 para el perdedor si no cede sets; 2 y
+                1, respectivamente, si el perdedor gana al menos un set.
+              </p>
+            </div>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+              <select
+                className='form-input'
+                value={playerCategoryId}
+                onChange={(event) => setPlayerCategoryId(event.target.value)}
+                aria-label='Filtrar estadísticas por categoría'
+              >
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.nombre}
+                  </option>
+                ))}
+              </select>
+              <select
+                className='form-input'
+                value={playerOrder}
+                onChange={(event) => setPlayerOrder(event.target.value)}
+                aria-label='Ordenar jugadores'
+              >
+                <option value='ranking'>Ranking</option>
+                <option value='alphabetical'>Alfabético A–Z</option>
+                <option value='alphabetical_desc'>Alfabético Z–A</option>
+              </select>
+            </div>
+          </div>
+          {lp ? (
+            Array(4)
+              .fill(0)
+              .map((_, i) => <div key={i} className='skeleton h-16 rounded-xl' />)
+          ) : sortedPlayers.length > 0 ? (
+            sortedPlayers.map((p) => (
+              <PlayerCard key={p.id} player={p} categoryId={playerCategoryId} />
+            ))
+          ) : (
+            <p className='card p-8 text-center text-sm' style={{ color: 'var(--text-muted)' }}>
+              Aún no hay partidos finalizados en esta categoría.
+            </p>
+          )}
         </div>
       )}
     </div>
