@@ -100,6 +100,26 @@ test('getAll devuelve sets, categoría y aplica los filtros del historial', asyn
   ])
 })
 
+test('getAll permite ordenar los próximos partidos desde la fecha más cercana', async () => {
+  const calls = []
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params })
+      return [[]]
+    },
+  }
+
+  await loadService(fakeDb).getAll({
+    estado: 'programado',
+    deporte: 'tenis',
+    orden: 'asc',
+  })
+
+  assert.match(calls[0].sql, /p\.fecha_inicio ASC/)
+  assert.match(calls[0].sql, /p\.hora_inicio ASC/)
+  assert.deepEqual(calls[0].params, ['programado', 'tenis'])
+})
+
 test('updateMarcador rechaza sets duplicados antes de escribir', async () => {
   const fakeDb = {
     async query() {

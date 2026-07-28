@@ -9,6 +9,7 @@ import { useMatches } from '../hooks/useMatches'
 import { usePlayers } from '../hooks/usePlayers'
 import { useDebounce } from '../hooks/useDebounce'
 import { categoriaService } from '../services/categoriaService'
+import { formatDate } from '../utils/formatDate'
 
 const VIEW_TABS = [
   { value: 'results', label: 'Resultados' },
@@ -21,10 +22,14 @@ export default function Tennis() {
   const [playerSearch, setPlayerSearch] = useState('')
   const [date, setDate] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [upcomingPlayerSearch, setUpcomingPlayerSearch] = useState('')
+  const [upcomingDate, setUpcomingDate] = useState('')
+  const [upcomingCategoryId, setUpcomingCategoryId] = useState('')
   const [categories, setCategories] = useState([])
   const [playerCategoryId, setPlayerCategoryId] = useState('')
   const [playerOrder, setPlayerOrder] = useState('ranking')
   const debouncedPlayer = useDebounce(playerSearch.trim(), 350)
+  const debouncedUpcomingPlayer = useDebounce(upcomingPlayerSearch.trim(), 350)
 
   useEffect(() => {
     categoriaService
@@ -49,7 +54,19 @@ export default function Tennis() {
     [categoryId, date, debouncedPlayer]
   )
   const { matches: finished, loading: lf } = useMatches(historyFilters)
-  const { matches: upcoming } = useMatches({ estado: 'programado', deporte: 'tenis' })
+  const upcomingFilters = useMemo(
+    () => ({
+      estado: 'programado',
+      deporte: 'tenis',
+      orden: 'asc',
+      ...(debouncedUpcomingPlayer && { jugador: debouncedUpcomingPlayer }),
+      ...(upcomingDate && { fecha: upcomingDate }),
+      ...(upcomingCategoryId && { categoria_id: upcomingCategoryId }),
+    }),
+    [debouncedUpcomingPlayer, upcomingCategoryId, upcomingDate]
+  )
+  const { matches: upcoming, loading: lu } = useMatches(upcomingFilters)
+  const upcomingGroups = useMemo(() => groupUpcomingMatches(upcoming), [upcoming])
   const { players, loading: lp } = usePlayers({
     deporte: 'tenis',
     ...(playerCategoryId && { categoria_id: playerCategoryId }),
@@ -73,11 +90,18 @@ export default function Tennis() {
     })
   }, [players, playerOrder])
   const hasFilters = Boolean(playerSearch || date || categoryId)
+  const hasUpcomingFilters = Boolean(upcomingPlayerSearch || upcomingDate || upcomingCategoryId)
 
   const clearFilters = () => {
     setPlayerSearch('')
     setDate('')
     setCategoryId('')
+  }
+
+  const clearUpcomingFilters = () => {
+    setUpcomingPlayerSearch('')
+    setUpcomingDate('')
+    setUpcomingCategoryId('')
   }
 
   return (
@@ -177,10 +201,98 @@ export default function Tennis() {
       )}
 
       {view === 'upcoming' && (
-        <div className='space-y-3'>
-          {upcoming.map((m) => (
-            <MatchCard key={m.id} match={m} />
-          ))}
+        <div className='space-y-5'>
+          <SectionHeader
+            title='Próximos partidos'
+            subtitle={`${upcoming.length} partido${upcoming.length === 1 ? '' : 's'}`}
+          />
+
+          <div className='card p-4'>
+            <div className='flex items-center justify-between gap-3 mb-3'>
+              <div className='flex items-center gap-2'>
+                <SlidersHorizontal className='w-4 h-4' style={{ color: 'var(--color-brand)' }} />
+                <span className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
+                  Filtrar programación
+                </span>
+              </div>
+              {hasUpcomingFilters && (
+                <button
+                  type='button'
+                  onClick={clearUpcomingFilters}
+                  className='btn-ghost text-xs flex items-center gap-1 px-2 py-1'
+                >
+                  <X className='w-3.5 h-3.5' />
+                  Limpiar
+                </button>
+              )}
+            </div>
+
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
+              <div className='relative'>
+                <Search
+                  className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4'
+                  style={{ color: 'var(--text-muted)' }}
+                />
+                <input
+                  className='form-input pl-10'
+                  value={upcomingPlayerSearch}
+                  onChange={(event) => setUpcomingPlayerSearch(event.target.value)}
+                  placeholder='Nombre del jugador'
+                  aria-label='Filtrar próximos partidos por jugador'
+                />
+              </div>
+              <input
+                type='date'
+                className='form-input'
+                value={upcomingDate}
+                onChange={(event) => setUpcomingDate(event.target.value)}
+                aria-label='Filtrar próximos partidos por fecha'
+              />
+              <select
+                className='form-input'
+                value={upcomingCategoryId}
+                onChange={(event) => setUpcomingCategoryId(event.target.value)}
+                aria-label='Filtrar próximos partidos por categoría'
+              >
+                <option value=''>Todas las categorías</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {lu ? (
+            <div className='space-y-3'>
+              {Array(3)
+                .fill(0)
+                .map((_, index) => (
+                  <MatchCardSkeleton key={index} />
+                ))}
+            </div>
+          ) : upcomingGroups.length > 0 ? (
+            upcomingGroups.map((group) => (
+              <section key={group.date || 'sin-fecha'} className='space-y-3'>
+                <SectionHeader
+                  title={group.date ? formatDate(group.date) : 'Sin fecha definida'}
+                  subtitle={`${group.matches.length} partido${
+                    group.matches.length === 1 ? '' : 's'
+                  }`}
+                />
+                <div className='space-y-3'>
+                  {group.matches.map((match) => (
+                    <MatchCard key={match.id} match={match} />
+                  ))}
+                </div>
+              </section>
+            ))
+          ) : (
+            <p className='card p-8 text-center text-sm' style={{ color: 'var(--text-muted)' }}>
+              No hay próximos partidos que coincidan con los filtros.
+            </p>
+          )}
         </div>
       )}
 
@@ -238,4 +350,29 @@ export default function Tennis() {
       )}
     </div>
   )
+}
+
+function groupUpcomingMatches(matches) {
+  const sorted = [...matches].sort((a, b) => {
+    if (!a.fecha_inicio && b.fecha_inicio) return 1
+    if (a.fecha_inicio && !b.fecha_inicio) return -1
+
+    const dateComparison = String(a.fecha_inicio || '').localeCompare(String(b.fecha_inicio || ''))
+    if (dateComparison) return dateComparison
+
+    const timeComparison = String(a.hora_inicio || '99:99:99').localeCompare(
+      String(b.hora_inicio || '99:99:99')
+    )
+    return timeComparison || Number(a.id) - Number(b.id)
+  })
+
+  const groups = new Map()
+  for (const match of sorted) {
+    const date = match.fecha_inicio || null
+    const key = date || 'sin-fecha'
+    if (!groups.has(key)) groups.set(key, { date, matches: [] })
+    groups.get(key).matches.push(match)
+  }
+
+  return [...groups.values()]
 }

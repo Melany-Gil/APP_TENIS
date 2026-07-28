@@ -55,7 +55,7 @@ const MATCH_SELECT = `
   LEFT JOIN equipos_padel op2e2 ON op2e2.id = op2.equipo2_id
 `
 
-exports.getAll = async ({ estado, deporte, categoria_id, fecha, jugador, desde, hasta }) => {
+exports.getAll = async ({ estado, deporte, categoria_id, fecha, jugador, desde, hasta, orden }) => {
   let query = `${MATCH_SELECT} WHERE 1 = 1`
   const params = []
 
@@ -94,7 +94,9 @@ exports.getAll = async ({ estado, deporte, categoria_id, fecha, jugador, desde, 
     params.push(term, term, term, term)
   }
 
-  query += ' ORDER BY p.fecha_inicio IS NULL, p.fecha_inicio DESC, p.hora_inicio DESC, p.id DESC'
+  const direction = orden === 'asc' ? 'ASC' : 'DESC'
+  query += ` ORDER BY p.fecha_inicio IS NULL, p.fecha_inicio ${direction},
+             p.hora_inicio IS NULL, p.hora_inicio ${direction}, p.id ${direction}`
 
   const [rows] = await db.query(query, params)
   if (!rows.length) return []
