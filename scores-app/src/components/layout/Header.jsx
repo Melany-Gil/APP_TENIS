@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router-dom'
 import {
   Bell,
   CheckCheck,
+  Handshake,
   Home,
   LogIn,
   Radio,
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio', exact: true },
   { to: '/live', icon: Radio, label: 'En vivo', dot: true },
   { to: '/tennis', icon: Trophy, label: 'Tenis' },
+  { to: '/sponsors', icon: Handshake, label: 'Patrocinadores' },
   { to: '/favorites', icon: Star, label: 'Favoritos' },
   { to: '/profile', icon: User, label: 'Mi perfil' },
   { to: '/settings', icon: Settings, label: 'Configuración' },

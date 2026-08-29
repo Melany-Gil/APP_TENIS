@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { Outlet } from 'react-router-dom'
 import Header from '../components/layout/Header'
+import SponsorDock from '../components/sponsors/SponsorDock'
 import ContentLoader from '../components/ui/ContentLoader'
 import ToastContainer from '../components/ui/Toast'
 import { useHealthCheck } from '../hooks/useHealthCheck'
@@ -18,6 +19,7 @@ export default function AppLayout() {
           </Suspense>
         </div>
       </main>
+      <SponsorDock />
       <ToastContainer />
     </div>
   )

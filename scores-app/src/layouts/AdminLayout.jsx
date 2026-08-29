@@ -18,6 +18,7 @@ import { authService } from '../services/authService'
 import { useHealthCheck } from '../hooks/useHealthCheck'
 import ThemeToggle from '../components/common/ThemeToggle'
 import ContentLoader from '../components/ui/ContentLoader'
+import SponsorDock from '../components/sponsors/SponsorDock'
 import { cn } from '../utils/cn'
 
 const NAV = [
@@ -121,6 +122,7 @@ export default function AdminLayout() {
           <Outlet />
         </Suspense>
       </main>
+      <SponsorDock defaultMinimized />
     </div>
   )
 }
