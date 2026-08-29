@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { CalendarDays, ChevronRight, History, Radio, Trophy } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import MatchCard from '../components/match/MatchCard'
+import SponsorsCarousel from '../components/sponsors/SponsorsCarousel'
 import { MatchCardSkeleton } from '../components/ui/Skeleton'
 import SectionHeader from '../components/common/SectionHeader'
 import { useMatches } from '../hooks/useMatches'
@@ -147,6 +148,8 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      <SponsorsCarousel />
     </div>
   )
 }
