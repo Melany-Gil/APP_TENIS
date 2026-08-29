@@ -1,135 +1,177 @@
-import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Bell, Menu, CheckCheck, LogIn } from 'lucide-react'
-import useUIStore from '../../store/useUIStore'
+import { useEffect, useRef, useState } from 'react'
+import { Link, NavLink } from 'react-router-dom'
+import {
+  Bell,
+  CheckCheck,
+  Home,
+  LogIn,
+  Radio,
+  Settings,
+  ShieldCheck,
+  Star,
+  Trophy,
+  User,
+} from 'lucide-react'
 import useAuthStore from '../../store/useAuthStore'
+import { cn } from '../../utils/cn'
 import ThemeToggle from '../common/ThemeToggle'
 
 const MOCK_NOTIFS = []
 
+const NAV_ITEMS = [
+  { to: '/', icon: Home, label: 'Inicio', exact: true },
+  { to: '/live', icon: Radio, label: 'En vivo', dot: true },
+  { to: '/tennis', icon: Trophy, label: 'Tenis' },
+  { to: '/favorites', icon: Star, label: 'Favoritos' },
+  { to: '/profile', icon: User, label: 'Mi perfil' },
+  { to: '/settings', icon: Settings, label: 'Configuración' },
+]
+
 export default function Header() {
-  const { toggleSidebar, sidebarCollapsed } = useUIStore()
   const { user } = useAuthStore()
   const [showNotifs, setShowNotifs] = useState(false)
   const notifRef = useRef(null)
+  const isAdmin = user?.rol === 'admin'
 
   useEffect(() => {
-    if (!showNotifs) return
-    const handler = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target)) {
+    if (!showNotifs) return undefined
+
+    const handler = (event) => {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
         setShowNotifs(false)
       }
     }
+
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showNotifs])
 
-  const unread = MOCK_NOTIFS.filter((n) => !n.read).length
+  const unread = MOCK_NOTIFS.filter((notification) => !notification.read).length
 
   return (
-    <header className='app-header fixed top-0 left-0 right-0 z-50 flex items-center h-16 px-4 sm:px-6 gap-3'>
-      {/* Hamburguesa */}
-      <button
-        onClick={toggleSidebar}
-        className='btn-ghost min-h-0 w-10 h-10 p-0 shrink-0'
-        aria-label={sidebarCollapsed ? 'Abrir navegación' : 'Cerrar navegación'}
-      >
-        <Menu className='w-5 h-5' style={{ color: 'var(--text-primary)' }} />
-      </button>
+    <header className='app-header top-navigation fixed inset-x-0 top-0 z-50'>
+      <div className='top-navigation-primary'>
+        <Link to='/' className='top-navigation-brands' aria-label='Ir al inicio del Club Unión'>
+          <img
+            src='/branding/subcomite-tenis-club-union.png'
+            alt='Subcomité de Tenis del Club Unión'
+            className='top-navigation-club-logo'
+          />
+          <span className='top-navigation-brand-divider' aria-hidden='true' />
+          <img
+            src='/branding/legal-branding.png'
+            alt='Legal Branding'
+            className='top-navigation-partner-logo'
+          />
+        </Link>
 
-      {/* Logo */}
-      <Link to='/' className='flex items-center gap-2 font-bold text-sm'>
-        <div
-          className='brand-mark w-9 h-9 rounded-xl flex items-center justify-center text-white font-extrabold text-xs shrink-0'
-          style={{ backgroundColor: 'var(--color-brand)', boxShadow: 'var(--shadow-brand)' }}
+        <nav
+          className='top-navigation-links top-navigation-links-desktop'
+          aria-label='Navegación principal'
         >
-          CU
-        </div>
-        <span className='hidden sm:flex flex-col leading-tight'>
-          <span style={{ color: 'var(--text-primary)' }}>Club Unión</span>
-          <span className='text-[10px] font-medium' style={{ color: 'var(--text-muted)' }}>
-            Subcomité de Tenis
-          </span>
-        </span>
-      </Link>
+          <NavigationLinks isAdmin={isAdmin} />
+        </nav>
 
-      <div className='ml-auto flex items-center gap-2'>
-        {/* Toggle modo claro/oscuro — visible para todos los roles */}
-        <ThemeToggle />
+        <div className='top-navigation-actions'>
+          <ThemeToggle />
 
-        {/* Notificaciones */}
-        <div ref={notifRef} className='relative'>
-          <button onClick={() => setShowNotifs((p) => !p)} className='btn-ghost relative p-2'>
-            <Bell className='w-5 h-5' style={{ color: 'var(--text-secondary)' }} />
-            {unread > 0 && (
-              <span
-                className='absolute top-1.5 right-1.5 w-2 h-2 rounded-full'
-                style={{ backgroundColor: 'var(--color-brand)' }}
-              />
-            )}
-          </button>
-
-          {showNotifs && (
-            <div
-              className='absolute right-0 top-11 w-72 rounded-xl shadow-xl overflow-hidden z-50 animate-fade-up'
-              style={{
-                backgroundColor: 'var(--bg-sidebar)',
-                border: '1px solid var(--border-color)',
-              }}
+          <div ref={notifRef} className='relative'>
+            <button
+              type='button'
+              onClick={() => setShowNotifs((current) => !current)}
+              className='btn-ghost relative p-2'
+              aria-label='Ver notificaciones'
+              aria-expanded={showNotifs}
             >
-              <div
-                className='flex items-center justify-between px-4 py-3'
-                style={{ borderBottom: '1px solid var(--border-color)' }}
-              >
-                <span className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
-                  Notificaciones
-                </span>
-                {unread > 0 && (
-                  <button
-                    className='flex items-center gap-1 text-xs'
-                    style={{ color: 'var(--color-brand)' }}
-                  >
-                    <CheckCheck className='w-3.5 h-3.5' /> Marcar leído
-                  </button>
-                )}
+              <Bell className='w-5 h-5' style={{ color: 'var(--text-secondary)' }} />
+              {unread > 0 && (
+                <span
+                  className='absolute top-1.5 right-1.5 w-2 h-2 rounded-full'
+                  style={{ backgroundColor: 'var(--color-brand)' }}
+                />
+              )}
+            </button>
+
+            {showNotifs && (
+              <div className='top-navigation-notifications animate-fade-up'>
+                <div
+                  className='flex items-center justify-between px-4 py-3'
+                  style={{ borderBottom: '1px solid var(--border-color)' }}
+                >
+                  <span className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
+                    Notificaciones
+                  </span>
+                  {unread > 0 && (
+                    <button
+                      type='button'
+                      className='flex items-center gap-1 text-xs'
+                      style={{ color: 'var(--color-brand)' }}
+                    >
+                      <CheckCheck className='w-3.5 h-3.5' /> Marcar leído
+                    </button>
+                  )}
+                </div>
+                <div className='flex flex-col items-center justify-center py-10 gap-2'>
+                  <Bell className='w-8 h-8' style={{ color: 'var(--text-muted)' }} />
+                  <p className='text-sm font-medium' style={{ color: 'var(--text-secondary)' }}>
+                    Sin notificaciones
+                  </p>
+                  <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
+                    Aquí verás los avisos del club
+                  </p>
+                </div>
               </div>
-              <div className='flex flex-col items-center justify-center py-10 gap-2'>
-                <Bell className='w-8 h-8' style={{ color: 'var(--text-muted)' }} />
-                <p className='text-sm font-medium' style={{ color: 'var(--text-secondary)' }}>
-                  Sin notificaciones
-                </p>
-                <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                  Aquí verás los avisos del club
-                </p>
-              </div>
-            </div>
+            )}
+          </div>
+
+          {user ? (
+            <Link
+              to='/profile'
+              className='top-navigation-avatar'
+              aria-label={`Abrir perfil de ${user.nombre}`}
+            >
+              {user.nombre?.charAt(0)?.toUpperCase()}
+            </Link>
+          ) : (
+            <Link to='/login' className='top-navigation-login'>
+              <LogIn className='w-4 h-4' />
+              <span>Ingresar</span>
+            </Link>
           )}
         </div>
-
-        {/* Cuenta */}
-        {user ? (
-          <Link
-            to='/profile'
-            className='w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all'
-            style={{
-              backgroundColor: 'var(--color-brand-dim)',
-              color: 'var(--color-brand)',
-              border: '1px solid var(--border-focus)',
-            }}
-          >
-            {user.nombre?.charAt(0)?.toUpperCase()}
-          </Link>
-        ) : (
-          <Link
-            to='/login'
-            className='inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold'
-            style={{ backgroundColor: 'var(--color-brand)', color: 'white' }}
-          >
-            <LogIn className='w-4 h-4' />
-            <span className='hidden sm:inline'>Iniciar sesión</span>
-          </Link>
-        )}
       </div>
+
+      <nav
+        className='top-navigation-links top-navigation-links-mobile'
+        aria-label='Navegación principal móvil'
+      >
+        <NavigationLinks isAdmin={isAdmin} />
+      </nav>
     </header>
   )
+}
+
+function NavigationLinks({ isAdmin }) {
+  const items = isAdmin
+    ? [...NAV_ITEMS, { to: '/admin', icon: ShieldCheck, label: 'Administración' }]
+    : NAV_ITEMS
+
+  return items.map((item) => (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={item.exact}
+      className={({ isActive }) => cn('top-navigation-link', isActive && 'active')}
+    >
+      {({ isActive }) => (
+        <>
+          <span className='top-navigation-link-icon'>
+            <item.icon strokeWidth={isActive ? 2.4 : 1.9} aria-hidden='true' />
+            {item.dot && <span className='top-navigation-live-dot' />}
+          </span>
+          <span>{item.label}</span>
+        </>
+      )}
+    </NavLink>
+  ))
 }

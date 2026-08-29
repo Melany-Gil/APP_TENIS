@@ -4,32 +4,32 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 const AUTOPLAY_DELAY = 5600
 
 const SPONSORS = [
-  { name: 'Propiedad Legal Inmobiliaria', image: '/sponsors/72.png', accent: '#171717' },
-  { name: 'Coascon Ingeniería y Construcción', image: '/sponsors/73.png', accent: '#ff6935' },
-  { name: 'Soluciones Dentales', image: '/sponsors/74.png', accent: '#15358e' },
-  { name: 'Legal Branding', image: '/sponsors/75.png', accent: '#202b42' },
-  { name: 'Supermercados Más x Menos', image: '/sponsors/4.png', accent: '#2d5688' },
   { name: 'Gente Útil', image: '/sponsors/6.png', accent: '#123ca3' },
-  { name: 'Metrollantas', image: '/sponsors/12.png', accent: '#173874' },
+  { name: 'Supermercados Más x Menos', image: '/sponsors/4.png', accent: '#2d5688' },
   { name: 'Actúa Legal', image: '/sponsors/15.png', accent: '#161616' },
+  { name: 'Toscano Producciones', image: '/sponsors/33.png', accent: '#171717' },
+  { name: 'Metrollantas', image: '/sponsors/12.png', accent: '#173874' },
   { name: 'Induleche', image: '/sponsors/19.png', accent: '#ed4b12' },
   { name: 'Choconato Artesanal', image: '/sponsors/23.png', accent: '#694335' },
-  { name: 'Cajasan', image: '/sponsors/27.png', accent: '#313f91' },
-  { name: 'DIRECTV', image: '/sponsors/32.png', accent: '#159dd2' },
-  { name: 'Toscano Producciones', image: '/sponsors/33.png', accent: '#171717' },
+  { name: 'Coascon Ingeniería y Construcción', image: '/sponsors/73.png', accent: '#ff6935' },
   { name: 'Ricuras Marly', image: '/sponsors/34.png', accent: '#2258a4' },
+  { name: 'Mercagán Parrilla', image: '/sponsors/44.png', accent: '#bc2028' },
+  { name: 'DIRECTV', image: '/sponsors/32.png', accent: '#159dd2' },
   { name: 'Santur Consultores de Viajes', image: '/sponsors/36.png', accent: '#447ff0' },
   { name: 'Caviisalud', image: '/sponsors/38.png', accent: '#304b19' },
-  { name: 'Sandra Quintero Fisioterapia', image: '/sponsors/40.png', accent: '#d9aa27' },
   { name: 'Avicampo', image: '/sponsors/41.png', accent: '#ff891f' },
   { name: 'Porci Campo', image: '/sponsors/42.png', accent: '#bd202b' },
-  { name: 'Mercagán Parrilla', image: '/sponsors/44.png', accent: '#bc2028' },
-  { name: 'Clínica de la Rodilla', image: '/sponsors/52.png', accent: '#315fa2' },
-  { name: 'Laboratorio Bolívar', image: '/sponsors/53.png', accent: '#f36b1c' },
-  { name: 'Montessori Jardín Infantil', image: '/sponsors/58.png', accent: '#2a8294' },
-  { name: 'SYS Ingeniería y Servicios', image: '/sponsors/59.png', accent: '#18bd9b' },
-  { name: 'Tila María Jaimes', image: '/sponsors/62.png', accent: '#35b7b8' },
+  { name: 'Soluciones Dentales', image: '/sponsors/74.png', accent: '#15358e' },
   { name: 'Hybrid Farma', image: '/sponsors/70.png', accent: '#11b6d0' },
+  { name: 'Laboratorios Bolívar', image: '/sponsors/53.png', accent: '#f36b1c' },
+  { name: 'Profesionales de la Salud I.P.S.', image: '/sponsors/62.png', accent: '#35b7b8' },
+  { name: 'SYS Ingeniería y Servicios', image: '/sponsors/59.png', accent: '#18bd9b' },
+  { name: 'Clínica de la Rodilla', image: '/sponsors/52.png', accent: '#315fa2' },
+  { name: 'Montessori Jardín Infantil', image: '/sponsors/58.png', accent: '#2a8294' },
+  { name: 'Dra. Sandra Quintero', image: '/sponsors/40.png', accent: '#d9aa27' },
+  { name: 'Cajasan', image: '/sponsors/27.png', accent: '#313f91' },
+  { name: 'Propiedad Legal Inmobiliaria', image: '/sponsors/72.png', accent: '#171717' },
+  { name: 'Legal Branding', image: '/sponsors/75.png', accent: '#202b42' },
 ]
 
 function circularOffset(index, activeIndex, total) {
@@ -204,10 +204,8 @@ export default function SponsorsCarousel() {
       </div>
 
       <div className='sponsors-controls'>
-        <div className='sponsors-counter' aria-live='polite' aria-atomic='true'>
-          <span>{String(activeIndex + 1).padStart(2, '0')}</span>
-          <span className='sponsors-counter-divider' />
-          <span>{String(total).padStart(2, '0')}</span>
+        <div className='sponsors-current-name' aria-live='polite' aria-atomic='true'>
+          {activeSponsor.name}
         </div>
 
         <div className='sponsors-progress' aria-hidden='true'>

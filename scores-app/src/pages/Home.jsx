@@ -24,6 +24,8 @@ export default function Home() {
 
   return (
     <div className='space-y-8 animate-fade-up'>
+      <SponsorsCarousel />
+
       <section className='hero-panel'>
         <div className='relative z-10 max-w-2xl'>
           <span className='hero-kicker'>
@@ -148,8 +150,6 @@ export default function Home() {
           </div>
         </section>
       )}
-
-      <SponsorsCarousel />
     </div>
   )
 }

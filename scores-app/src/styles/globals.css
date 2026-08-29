@@ -160,6 +160,169 @@
     -webkit-backdrop-filter: blur(18px) saturate(150%);
   }
 
+  .app-main {
+    padding-top: 84px;
+    padding-bottom: 32px;
+  }
+
+  .top-navigation {
+    box-shadow: 0 8px 32px rgba(18, 60, 42, 0.07);
+  }
+
+  .top-navigation-primary {
+    display: flex;
+    align-items: center;
+    gap: clamp(20px, 3vw, 46px);
+    width: 100%;
+    max-width: 1480px;
+    height: 76px;
+    margin-inline: auto;
+    padding-inline: clamp(18px, 3vw, 42px);
+  }
+
+  .top-navigation-brands {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .top-navigation-club-logo {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    filter: drop-shadow(0 5px 10px rgba(18, 60, 42, 0.14));
+  }
+
+  .top-navigation-partner-logo {
+    width: 112px;
+    height: 48px;
+    object-fit: contain;
+  }
+
+  .dark .top-navigation-partner-logo {
+    filter: brightness(0) invert(1) opacity(0.9);
+  }
+
+  .top-navigation-brand-divider {
+    width: 1px;
+    height: 34px;
+    background: var(--border-color);
+  }
+
+  .top-navigation-links {
+    align-items: center;
+    gap: 4px;
+  }
+
+  .top-navigation-links-desktop {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .top-navigation-links-mobile {
+    display: none;
+  }
+
+  .top-navigation-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 42px;
+    padding: 9px 13px;
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1;
+    white-space: nowrap;
+    transition: color 170ms ease, background-color 170ms ease, transform 170ms ease;
+  }
+
+  .top-navigation-link:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+  }
+
+  .top-navigation-link.active {
+    background: var(--color-brand-dim);
+    color: var(--color-brand);
+    font-weight: 750;
+  }
+
+  .top-navigation-link-icon {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .top-navigation-link-icon svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .top-navigation-live-dot {
+    position: absolute;
+    top: -2px;
+    right: -3px;
+    width: 5px;
+    height: 5px;
+    border: 1px solid var(--bg-sidebar);
+    border-radius: 50%;
+    background: var(--club-clay);
+  }
+
+  .top-navigation-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .top-navigation-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-focus);
+    border-radius: 50%;
+    background: var(--color-brand-dim);
+    color: var(--color-brand);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .top-navigation-login {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 40px;
+    padding: 9px 14px;
+    border-radius: var(--radius-full);
+    background: var(--color-brand);
+    color: var(--club-white);
+    font-size: 12px;
+    font-weight: 750;
+    box-shadow: 0 5px 16px rgba(var(--color-brand-rgb), 0.18);
+  }
+
+  .top-navigation-notifications {
+    position: absolute;
+    top: 46px;
+    right: 0;
+    z-index: 60;
+    width: min(288px, calc(100vw - 32px));
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-sidebar);
+    box-shadow: var(--shadow-hover);
+  }
+
   .app-sidebar {
     background: var(--bg-sidebar);
     border-right: 1px solid var(--border-color);
@@ -966,25 +1129,18 @@
     padding-inline: clamp(22px, 5vw, 64px);
   }
 
-  .sponsors-counter {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-muted);
-    font-size: 10px;
-    font-variant-numeric: tabular-nums;
-    font-weight: 800;
-    letter-spacing: 0.1em;
-  }
-
-  .sponsors-counter span:first-child {
+  .sponsors-current-name {
+    flex: 0 1 270px;
+    min-width: 0;
+    overflow: hidden;
     color: var(--text-primary);
-  }
-
-  .sponsors-counter-divider {
-    width: 22px;
-    height: 1px;
-    background: var(--border-hover);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.055em;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
 
   .sponsors-progress {
@@ -1090,6 +1246,40 @@
   }
 }
 
+@media (max-width: 1180px) {
+  .app-main {
+    padding-top: 128px;
+    padding-bottom: 26px;
+  }
+
+  .top-navigation-primary {
+    height: 74px;
+  }
+
+  .top-navigation-links-desktop {
+    display: none;
+  }
+
+  .top-navigation-links-mobile {
+    display: flex;
+    height: 50px;
+    padding: 4px 16px 5px;
+    overflow-x: auto;
+    border-top: 1px solid var(--border-color);
+    scrollbar-width: none;
+  }
+
+  .top-navigation-links-mobile::-webkit-scrollbar {
+    display: none;
+  }
+
+  .top-navigation-links-mobile .top-navigation-link {
+    min-height: 39px;
+    padding: 8px 13px;
+    flex-shrink: 0;
+  }
+}
+
 @media (max-width: 640px) {
   .auth-card {
     padding: 28px 22px;
@@ -1098,6 +1288,67 @@
 
   .hero-panel {
     border-radius: var(--radius-lg);
+  }
+
+  .app-main {
+    padding-top: 122px;
+    padding-bottom: 20px;
+  }
+
+  .top-navigation-primary {
+    height: 70px;
+    gap: 10px;
+    padding-inline: 12px;
+  }
+
+  .top-navigation-brands {
+    gap: 8px;
+  }
+
+  .top-navigation-club-logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .top-navigation-partner-logo {
+    width: 90px;
+    height: 40px;
+  }
+
+  .top-navigation-brand-divider {
+    height: 28px;
+  }
+
+  .top-navigation-actions {
+    margin-left: auto;
+    gap: 0;
+  }
+
+  .top-navigation-actions .btn-ghost {
+    width: 36px;
+    min-height: 36px;
+    padding: 7px;
+  }
+
+  .top-navigation-login {
+    min-height: 36px;
+    padding: 8px 10px;
+  }
+
+  .top-navigation-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .top-navigation-links-mobile {
+    height: 48px;
+    padding-inline: 10px;
+  }
+
+  .top-navigation-links-mobile .top-navigation-link {
+    min-height: 37px;
+    padding-inline: 11px;
+    font-size: 11px;
   }
 
   .sponsors-section {
@@ -1139,11 +1390,27 @@
     gap: 10px;
   }
 
+  .sponsors-current-name {
+    flex-basis: 47%;
+    font-size: 9px;
+    letter-spacing: 0.035em;
+  }
+
   .sponsors-progress {
     max-width: none;
   }
 
   .sponsors-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .top-navigation-partner-logo {
+    width: 76px;
+  }
+
+  .top-navigation-login span {
     display: none;
   }
 }
