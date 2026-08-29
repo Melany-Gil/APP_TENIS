@@ -25,6 +25,11 @@ export default function SponsorDock({ defaultMinimized = false }) {
     setActiveIndex((current) => (current + 1) % total)
   }, [total])
 
+  const minimizeDock = useCallback(() => {
+    setIsPaused(false)
+    setIsMinimized(true)
+  }, [])
+
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
     const updatePreference = () => setPrefersReducedMotion(mediaQuery.matches)
@@ -34,10 +39,11 @@ export default function SponsorDock({ defaultMinimized = false }) {
   }, [])
 
   useEffect(() => {
-    if (isPaused || prefersReducedMotion) return undefined
+    const rotationIsPaused = !isMinimized && isPaused
+    if (rotationIsPaused || prefersReducedMotion) return undefined
     const timer = window.setTimeout(goNext, ROTATION_DELAY)
     return () => window.clearTimeout(timer)
-  }, [activeIndex, goNext, isPaused, prefersReducedMotion])
+  }, [activeIndex, goNext, isMinimized, isPaused, prefersReducedMotion])
 
   if (isMinimized) {
     return (
@@ -83,7 +89,7 @@ export default function SponsorDock({ defaultMinimized = false }) {
           </span>
           <button
             type='button'
-            onClick={() => setIsMinimized(true)}
+            onClick={minimizeDock}
             aria-label='Minimizar patrocinador'
           >
             <Minimize2 aria-hidden='true' />
