@@ -25,6 +25,19 @@ const getColumn = async (tableName, columnName) => {
   return rows[0] || null
 }
 
+const getColumnType = async (tableName, columnName) => {
+  const [rows] = await db.query(
+    `SELECT COLUMN_TYPE AS columnType
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?
+     LIMIT 1`,
+    [tableName, columnName]
+  )
+  return rows[0]?.columnType || null
+}
+
 const columnIndexExists = async (tableName, columnName) => {
   const [rows] = await db.query(
     `SELECT COUNT(*) AS total
@@ -51,6 +64,13 @@ const columnForeignKeyExists = async (tableName, columnName) => {
 }
 
 exports.ensureSchema = async () => {
+  const roleType = await getColumnType('users', 'rol')
+  if (roleType && !roleType.includes("'juez'")) {
+    await db.query(
+      "ALTER TABLE users MODIFY rol ENUM('admin','juez','miembro') NOT NULL DEFAULT 'miembro'"
+    )
+  }
+
   const tournamentStart = await getColumn('torneos', 'fecha_inicio')
   const tournamentEnd = await getColumn('torneos', 'fecha_fin')
   if (tournamentStart?.isNullable === 'NO') {
@@ -89,6 +109,44 @@ exports.ensureSchema = async () => {
   if (!(await columnExists('partidos', 'origen_partido2_id'))) {
     await db.query(
       'ALTER TABLE partidos ADD COLUMN origen_partido2_id INT NULL AFTER origen_partido1_id'
+    )
+  }
+  if (!(await columnExists('partidos', 'juez_id'))) {
+    await db.query('ALTER TABLE partidos ADD COLUMN juez_id INT NULL AFTER origen_partido2_id')
+  }
+  if (!(await columnExists('partidos', 'mejor_de_sets'))) {
+    await db.query(
+      'ALTER TABLE partidos ADD COLUMN mejor_de_sets TINYINT NOT NULL DEFAULT 3 AFTER juez_id'
+    )
+  }
+  if (!(await columnExists('partidos', 'modo_game'))) {
+    await db.query(
+      "ALTER TABLE partidos ADD COLUMN modo_game ENUM('ventaja','sin_ventaja') NOT NULL DEFAULT 'ventaja' AFTER mejor_de_sets"
+    )
+  }
+  if (!(await columnExists('partidos', 'set_decisivo'))) {
+    await db.query(
+      "ALTER TABLE partidos ADD COLUMN set_decisivo ENUM('set_completo','match_tiebreak') NOT NULL DEFAULT 'set_completo' AFTER modo_game"
+    )
+  }
+  if (!(await columnExists('partidos', 'tiebreak_en'))) {
+    await db.query(
+      'ALTER TABLE partidos ADD COLUMN tiebreak_en TINYINT NOT NULL DEFAULT 6 AFTER set_decisivo'
+    )
+  }
+  if (!(await columnExists('partidos', 'tiebreak_puntos'))) {
+    await db.query(
+      'ALTER TABLE partidos ADD COLUMN tiebreak_puntos TINYINT NOT NULL DEFAULT 7 AFTER tiebreak_en'
+    )
+  }
+  if (!(await columnExists('partidos', 'match_tiebreak_puntos'))) {
+    await db.query(
+      'ALTER TABLE partidos ADD COLUMN match_tiebreak_puntos TINYINT NOT NULL DEFAULT 10 AFTER tiebreak_puntos'
+    )
+  }
+  if (!(await columnExists('partidos', 'servidor_inicial'))) {
+    await db.query(
+      "ALTER TABLE partidos ADD COLUMN servidor_inicial ENUM('jugador1','jugador2') NOT NULL DEFAULT 'jugador1' AFTER match_tiebreak_puntos"
     )
   }
 
@@ -151,6 +209,43 @@ exports.ensureSchema = async () => {
        FOREIGN KEY (origen_partido2_id) REFERENCES partidos(id) ON DELETE SET NULL`
     )
   }
+  if (!(await columnIndexExists('partidos', 'juez_id'))) {
+    await db.query('CREATE INDEX idx_partidos_juez ON partidos (juez_id)')
+  }
+  if (!(await columnForeignKeyExists('partidos', 'juez_id'))) {
+    await db.query(
+      `ALTER TABLE partidos
+       ADD CONSTRAINT fk_partidos_juez
+       FOREIGN KEY (juez_id) REFERENCES users(id) ON DELETE SET NULL`
+    )
+  }
 
-  console.log('✅  Esquema de partidos actualizado')
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS eventos_partido (
+      id               BIGINT NOT NULL AUTO_INCREMENT,
+      partido_id       INT NOT NULL,
+      secuencia        INT NOT NULL,
+      tipo             ENUM('punto','primera_falta','let') NOT NULL,
+      ganador          ENUM('jugador1','jugador2') NULL,
+      motivo           VARCHAR(40) NULL,
+      servidor         ENUM('jugador1','jugador2') NOT NULL,
+      numero_servicio  TINYINT NOT NULL DEFAULT 1,
+      marcador_antes   JSON NOT NULL,
+      marcador_despues JSON NOT NULL,
+      created_by       INT NOT NULL,
+      created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      anulado_at       TIMESTAMP NULL,
+      anulado_por      INT NULL,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_evento_secuencia (partido_id, secuencia),
+      KEY idx_eventos_partido_activos (partido_id, anulado_at, secuencia),
+      KEY idx_eventos_created_by (created_by),
+      CONSTRAINT fk_eventos_partido
+        FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE,
+      CONSTRAINT fk_eventos_created_by FOREIGN KEY (created_by) REFERENCES users(id),
+      CONSTRAINT fk_eventos_anulado_por FOREIGN KEY (anulado_por) REFERENCES users(id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
+
+  console.log('✅  Esquema de partidos y jueces actualizado')
 }

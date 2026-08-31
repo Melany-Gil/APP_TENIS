@@ -14,7 +14,7 @@ export default function Login() {
   const { addToast } = useUIStore()
   const navigate = useNavigate()
   const location = useLocation()
-  const redirectTo = location.state?.from || '/'
+  const requestedRedirect = location.state?.from
   const {
     register,
     handleSubmit,
@@ -30,6 +30,8 @@ export default function Login() {
 
       login(user)
       addToast({ type: 'success', title: '¡Bienvenido!', message: `Hola, ${user.nombre}` })
+      const redirectTo =
+        requestedRedirect || (user.rol === 'juez' ? '/juez' : user.rol === 'admin' ? '/admin' : '/')
       navigate(redirectTo, { replace: true })
     } catch (error) {
       setError('numero_documento', {

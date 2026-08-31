@@ -95,7 +95,14 @@ export default function Match() {
         </div>
 
         <div className='space-y-4'>
-          <ScoreRow player={p1} sets={p1Sets} isWinner={winner === 'jugador1'} isLive={isLive} />
+          <ScoreRow
+            player={p1}
+            sets={p1Sets}
+            points={match.marcador_actual?.displayPoints?.[0]}
+            isServing={match.marcador_actual?.server === 'jugador1'}
+            isWinner={winner === 'jugador1'}
+            isLive={isLive}
+          />
           <div className='flex items-center gap-3'>
             <div className='flex-1 h-px' style={{ backgroundColor: 'var(--border-color)' }} />
             {isLive ? (
@@ -107,7 +114,14 @@ export default function Match() {
             )}
             <div className='flex-1 h-px' style={{ backgroundColor: 'var(--border-color)' }} />
           </div>
-          <ScoreRow player={p2} sets={p2Sets} isWinner={winner === 'jugador2'} isLive={isLive} />
+          <ScoreRow
+            player={p2}
+            sets={p2Sets}
+            points={match.marcador_actual?.displayPoints?.[1]}
+            isServing={match.marcador_actual?.server === 'jugador2'}
+            isWinner={winner === 'jugador2'}
+            isLive={isLive}
+          />
         </div>
 
         <div
@@ -151,10 +165,13 @@ export default function Match() {
   )
 }
 
-function ScoreRow({ player, sets, isWinner, isLive }) {
+function ScoreRow({ player, sets, points, isServing, isWinner, isLive }) {
   return (
     <div className='flex items-center gap-3'>
       <div className='flex items-center gap-2 flex-1 min-w-0'>
+        {isServing && isLive && (
+          <span className='w-2.5 h-2.5 rounded-full shrink-0' style={{ backgroundColor: 'var(--club-clay)' }} />
+        )}
         <div>
           <p
             className='font-semibold'
@@ -179,6 +196,14 @@ function ScoreRow({ player, sets, isWinner, isLive }) {
             {s}
           </span>
         ))}
+        {isLive && points != null && (
+          <strong
+            className='score-number text-2xl min-w-[2.5rem] text-center rounded-lg py-1'
+            style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+          >
+            {points}
+          </strong>
+        )}
       </div>
     </div>
   )

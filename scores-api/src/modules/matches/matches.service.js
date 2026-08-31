@@ -13,6 +13,23 @@ const MATCH_SELECT = `
     p.notas,
     p.origen_partido1_id,
     p.origen_partido2_id,
+    p.juez_id,
+    p.mejor_de_sets,
+    p.modo_game,
+    p.set_decisivo,
+    p.tiebreak_en,
+    p.tiebreak_puntos,
+    p.match_tiebreak_puntos,
+    p.servidor_inicial,
+    (
+      SELECT ep.marcador_despues
+      FROM eventos_partido ep
+      WHERE ep.partido_id = p.id AND ep.anulado_at IS NULL
+      ORDER BY ep.secuencia DESC
+      LIMIT 1
+    ) AS marcador_actual,
+    uj.nombre AS juez_nombre,
+    uj.apellido AS juez_apellido,
     cat.id     AS categoria_id,
     cat.nombre AS categoria_nombre,
     j1.id       AS j1_id,
@@ -43,6 +60,7 @@ const MATCH_SELECT = `
   LEFT JOIN jugadores j2 ON j2.id = p.jugador2_id
   LEFT JOIN equipos_padel e1 ON e1.id = p.equipo1_id
   LEFT JOIN equipos_padel e2 ON e2.id = p.equipo2_id
+  LEFT JOIN users uj ON uj.id = p.juez_id
   LEFT JOIN partidos op1 ON op1.id = p.origen_partido1_id
   LEFT JOIN jugadores op1j1 ON op1j1.id = op1.jugador1_id
   LEFT JOIN jugadores op1j2 ON op1j2.id = op1.jugador2_id
@@ -55,7 +73,17 @@ const MATCH_SELECT = `
   LEFT JOIN equipos_padel op2e2 ON op2e2.id = op2.equipo2_id
 `
 
-exports.getAll = async ({ estado, deporte, categoria_id, fecha, jugador, desde, hasta, orden }) => {
+exports.getAll = async ({
+  estado,
+  deporte,
+  categoria_id,
+  fecha,
+  jugador,
+  desde,
+  hasta,
+  orden,
+  juez_id,
+}) => {
   let query = `${MATCH_SELECT} WHERE 1 = 1`
   const params = []
 
@@ -92,6 +120,10 @@ exports.getAll = async ({ estado, deporte, categoria_id, fecha, jugador, desde, 
     )`
     const term = `%${jugador.trim()}%`
     params.push(term, term, term, term)
+  }
+  if (juez_id) {
+    query += ' AND p.juez_id = ?'
+    params.push(juez_id)
   }
 
   const direction = orden === 'asc' ? 'ASC' : 'DESC'
@@ -141,14 +173,19 @@ exports.getById = async (id) => {
   }
 }
 
-exports.create = async (body, created_by) => {
+exports.create = async (body, actor) => {
+  const requester = normalizeActor(actor)
   const match = await validateBasicMatch(body)
+  const scoring = normalizeScoringConfig(body)
+  const judgeId = requester.rol === 'juez' ? requester.id : positiveId(body.juez_id)
+  await validateJudge(judgeId)
   const [result] = await db.query(
     `INSERT INTO partidos
        (deporte, categoria_id, jugador1_id, jugador2_id, equipo1_id, equipo2_id,
         estado, fecha_inicio, hora_inicio, notas, origen_partido1_id, origen_partido2_id,
-        created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        created_by, juez_id, mejor_de_sets, modo_game, set_decisivo, tiebreak_en,
+        tiebreak_puntos, match_tiebreak_puntos, servidor_inicial)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       match.deporte,
       match.categoria_id,
@@ -162,23 +199,41 @@ exports.create = async (body, created_by) => {
       match.notas,
       match.origen_partido1_id,
       match.origen_partido2_id,
-      created_by,
+      requester.id,
+      judgeId,
+      scoring.mejor_de_sets,
+      scoring.modo_game,
+      scoring.set_decisivo,
+      scoring.tiebreak_en,
+      scoring.tiebreak_puntos,
+      scoring.match_tiebreak_puntos,
+      scoring.servidor_inicial,
     ]
   )
 
   return exports.getById(result.insertId)
 }
 
-exports.update = async (id, body) => {
-  const [existing] = await db.query('SELECT id FROM partidos WHERE id = ?', [id])
+exports.update = async (id, body, actor) => {
+  const requester = normalizeActor(actor)
+  const [existing] = await db.query(
+    'SELECT id, juez_id, created_by FROM partidos WHERE id = ?',
+    [id]
+  )
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
+  assertCanManage(existing[0], requester)
 
   const match = await validateBasicMatch(body, Number(id))
+  const scoring = normalizeScoringConfig(body)
+  const judgeId = requester.rol === 'juez' ? requester.id : positiveId(body.juez_id)
+  await validateJudge(judgeId)
   await db.query(
     `UPDATE partidos
      SET deporte = ?, categoria_id = ?, jugador1_id = ?, jugador2_id = ?,
          equipo1_id = ?, equipo2_id = ?, estado = ?, fecha_inicio = ?, hora_inicio = ?, notas = ?,
-         origen_partido1_id = ?, origen_partido2_id = ?
+         origen_partido1_id = ?, origen_partido2_id = ?, juez_id = ?, mejor_de_sets = ?,
+         modo_game = ?, set_decisivo = ?, tiebreak_en = ?, tiebreak_puntos = ?,
+         match_tiebreak_puntos = ?, servidor_inicial = ?
      WHERE id = ?`,
     [
       match.deporte,
@@ -193,6 +248,14 @@ exports.update = async (id, body) => {
       match.notas,
       match.origen_partido1_id,
       match.origen_partido2_id,
+      judgeId,
+      scoring.mejor_de_sets,
+      scoring.modo_game,
+      scoring.set_decisivo,
+      scoring.tiebreak_en,
+      scoring.tiebreak_puntos,
+      scoring.match_tiebreak_puntos,
+      scoring.servidor_inicial,
       id,
     ]
   )
@@ -200,14 +263,16 @@ exports.update = async (id, body) => {
   return exports.getById(id)
 }
 
-exports.updateMarcador = async (id, { sets, estado, ganador }) => {
+exports.updateMarcador = async (id, { sets, estado, ganador }, actor) => {
+  const requester = normalizeActor(actor)
   const [existing] = await db.query(
-    `SELECT id, deporte, jugador1_id, jugador2_id, equipo1_id, equipo2_id
+    `SELECT id, deporte, jugador1_id, jugador2_id, equipo1_id, equipo2_id, juez_id, created_by
      FROM partidos
      WHERE id = ?`,
     [id]
   )
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
+  assertCanManage(existing[0], requester)
 
   if (!Array.isArray(sets) || sets.length < 1 || sets.length > MAX_SETS) {
     throw { status: 400, message: `El marcador debe contener entre uno y ${MAX_SETS} sets` }
@@ -415,9 +480,73 @@ function normalizeOptionalTime(value) {
   return time
 }
 
+function normalizeScoringConfig(body) {
+  const bestOfSets = Number(body.mejor_de_sets || 3)
+  const tieBreakAt = Number(body.tiebreak_en ?? 6)
+  const tieBreakPoints = Number(body.tiebreak_puntos || 7)
+  const matchTieBreakPoints = Number(body.match_tiebreak_puntos || 10)
+
+  if (![1, 3, 5].includes(bestOfSets)) {
+    throw { status: 400, message: 'El formato debe ser al mejor de 1, 3 o 5 sets' }
+  }
+  if (!['ventaja', 'sin_ventaja'].includes(body.modo_game || 'ventaja')) {
+    throw { status: 400, message: 'Selecciona un modo de game válido' }
+  }
+  if (!['set_completo', 'match_tiebreak'].includes(body.set_decisivo || 'set_completo')) {
+    throw { status: 400, message: 'Selecciona un formato válido para el set decisivo' }
+  }
+  if (!Number.isInteger(tieBreakAt) || tieBreakAt < 0 || tieBreakAt > 12) {
+    throw { status: 400, message: 'El inicio del tiebreak no es válido' }
+  }
+  if (!Number.isInteger(tieBreakPoints) || tieBreakPoints < 5 || tieBreakPoints > 99) {
+    throw { status: 400, message: 'Los puntos del tiebreak no son válidos' }
+  }
+  if (!Number.isInteger(matchTieBreakPoints) || matchTieBreakPoints < 5 || matchTieBreakPoints > 99) {
+    throw { status: 400, message: 'Los puntos del match tiebreak no son válidos' }
+  }
+
+  return {
+    mejor_de_sets: bestOfSets,
+    modo_game: body.modo_game || 'ventaja',
+    set_decisivo: body.set_decisivo || 'set_completo',
+    tiebreak_en: tieBreakAt,
+    tiebreak_puntos: tieBreakPoints,
+    match_tiebreak_puntos: matchTieBreakPoints,
+    servidor_inicial: body.servidor_inicial === 'jugador2' ? 'jugador2' : 'jugador1',
+  }
+}
+
 function positiveId(value) {
   const parsed = Number(value)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function normalizeActor(actor) {
+  if (actor && typeof actor === 'object') {
+    return { id: Number(actor.id), rol: actor.rol || 'miembro' }
+  }
+  return { id: Number(actor) || null, rol: 'admin' }
+}
+
+function assertCanManage(match, actor) {
+  if (actor.rol === 'admin') return
+  if (
+    actor.rol === 'juez' &&
+    (Number(match.juez_id) === actor.id ||
+      (!match.juez_id && Number(match.created_by) === actor.id))
+  ) {
+    return
+  }
+  throw { status: 403, message: 'Este partido no está asignado a tu cuenta de juez' }
+}
+
+async function validateJudge(judgeId) {
+  if (!judgeId) return
+  const [rows] = await db.query(
+    "SELECT id FROM users WHERE id = ? AND rol IN ('juez','admin') AND activo = TRUE LIMIT 1",
+    [judgeId]
+  )
+  if (!rows.length) throw { status: 400, message: 'El juez seleccionado no está disponible' }
 }
 
 async function resolveMatchSource(sourceId, deporte, categoriaId, currentMatchId) {
@@ -489,6 +618,19 @@ function formatSummary(row) {
     fecha_inicio: row.fecha_inicio || null,
     hora_inicio: row.hora_inicio || null,
     notas: row.notas || null,
+    marcador_actual: parseScoreSnapshot(row.marcador_actual),
+    juez: row.juez_id
+      ? { id: row.juez_id, nombre: row.juez_nombre, apellido: row.juez_apellido }
+      : null,
+    formato: {
+      mejor_de_sets: Number(row.mejor_de_sets || 3),
+      modo_game: row.modo_game || 'ventaja',
+      set_decisivo: row.set_decisivo || 'set_completo',
+      tiebreak_en: Number(row.tiebreak_en ?? 6),
+      tiebreak_puntos: Number(row.tiebreak_puntos || 7),
+      match_tiebreak_puntos: Number(row.match_tiebreak_puntos || 10),
+      servidor_inicial: row.servidor_inicial || 'jugador1',
+    },
     origen_partido1: formatMatchSource(row, 1),
     origen_partido2: formatMatchSource(row, 2),
     categoria: row.categoria_id
@@ -526,6 +668,16 @@ function formatSet(set) {
     tiebreak_j1: set.tiebreak_j1 ?? null,
     tiebreak_j2: set.tiebreak_j2 ?? null,
     completado: Boolean(set.completado),
+  }
+}
+
+function parseScoreSnapshot(value) {
+  if (!value) return null
+  if (typeof value === 'object') return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
   }
 }
 

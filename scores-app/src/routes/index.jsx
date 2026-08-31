@@ -5,6 +5,8 @@ import AppLayout from '../layouts/AppLayout'
 import AdminLayout from '../layouts/AdminLayout'
 import ProtectedRoute from './ProtectedRoute'
 import AdminRoute from './AdminRoute'
+import OfficialRoute from './OfficialRoute'
+import JudgeLayout from '../layouts/JudgeLayout'
 
 // ── Auth ──────────────────────────────────────────────────
 const Login = lazy(() => import('../pages/auth/Login'))
@@ -34,6 +36,10 @@ const GestionAnuncios = lazy(() => import('../pages/admin/GestionAnuncios'))
 const GestionSedes = lazy(() => import('../pages/admin/GestionSedes'))
 const GestionCategorias = lazy(() => import('../pages/admin/GestionCategorias'))
 const GestionUsuarios = lazy(() => import('../pages/admin/GestionUsuarios'))
+
+// ── Juez / control de cancha ──
+const JudgeDashboard = lazy(() => import('../pages/judge/JudgeDashboard'))
+const JudgeControl = lazy(() => import('../pages/judge/JudgeControl'))
 
 // NOTA: no hay <Suspense> aquí a propósito.
 // Cada layout (AuthLayout, AppLayout, AdminLayout) tiene su propio
@@ -84,6 +90,19 @@ export default function AppRouter() {
             </ProtectedRoute>
           }
         />
+      </Route>
+
+      <Route
+        element={
+          <ProtectedRoute>
+            <OfficialRoute>
+              <JudgeLayout />
+            </OfficialRoute>
+          </ProtectedRoute>
+        }
+      >
+        <Route path='/juez' element={<JudgeDashboard />} />
+        <Route path='/juez/partido/:id' element={<JudgeControl />} />
       </Route>
 
       {/* Admin (solo rol admin) */}

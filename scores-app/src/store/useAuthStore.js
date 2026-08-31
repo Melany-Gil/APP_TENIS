@@ -25,6 +25,7 @@ const useAuthStore = create(
         })),
 
       isAdmin: () => get().user?.rol === 'admin',
+      isOfficial: () => ['admin', 'juez'].includes(get().user?.rol),
     }),
     {
       name: 'auth-storage-v2',

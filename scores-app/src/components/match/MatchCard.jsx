@@ -68,8 +68,22 @@ export default function MatchCard({ match }) {
 
         {/* Jugadores + Scores */}
         <div className='px-4 py-3 space-y-2.5'>
-          <PlayerRow name={p1Name} sets={p1Sets} isWinner={winner === 'jugador1'} isLive={isLive} />
-          <PlayerRow name={p2Name} sets={p2Sets} isWinner={winner === 'jugador2'} isLive={isLive} />
+          <PlayerRow
+            name={p1Name}
+            sets={p1Sets}
+            points={match.marcador_actual?.displayPoints?.[0]}
+            isServing={match.marcador_actual?.server === 'jugador1'}
+            isWinner={winner === 'jugador1'}
+            isLive={isLive}
+          />
+          <PlayerRow
+            name={p2Name}
+            sets={p2Sets}
+            points={match.marcador_actual?.displayPoints?.[1]}
+            isServing={match.marcador_actual?.server === 'jugador2'}
+            isWinner={winner === 'jugador2'}
+            isLive={isLive}
+          />
         </div>
 
         {match.notas && (
@@ -89,9 +103,12 @@ export default function MatchCard({ match }) {
   )
 }
 
-function PlayerRow({ name, sets, isWinner, isLive }) {
+function PlayerRow({ name, sets, points, isServing, isWinner, isLive }) {
   return (
     <div className='flex items-center gap-2'>
+      {isServing && isLive && (
+        <span className='w-2 h-2 rounded-full shrink-0' style={{ backgroundColor: 'var(--club-clay)' }} />
+      )}
       <span
         className={cn('flex-1 text-sm truncate')}
         style={{
@@ -102,6 +119,14 @@ function PlayerRow({ name, sets, isWinner, isLive }) {
         {name || '—'}
       </span>
       <ScoreDisplay sets={sets} isWinner={isWinner} isLive={isLive} />
+      {isLive && points != null && (
+        <strong
+          className='min-w-9 text-center rounded-md py-1 text-sm'
+          style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+        >
+          {points}
+        </strong>
+      )}
     </div>
   )
 }

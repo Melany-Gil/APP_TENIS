@@ -13,7 +13,11 @@ require.cache[dbPath] = {
   },
 }
 
-const { requireAuth, requireAdmin } = require('../src/middlewares/auth.middleware')
+const {
+  requireAuth,
+  requireAdmin,
+  requireOfficial,
+} = require('../src/middlewares/auth.middleware')
 
 const routes = {
   categorias: require('../src/modules/categorias/categorias.routes'),
@@ -50,17 +54,17 @@ test('las consultas necesarias para ver marcadores no exigen autenticación', ()
 
 test('las operaciones de administración siguen protegidas', () => {
   const protectedWrites = [
-    [routes.categorias, 'post', '/'],
-    [routes.equipos, 'post', '/'],
-    [routes.jugadores, 'post', '/'],
-    [routes.partidos, 'post', '/'],
-    [routes.partidos, 'put', '/:id/marcador'],
-    [routes.anuncios, 'post', '/'],
+    [routes.categorias, 'post', '/', requireAdmin],
+    [routes.equipos, 'post', '/', requireAdmin],
+    [routes.jugadores, 'post', '/', requireAdmin],
+    [routes.partidos, 'post', '/', requireOfficial],
+    [routes.partidos, 'put', '/:id/marcador', requireOfficial],
+    [routes.anuncios, 'post', '/', requireAdmin],
   ]
 
-  for (const [router, method, path] of protectedWrites) {
+  for (const [router, method, path, roleGuard] of protectedWrites) {
     const handlers = handlersFor(router, method, path)
     assert.ok(handlers.includes(requireAuth))
-    assert.ok(handlers.includes(requireAdmin))
+    assert.ok(handlers.includes(roleGuard))
   }
 })

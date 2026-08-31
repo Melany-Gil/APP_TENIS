@@ -9,5 +9,9 @@ export const matchService = {
   create: (data) => api.post('/partidos', data),
   update: (id, data) => api.put(`/partidos/${id}`, data),
   updateMarcador: (id, data) => api.put(`/partidos/${id}/marcador`, data),
+  getManaged: () => api.get('/partidos/gestion/mis-partidos'),
+  getControl: (id) => api.get(`/partidos/${id}/control`),
+  addEvent: (id, data) => api.post(`/partidos/${id}/eventos`, data),
+  undoEvent: (id) => api.post(`/partidos/${id}/deshacer`),
   remove: (id) => api.delete(`/partidos/${id}`),
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Shield, User, X } from 'lucide-react'
+import { Gavel, Plus, Search, Shield, User, X } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { userService } from '../../services/userService'
 import useAuthStore from '../../store/useAuthStore'
@@ -47,15 +47,20 @@ export default function GestionUsuarios() {
     }
   }
 
-  const toggleRol = async (usuario) => {
+  const changeRol = async (usuario, newRol) => {
     if (usuario.id === me?.id) {
       addToast({ type: 'error', title: 'No puedes cambiarte el rol a ti mismo' })
       return
     }
-    const newRol = usuario.rol === 'admin' ? 'miembro' : 'admin'
+    if (newRol === usuario.rol) return
+    const descriptions = {
+      admin: 'Tendrá acceso completo al panel de administración.',
+      juez: 'Podrá crear y controlar los partidos que tenga asignados.',
+      miembro: 'Solo tendrá acceso a las funciones generales para miembros.',
+    }
     const ok = await confirm({
       title: 'Cambiar rol de usuario',
-      message: `${usuario.nombre} ${usuario.apellido} pasará a tener el rol "${newRol}". ${newRol === 'admin' ? 'Tendrá acceso completo al panel de administración.' : 'Perderá acceso al panel de administración.'}`,
+      message: `${usuario.nombre} ${usuario.apellido} pasará a tener el rol "${newRol}". ${descriptions[newRol]}`,
       confirmLabel: 'Confirmar cambio',
       danger: newRol === 'admin',
     })
@@ -76,6 +81,7 @@ export default function GestionUsuarios() {
   )
 
   const admins = filtered.filter((u) => u.rol === 'admin').length
+  const jueces = filtered.filter((u) => u.rol === 'juez').length
   const miembros = filtered.filter((u) => u.rol === 'miembro').length
 
   return (
@@ -163,6 +169,7 @@ export default function GestionUsuarios() {
               <span className='form-label'>Rol</span>
               <select className='form-input' {...register('rol')}>
                 <option value='miembro'>Miembro</option>
+                <option value='juez'>Juez de partido</option>
                 <option value='admin'>Administrador</option>
               </select>
             </label>
@@ -176,7 +183,7 @@ export default function GestionUsuarios() {
       )}
 
       {/* Stats rápidas */}
-      <div className='grid grid-cols-2 gap-3'>
+      <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
         <div className='card p-4 flex items-center gap-3'>
           <div
             className='w-10 h-10 rounded-lg flex items-center justify-center'
@@ -190,6 +197,22 @@ export default function GestionUsuarios() {
             </p>
             <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
               Administradores
+            </p>
+          </div>
+        </div>
+        <div className='card p-4 flex items-center gap-3'>
+          <div
+            className='w-10 h-10 rounded-lg flex items-center justify-center'
+            style={{ backgroundColor: 'rgba(23,107,58,0.12)' }}
+          >
+            <Gavel className='w-5 h-5' style={{ color: 'var(--color-brand)' }} />
+          </div>
+          <div>
+            <p className='text-2xl font-black' style={{ color: 'var(--text-primary)' }}>
+              {jueces}
+            </p>
+            <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
+              Jueces
             </p>
           </div>
         </div>
@@ -286,25 +309,23 @@ export default function GestionUsuarios() {
                 </p>
               </div>
 
-              {/* Rol + toggle */}
+              {/* Rol */}
               <div className='flex items-center gap-2 shrink-0'>
-                <span className={u.rol === 'admin' ? 'badge-live' : 'badge-atp'}>{u.rol}</span>
-                <button
-                  onClick={() => toggleRol(u)}
+                <select
+                  value={u.rol}
+                  onChange={(event) => changeRol(u, event.target.value)}
                   disabled={u.id === me?.id}
-                  className='btn-ghost p-2 disabled:opacity-40'
+                  className='form-input py-1.5 text-xs w-28 disabled:opacity-50'
                   title={
                     u.id === me?.id
                       ? 'No puedes cambiarte el rol'
-                      : `Cambiar a ${u.rol === 'admin' ? 'miembro' : 'admin'}`
+                      : 'Cambiar rol'
                   }
                 >
-                  {u.rol === 'admin' ? (
-                    <User className='w-4 h-4' style={{ color: '#3b82f6' }} />
-                  ) : (
-                    <Shield className='w-4 h-4' style={{ color: 'var(--color-brand)' }} />
-                  )}
-                </button>
+                  <option value='miembro'>Miembro</option>
+                  <option value='juez'>Juez</option>
+                  <option value='admin'>Admin</option>
+                </select>
               </div>
             </div>
           ))
@@ -312,7 +333,7 @@ export default function GestionUsuarios() {
       </div>
 
       <p className='text-xs text-center' style={{ color: 'var(--text-muted)' }}>
-        Haz clic en el ícono de escudo/usuario para cambiar el rol de un miembro
+        Selecciona el rol para definir los permisos de cada cuenta
       </p>
     </div>
   )

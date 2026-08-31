@@ -35,18 +35,21 @@ exports.requireAuth = (req, res, next) => {
  * Middleware que verifica que el usuario autenticado tenga rol 'admin'.
  * Debe usarse DESPUÉS de requireAuth.
  */
-exports.requireAdmin = async (req, res, next) => {
+exports.requireRoles = (...allowedRoles) => async (req, res, next) => {
   try {
     const [rows] = await db.query(
-      "SELECT rol, activo FROM users WHERE id = ? AND rol = 'admin' AND activo = TRUE LIMIT 1",
+      'SELECT rol, activo FROM users WHERE id = ? AND activo = TRUE LIMIT 1',
       [req.user.id]
     )
-    if (!rows.length) {
-      return error(res, 'Acceso restringido a administradores', 403)
+    if (!rows.length || !allowedRoles.includes(rows[0].rol)) {
+      return error(res, 'No tienes permisos para realizar esta acción', 403)
     }
-    req.user.rol = 'admin'
+    req.user.rol = rows[0].rol
     next()
   } catch (databaseError) {
     next(databaseError)
   }
 }
+
+exports.requireAdmin = exports.requireRoles('admin')
+exports.requireOfficial = exports.requireRoles('admin', 'juez')

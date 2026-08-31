@@ -26,7 +26,7 @@ exports.create = async ({
   telefono,
   rol = 'miembro',
 }) => {
-  if (!['admin', 'miembro'].includes(rol)) {
+  if (!['admin', 'juez', 'miembro'].includes(rol)) {
     throw { status: 400, message: 'Rol inválido' }
   }
 
@@ -58,8 +58,8 @@ exports.create = async ({
 }
 
 exports.updateRole = async (id, rol, requesterId) => {
-  if (!['admin', 'miembro'].includes(rol)) {
-    throw { status: 400, message: 'Rol inválido. Debe ser "admin" o "miembro"' }
+  if (!['admin', 'juez', 'miembro'].includes(rol)) {
+    throw { status: 400, message: 'Rol inválido. Debe ser "admin", "juez" o "miembro"' }
   }
   if (Number(id) === Number(requesterId)) {
     throw { status: 400, message: 'No puedes cambiar tu propio rol' }

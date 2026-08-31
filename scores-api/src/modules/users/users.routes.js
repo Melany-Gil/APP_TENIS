@@ -21,7 +21,7 @@ router.post(
     body('apellido').trim().isLength({ min: 2, max: 100 }),
     body('email').normalizeEmail().isEmail(),
     body('password').isLength({ min: 8, max: 72 }).matches(/[A-Z]/).matches(/[0-9]/),
-    body('rol').optional().isIn(['admin', 'miembro']),
+    body('rol').optional().isIn(['admin', 'juez', 'miembro']),
     body('telefono').optional({ values: 'falsy' }).trim().isLength({ max: 20 }),
   ],
   validate,

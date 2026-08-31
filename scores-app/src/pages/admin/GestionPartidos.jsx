@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, X, Radio } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Radio, Gavel, SlidersHorizontal } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { matchService } from '../../services/matchService'
 import { playerService } from '../../services/playerService'
 import { teamService } from '../../services/teamService'
 import { categoriaService } from '../../services/categoriaService'
+import { userService } from '../../services/userService'
 import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
@@ -33,6 +35,7 @@ export default function GestionPartidos() {
   const [jugadores, setJugadores] = useState([])
   const [equipos, setEquipos] = useState([])
   const [categorias, setCategorias] = useState([])
+  const [jueces, setJueces] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showMarcador, setShowMarcador] = useState(null)
@@ -79,12 +82,14 @@ export default function GestionPartidos() {
       playerService.getAll(),
       teamService.getAll(),
       categoriaService.getAll(),
+      userService.getAll(),
     ])
-      .then(([p, j, e, c]) => {
+      .then(([p, j, e, c, u]) => {
         setPartidos(p.data || [])
         setJugadores(j.data || [])
         setEquipos(e.data || [])
         setCategorias(c.data || [])
+        setJueces((u.data || []).filter((usuario) => ['juez', 'admin'].includes(usuario.rol)))
       })
       .catch(() => addToast({ type: 'error', title: 'Error al cargar datos' }))
       .finally(() => setLoading(false))
@@ -107,6 +112,14 @@ export default function GestionPartidos() {
       estado: 'programado',
       participante1_tipo: 'fijo',
       participante2_tipo: 'fijo',
+      juez_id: '',
+      mejor_de_sets: '3',
+      modo_game: 'ventaja',
+      set_decisivo: 'set_completo',
+      tiebreak_en: '6',
+      tiebreak_puntos: '7',
+      match_tiebreak_puntos: '10',
+      servidor_inicial: 'jugador1',
     })
     setEditing(null)
     setShowForm(true)
@@ -129,6 +142,14 @@ export default function GestionPartidos() {
       origen_partido1_id: partido.origen_partido1?.id || '',
       origen_partido2_id: partido.origen_partido2?.id || '',
       notas: partido.notas || '',
+      juez_id: partido.juez?.id || '',
+      mejor_de_sets: String(partido.formato?.mejor_de_sets || 3),
+      modo_game: partido.formato?.modo_game || 'ventaja',
+      set_decisivo: partido.formato?.set_decisivo || 'set_completo',
+      tiebreak_en: String(partido.formato?.tiebreak_en ?? 6),
+      tiebreak_puntos: String(partido.formato?.tiebreak_puntos || 7),
+      match_tiebreak_puntos: String(partido.formato?.match_tiebreak_puntos || 10),
+      servidor_inicial: partido.formato?.servidor_inicial || 'jugador1',
     })
     setShowForm(true)
   }
@@ -162,6 +183,14 @@ export default function GestionPartidos() {
         origen_partido1_id: data.participante1_tipo === 'ganador' ? data.origen_partido1_id : null,
         origen_partido2_id: data.participante2_tipo === 'ganador' ? data.origen_partido2_id : null,
         notas: data.notas,
+        juez_id: data.juez_id || null,
+        mejor_de_sets: data.mejor_de_sets,
+        modo_game: data.modo_game,
+        set_decisivo: data.set_decisivo,
+        tiebreak_en: data.tiebreak_en,
+        tiebreak_puntos: data.tiebreak_puntos,
+        match_tiebreak_puntos: data.match_tiebreak_puntos,
+        servidor_inicial: data.servidor_inicial,
       }
       if (data.deporte === 'padel') {
         delete payload.jugador1_id
@@ -316,6 +345,79 @@ export default function GestionPartidos() {
 
             <Input label='Fecha' type='date' {...register('fecha_inicio')} />
             <Input label='Hora' type='time' {...register('hora_inicio')} />
+
+            <div className='form-group'>
+              <label className='form-label'>Juez asignado</label>
+              <select className='form-input' {...register('juez_id')}>
+                <option value=''>Sin asignar</option>
+                {jueces.map((juez) => (
+                  <option key={juez.id} value={juez.id}>
+                    {juez.nombre} {juez.apellido} {juez.rol === 'admin' ? '(admin)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div
+              className='sm:col-span-2 rounded-xl p-4 space-y-3'
+              style={{ backgroundColor: 'var(--bg-hover)' }}
+            >
+              <div className='flex items-center gap-2'>
+                <SlidersHorizontal className='w-4 h-4' style={{ color: 'var(--color-brand)' }} />
+                <div>
+                  <p className='form-label m-0'>Formato de puntuación</p>
+                  <p className='text-[11px] mt-0.5' style={{ color: 'var(--text-muted)' }}>
+                    Configurable por partido. El control del juez aplicará estas reglas.
+                  </p>
+                </div>
+              </div>
+              <div className='grid grid-cols-2 sm:grid-cols-3 gap-3'>
+                <label className='form-group'>
+                  <span className='form-label'>Mejor de</span>
+                  <select className='form-input' {...register('mejor_de_sets')}>
+                    <option value='1'>1 set</option>
+                    <option value='3'>3 sets</option>
+                    <option value='5'>5 sets</option>
+                  </select>
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Games</span>
+                  <select className='form-input' {...register('modo_game')}>
+                    <option value='ventaja'>Con ventaja</option>
+                    <option value='sin_ventaja'>Punto decisivo</option>
+                  </select>
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Set decisivo</span>
+                  <select className='form-input' {...register('set_decisivo')}>
+                    <option value='set_completo'>Set completo</option>
+                    <option value='match_tiebreak'>Match tiebreak</option>
+                  </select>
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Tiebreak en</span>
+                  <select className='form-input' {...register('tiebreak_en')}>
+                    <option value='6'>6–6</option>
+                    <option value='0'>Sin tiebreak</option>
+                  </select>
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Tiebreak a</span>
+                  <input type='number' min='5' max='99' className='form-input' {...register('tiebreak_puntos')} />
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Match tiebreak a</span>
+                  <input type='number' min='5' max='99' className='form-input' {...register('match_tiebreak_puntos')} />
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Primer servidor</span>
+                  <select className='form-input' {...register('servidor_inicial')}>
+                    <option value='jugador1'>Participante 1</option>
+                    <option value='jugador2'>Participante 2</option>
+                  </select>
+                </label>
+              </div>
+            </div>
 
             {/* Participantes según deporte */}
             {selectedDeporte === 'tenis' ? (
@@ -593,18 +695,34 @@ export default function GestionPartidos() {
                         .filter(Boolean)
                         .join(' ')}`}
                   </p>
+                  {p.juez && (
+                    <p className='text-[11px] mt-1 flex items-center gap-1' style={{ color: 'var(--text-muted)' }}>
+                      <Gavel className='w-3 h-3' /> Juez: {p.juez.nombre} {p.juez.apellido}
+                    </p>
+                  )}
                 </div>
                 <div className='flex items-center gap-1 shrink-0'>
                   {p.estado !== 'cancelado' && (
-                    <button
-                      onClick={() => openMarcador(p)}
-                      className='btn-secondary px-3 py-2 flex items-center gap-1.5 text-xs'
-                      style={{ color: 'var(--club-clay)' }}
-                      title='Editar marcador'
-                    >
-                      <Radio className='w-4 h-4' />
-                      <span>Marcador</span>
-                    </button>
+                    <>
+                      <Link
+                        to={`/juez/partido/${p.id}`}
+                        className='btn-secondary px-3 py-2 flex items-center gap-1.5 text-xs'
+                        style={{ color: 'var(--color-brand)' }}
+                        title='Control punto a punto'
+                      >
+                        <Gavel className='w-4 h-4' />
+                        <span className='hidden lg:inline'>Control</span>
+                      </Link>
+                      <button
+                        onClick={() => openMarcador(p)}
+                        className='btn-secondary px-3 py-2 flex items-center gap-1.5 text-xs'
+                        style={{ color: 'var(--club-clay)' }}
+                        title='Editar marcador manualmente'
+                      >
+                        <Radio className='w-4 h-4' />
+                        <span className='hidden lg:inline'>Manual</span>
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={() => openEdit(p)}

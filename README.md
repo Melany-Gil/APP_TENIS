@@ -1,6 +1,6 @@
 # Marcadores de Tenis · Club Unión
 
-Aplicación web para el Subcomité de Tenis del Club Unión en Bucaramanga. Incluye acceso por documento y contraseña, recuperación por correo, roles de administrador y miembro, marcadores con tres sets, actualización automática y consulta del historial.
+Aplicación web para el Subcomité de Tenis del Club Unión en Bucaramanga. Incluye acceso por documento y contraseña, recuperación por correo, roles de administrador, juez y miembro, marcadores en vivo y consulta del historial.
 
 ## Funcionalidad principal
 
@@ -14,6 +14,14 @@ Aplicación web para el Subcomité de Tenis del Club Unión en Bucaramanga. Incl
 - Marcador con tres sets fijos y posibilidad de agregar o quitar sets adicionales.
 - Partidos encadenados: un participante puede ser el ganador de otro partido de la misma categoría.
 - Estadísticas y ranking de jugadores calculados por categoría desde los partidos finalizados.
+- Control de cancha para jueces con tanteo punto a punto, servicio, primera falta, let y deshacer.
+- Motivo de cada punto: ace, tiro ganador, error forzado/no forzado, doble falta, penalización o infracción.
+- Formato configurable por partido: mejor de 1/3/5, ventaja o punto decisivo, tiebreak y match tiebreak.
+- Estadísticas detalladas por encuentro y puntos actuales visibles en el marcador público.
+
+## Rol de juez
+
+El administrador crea la cuenta con rol `juez` y asigna el responsable al partido. Al iniciar sesión, el juez entra en `/juez`, donde puede crear y editar sus encuentros y abrir el control de cancha. Solo el juez asignado y los administradores pueden modificar el tanteo. Cada acción queda registrada y las correcciones anulan el evento anterior sin borrarlo del historial de auditoría.
 
 ## Puntuación de la clasificación interna
 
@@ -67,7 +75,7 @@ Si la base ya fue creada con el script anterior, ejecuta una sola vez:
 scores-api/migrations/001_security_and_search.sql
 ```
 
-La migración amplía el hash de recuperación, añade índices de búsqueda y crea las categorías `5ta` y `Damas`.
+Para incorporar el control de jueces manualmente también está disponible `scores-api/migrations/005_judge_scoring.sql`. En el despliegue normal, el backend aplica estos cambios de forma idempotente antes de iniciar el servidor.
 
 ## Despliegue gratuito recomendado
 

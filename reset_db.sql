@@ -23,7 +23,7 @@ CREATE TABLE users (
   apellido          VARCHAR(100) NOT NULL,
   email             VARCHAR(150) NOT NULL,
   password          VARCHAR(255) NOT NULL,
-  rol               ENUM('admin','miembro') NOT NULL DEFAULT 'miembro',
+  rol               ENUM('admin','juez','miembro') NOT NULL DEFAULT 'miembro',
   telefono          VARCHAR(20)      NULL,
   avatar            VARCHAR(255)     NULL,
   activo            BOOLEAN      NOT NULL DEFAULT TRUE,
@@ -201,6 +201,14 @@ CREATE TABLE partidos (
   equipo2_id   INT         NULL,
   origen_partido1_id INT    NULL,
   origen_partido2_id INT    NULL,
+  juez_id      INT         NULL,
+  mejor_de_sets TINYINT    NOT NULL DEFAULT 3,
+  modo_game    ENUM('ventaja','sin_ventaja') NOT NULL DEFAULT 'ventaja',
+  set_decisivo ENUM('set_completo','match_tiebreak') NOT NULL DEFAULT 'set_completo',
+  tiebreak_en  TINYINT     NOT NULL DEFAULT 6,
+  tiebreak_puntos TINYINT  NOT NULL DEFAULT 7,
+  match_tiebreak_puntos TINYINT NOT NULL DEFAULT 10,
+  servidor_inicial ENUM('jugador1','jugador2') NOT NULL DEFAULT 'jugador1',
   estado       ENUM('programado','en_vivo','finalizado','cancelado') NOT NULL DEFAULT 'programado',
   ganador      ENUM('jugador1','jugador2') NULL,
   fecha_inicio DATE            NULL,
@@ -215,6 +223,7 @@ CREATE TABLE partidos (
   KEY idx_partidos_jugador2 (jugador2_id),
   KEY idx_partidos_origen1 (origen_partido1_id),
   KEY idx_partidos_origen2 (origen_partido2_id),
+  KEY idx_partidos_juez (juez_id),
   FOREIGN KEY (categoria_id) REFERENCES categorias(id),
   FOREIGN KEY (jugador1_id) REFERENCES jugadores(id),
   FOREIGN KEY (jugador2_id) REFERENCES jugadores(id),
@@ -222,7 +231,34 @@ CREATE TABLE partidos (
   FOREIGN KEY (equipo2_id)  REFERENCES equipos_padel(id),
   FOREIGN KEY (origen_partido1_id) REFERENCES partidos(id) ON DELETE SET NULL,
   FOREIGN KEY (origen_partido2_id) REFERENCES partidos(id) ON DELETE SET NULL,
+  FOREIGN KEY (juez_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (created_by)  REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─────────────────────────────────────────────────────
+-- eventos_partido — fuente del marcador punto a punto
+-- ─────────────────────────────────────────────────────
+CREATE TABLE eventos_partido (
+  id               BIGINT NOT NULL AUTO_INCREMENT,
+  partido_id       INT NOT NULL,
+  secuencia        INT NOT NULL,
+  tipo             ENUM('punto','primera_falta','let') NOT NULL,
+  ganador          ENUM('jugador1','jugador2') NULL,
+  motivo           VARCHAR(40) NULL,
+  servidor         ENUM('jugador1','jugador2') NOT NULL,
+  numero_servicio  TINYINT NOT NULL DEFAULT 1,
+  marcador_antes   JSON NOT NULL,
+  marcador_despues JSON NOT NULL,
+  created_by       INT NOT NULL,
+  created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  anulado_at       TIMESTAMP NULL,
+  anulado_por      INT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_evento_secuencia (partido_id, secuencia),
+  KEY idx_eventos_partido_activos (partido_id, anulado_at, secuencia),
+  FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  FOREIGN KEY (anulado_por) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ─────────────────────────────────────────────────────
