@@ -53,19 +53,28 @@ export default function Header() {
   return (
     <header className='app-header top-navigation fixed inset-x-0 top-0 z-50'>
       <div className='top-navigation-primary'>
-        <Link to='/' className='top-navigation-brands' aria-label='Ir al inicio del Club Unión'>
-          <img
-            src='/branding/subcomite-tenis-club-union.png'
-            alt='Subcomité de Tenis del Club Unión'
-            className='top-navigation-club-logo'
-          />
+        <div className='top-navigation-brands'>
+          <Link to='/' aria-label='Ir al inicio del Club Unión'>
+            <img
+              src='/branding/subcomite-tenis-club-union.png'
+              alt='Subcomité de Tenis del Club Unión'
+              className='top-navigation-club-logo'
+            />
+          </Link>
           <span className='top-navigation-brand-divider' aria-hidden='true' />
-          <img
-            src='/branding/legal-branding.png'
-            alt='Legal Branding'
-            className='top-navigation-partner-logo'
-          />
-        </Link>
+          <a
+            href='https://www.instagram.com/legal.branding'
+            target='_blank'
+            rel='noreferrer'
+            aria-label='Abrir Instagram de Legal Branding'
+          >
+            <img
+              src='/branding/legal-branding.png'
+              alt='Legal Branding'
+              className='top-navigation-partner-logo'
+            />
+          </a>
+        </div>
 
         <nav
           className='top-navigation-links top-navigation-links-desktop'

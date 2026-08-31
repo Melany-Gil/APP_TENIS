@@ -187,6 +187,17 @@
     flex-shrink: 0;
   }
 
+  .top-navigation-brands > a {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 12px;
+  }
+
+  .top-navigation-brands > a:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 3px;
+  }
+
   .top-navigation-club-logo {
     width: 56px;
     height: 56px;
