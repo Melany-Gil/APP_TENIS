@@ -39,8 +39,7 @@ const GestionCategorias = lazy(() => import('../pages/admin/GestionCategorias'))
 const GestionUsuarios = lazy(() => import('../pages/admin/GestionUsuarios'))
 
 // ── Juez / control de cancha ──
-const JudgeDashboard = lazy(() => import('../pages/judge/JudgeDashboard'))
-const JudgeControl = lazy(() => import('../pages/judge/JudgeControl'))
+const JuezPartidos = lazy(() => import('../pages/judge/JuezPartidos'))
 
 // NOTA: no hay <Suspense> aquí a propósito.
 // Cada layout (AuthLayout, AppLayout, AdminLayout) tiene su propio
@@ -104,8 +103,8 @@ export default function AppRouter() {
           </ProtectedRoute>
         }
       >
-        <Route path='/juez' element={<JudgeDashboard />} />
-        <Route path='/juez/partido/:id' element={<JudgeControl />} />
+        <Route path='/juez' element={<JuezPartidos />} />
+        <Route path='/juez/partido/:id' element={<Navigate to='/juez' replace />} />
       </Route>
 
       {/* Admin (solo rol admin) */}
