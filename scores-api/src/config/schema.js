@@ -114,9 +114,22 @@ exports.ensureSchema = async () => {
   if (!(await columnExists('partidos', 'juez_id'))) {
     await db.query('ALTER TABLE partidos ADD COLUMN juez_id INT NULL AFTER origen_partido2_id')
   }
+  if (!(await columnExists('partidos', 'cancha_id'))) {
+    await db.query('ALTER TABLE partidos ADD COLUMN cancha_id INT NULL AFTER juez_id')
+  }
   if (!(await columnExists('partidos', 'mejor_de_sets'))) {
     await db.query(
-      'ALTER TABLE partidos ADD COLUMN mejor_de_sets TINYINT NOT NULL DEFAULT 3 AFTER juez_id'
+      'ALTER TABLE partidos ADD COLUMN mejor_de_sets TINYINT NOT NULL DEFAULT 3 AFTER cancha_id'
+    )
+  }
+  if (!(await columnExists('partidos', 'juegos_por_set'))) {
+    await db.query(
+      'ALTER TABLE partidos ADD COLUMN juegos_por_set TINYINT NOT NULL DEFAULT 6 AFTER mejor_de_sets'
+    )
+  }
+  if (!(await columnExists('partidos', 'diferencia_juegos'))) {
+    await db.query(
+      'ALTER TABLE partidos ADD COLUMN diferencia_juegos TINYINT NOT NULL DEFAULT 2 AFTER juegos_por_set'
     )
   }
   if (!(await columnExists('partidos', 'modo_game'))) {
@@ -219,6 +232,16 @@ exports.ensureSchema = async () => {
        FOREIGN KEY (juez_id) REFERENCES users(id) ON DELETE SET NULL`
     )
   }
+  if (!(await columnIndexExists('partidos', 'cancha_id'))) {
+    await db.query('CREATE INDEX idx_partidos_cancha ON partidos (cancha_id)')
+  }
+  if (!(await columnForeignKeyExists('partidos', 'cancha_id'))) {
+    await db.query(
+      `ALTER TABLE partidos
+       ADD CONSTRAINT fk_partidos_cancha
+       FOREIGN KEY (cancha_id) REFERENCES canchas(id) ON DELETE SET NULL`
+    )
+  }
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS eventos_partido (
@@ -244,6 +267,27 @@ exports.ensureSchema = async () => {
         FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE,
       CONSTRAINT fk_eventos_created_by FOREIGN KEY (created_by) REFERENCES users(id),
       CONSTRAINT fk_eventos_anulado_por FOREIGN KEY (anulado_por) REFERENCES users(id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
+
+  const eventType = await getColumnType('eventos_partido', 'tipo')
+  if (eventType && !eventType.includes("'cambio_servidor'")) {
+    await db.query(
+      "ALTER TABLE eventos_partido MODIFY tipo ENUM('punto','primera_falta','let','cambio_servidor') NOT NULL"
+    )
+  }
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS estado_en_vivo_partido (
+      partido_id       INT NOT NULL,
+      iniciado_at      DATETIME NULL,
+      pausado_at       DATETIME NULL,
+      segundos_pausa   INT NOT NULL DEFAULT 0,
+      finalizado_at    DATETIME NULL,
+      updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (partido_id),
+      CONSTRAINT fk_estado_en_vivo_partido
+        FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
 

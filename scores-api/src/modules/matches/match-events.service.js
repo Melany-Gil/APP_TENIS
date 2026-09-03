@@ -29,10 +29,17 @@ exports.getControl = async (id, user) => {
     : createInitialState(matchRow)
 
   const [pointEvents] = await db.query(
-    `SELECT tipo, ganador, motivo, servidor, numero_servicio
+    `SELECT tipo, ganador, motivo, servidor, numero_servicio, marcador_antes
      FROM eventos_partido
      WHERE partido_id = ? AND anulado_at IS NULL
      ORDER BY secuencia`,
+    [id]
+  )
+  const [liveRows] = await db.query(
+    `SELECT iniciado_at, pausado_at, segundos_pausa, finalizado_at
+     FROM estado_en_vivo_partido
+     WHERE partido_id = ?
+     LIMIT 1`,
     [id]
   )
 
@@ -41,8 +48,106 @@ exports.getControl = async (id, user) => {
     marcador: serializeState(state),
     estadisticas: buildStats(pointEvents),
     eventos_recientes: lastEvents.map(formatEvent),
+    en_vivo: formatLiveState(liveRows[0]),
   }
 }
+
+exports.getStats = async (id, setNumber = null) => {
+  await matchesService.getById(id)
+  const selectedSet = setNumber === null || setNumber === undefined || setNumber === ''
+    ? null
+    : Number(setNumber)
+  if (selectedSet !== null && (!Number.isInteger(selectedSet) || selectedSet < 1 || selectedSet > 127)) {
+    throw { status: 400, message: 'El set seleccionado no es válido' }
+  }
+
+  const [events] = await db.query(
+    `SELECT tipo, ganador, motivo, servidor, numero_servicio, marcador_antes
+     FROM eventos_partido
+     WHERE partido_id = ? AND anulado_at IS NULL
+     ORDER BY secuencia`,
+    [id]
+  )
+  const setNumbers = events
+    .map((event) => Number(parseJson(event.marcador_antes)?.currentSet || 1))
+    .filter((value) => Number.isInteger(value))
+
+  return {
+    estadisticas: buildStats(events, selectedSet),
+    total_sets: setNumbers.length ? Math.max(...setNumbers) : 0,
+    set: selectedSet,
+  }
+}
+
+exports.startMatch = async (id, user) => {
+  const connection = await db.getConnection()
+  try {
+    await connection.beginTransaction()
+    const [matches] = await connection.query('SELECT * FROM partidos WHERE id = ? FOR UPDATE', [id])
+    if (!matches.length) throw { status: 404, message: 'Partido no encontrado' }
+    assertCanManage(matches[0], user)
+    if (matches[0].estado === 'finalizado' || matches[0].estado === 'cancelado') {
+      throw { status: 409, message: 'Este partido no se puede iniciar' }
+    }
+    await ensureLiveState(connection, id)
+    await connection.query(
+      `UPDATE estado_en_vivo_partido
+       SET pausado_at = NULL, finalizado_at = NULL
+       WHERE partido_id = ?`,
+      [id]
+    )
+    await connection.query("UPDATE partidos SET estado = 'en_vivo' WHERE id = ?", [id])
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+  return exports.getControl(id, user)
+}
+
+exports.setPaused = async (id, paused, user) => {
+  const connection = await db.getConnection()
+  try {
+    await connection.beginTransaction()
+    const [matches] = await connection.query('SELECT * FROM partidos WHERE id = ? FOR UPDATE', [id])
+    if (!matches.length) throw { status: 404, message: 'Partido no encontrado' }
+    assertCanManage(matches[0], user)
+    if (matches[0].estado !== 'en_vivo') {
+      throw { status: 409, message: 'Solo puedes pausar un partido en vivo' }
+    }
+    await ensureLiveState(connection, id)
+    const [liveRows] = await connection.query(
+      'SELECT pausado_at FROM estado_en_vivo_partido WHERE partido_id = ? FOR UPDATE',
+      [id]
+    )
+    if (paused && !liveRows[0].pausado_at) {
+      await connection.query(
+        'UPDATE estado_en_vivo_partido SET pausado_at = NOW() WHERE partido_id = ?',
+        [id]
+      )
+    } else if (!paused && liveRows[0].pausado_at) {
+      await connection.query(
+        `UPDATE estado_en_vivo_partido
+         SET segundos_pausa = segundos_pausa + TIMESTAMPDIFF(SECOND, pausado_at, NOW()),
+             pausado_at = NULL
+         WHERE partido_id = ?`,
+        [id]
+      )
+    }
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+  return exports.getControl(id, user)
+}
+
+exports.changeServer = async (id, server, user) =>
+  exports.addEvent(id, { tipo: 'cambio_servidor', ganador: server }, user)
 
 exports.addEvent = async (id, event, user) => {
   const connection = await db.getConnection()
@@ -51,6 +156,17 @@ exports.addEvent = async (id, event, user) => {
     const [matches] = await connection.query('SELECT * FROM partidos WHERE id = ? FOR UPDATE', [id])
     if (!matches.length) throw { status: 404, message: 'Partido no encontrado' }
     assertCanManage(matches[0], user)
+    if (matches[0].estado === 'finalizado' || matches[0].estado === 'cancelado') {
+      throw { status: 409, message: 'Este partido ya no admite cambios' }
+    }
+    await ensureLiveState(connection, id)
+    const [liveRows] = await connection.query(
+      'SELECT pausado_at FROM estado_en_vivo_partido WHERE partido_id = ? FOR UPDATE',
+      [id]
+    )
+    if (liveRows[0]?.pausado_at) {
+      throw { status: 409, message: 'Reanuda el partido antes de registrar acciones' }
+    }
 
     const [lastEvents] = await connection.query(
       `SELECT marcador_despues
@@ -134,11 +250,15 @@ exports.undoLastEvent = async (id, user) => {
     const restored = previousEvents.length
       ? parseJson(previousEvents[0].marcador_despues)
       : createInitialState(matches[0])
+    const [liveRows] = await connection.query(
+      'SELECT iniciado_at FROM estado_en_vivo_partido WHERE partido_id = ? LIMIT 1',
+      [id]
+    )
     await syncProjection(
       connection,
       matches[0],
       restored,
-      previousEvents.length ? 'en_vivo' : 'programado'
+      previousEvents.length || liveRows[0]?.iniciado_at ? 'en_vivo' : 'programado'
     )
     await connection.commit()
   } catch (error) {
@@ -191,6 +311,14 @@ async function syncProjection(connection, match, state, fallbackStatus) {
     state.winner || null,
     match.id,
   ])
+  if (state.winner) {
+    await connection.query(
+      `UPDATE estado_en_vivo_partido
+       SET finalizado_at = COALESCE(finalizado_at, NOW()), pausado_at = NULL
+       WHERE partido_id = ?`,
+      [match.id]
+    )
+  }
   await propagateWinner(connection, match, status, state.winner)
 }
 
@@ -210,13 +338,15 @@ async function propagateWinner(connection, match, status, winner) {
   )
 }
 
-function buildStats(events) {
+function buildStats(events, selectedSet = null) {
   const stats = {
     jugador1: emptyStats(),
     jugador2: emptyStats(),
   }
 
   for (const event of events) {
+    const eventSet = Number(parseJson(event.marcador_antes)?.currentSet || 1)
+    if (selectedSet !== null && eventSet !== selectedSet) continue
     if (event.tipo === 'primera_falta') {
       stats[event.servidor].primeras_faltas += 1
       continue
@@ -287,5 +417,26 @@ function formatEvent(event) {
     numero_servicio: Number(event.numero_servicio),
     marcador: serializeState(parseJson(event.marcador_despues)),
     created_at: event.created_at,
+  }
+}
+
+async function ensureLiveState(connection, id) {
+  await connection.query(
+    `INSERT INTO estado_en_vivo_partido
+       (partido_id, iniciado_at, pausado_at, segundos_pausa, finalizado_at)
+     VALUES (?, NOW(), NULL, 0, NULL)
+     ON DUPLICATE KEY UPDATE
+       iniciado_at = COALESCE(iniciado_at, VALUES(iniciado_at))`,
+    [id]
+  )
+}
+
+function formatLiveState(row) {
+  if (!row?.iniciado_at) return null
+  return {
+    iniciado_at: row.iniciado_at,
+    pausado_at: row.pausado_at || null,
+    segundos_pausa: Number(row.segundos_pausa || 0),
+    finalizado_at: row.finalizado_at || null,
   }
 }

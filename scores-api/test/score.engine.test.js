@@ -92,3 +92,20 @@ test('rechaza ace del receptor y doble falta sin primera falta', () => {
     (error) => error.status === 400 && /primera falta/.test(error.message)
   )
 })
+
+test('respeta juegos por set y diferencia configurables', () => {
+  const config = { mejor_de_sets: 1, juegos_por_set: 4, diferencia_juegos: 1, tiebreak_en: 0 }
+  let state = createInitialState(config)
+  for (let game = 0; game < 4; game += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  assert.equal(state.winner, 'jugador1')
+  assert.deepEqual(projectSets(state)[0].games_j1, 4)
+})
+
+test('permite corregir manualmente el servidor sin sumar puntos', () => {
+  const state = createInitialState({ servidor_inicial: 'jugador1' })
+  const corrected = applyEvent(state, { tipo: 'cambio_servidor', ganador: 'jugador2' })
+  assert.equal(corrected.server, 'jugador2')
+  assert.deepEqual(corrected.points, [0, 0])
+})

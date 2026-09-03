@@ -6,6 +6,7 @@ const POINT_REASONS = [
   'doble_falta',
   'penalizacion',
   'infraccion',
+  'punto_sin_detalle',
 ]
 
 const otherSide = (side) => (side === 'jugador1' ? 'jugador2' : 'jugador1')
@@ -16,6 +17,8 @@ function normalizeConfig(match = {}) {
     bestOfSets: [1, 3, 5].includes(Number(match.mejor_de_sets))
       ? Number(match.mejor_de_sets)
       : 3,
+    gamesPerSet: Math.max(1, Math.min(12, Number(match.juegos_por_set) || 6)),
+    gamesDifference: Math.max(1, Math.min(6, Number(match.diferencia_juegos) || 2)),
     gameMode: match.modo_game === 'sin_ventaja' ? 'sin_ventaja' : 'ventaja',
     decidingSet: match.set_decisivo === 'match_tiebreak' ? 'match_tiebreak' : 'set_completo',
     tieBreakAt: Number.isInteger(Number(match.tiebreak_en))
@@ -85,9 +88,9 @@ function serverForTieBreak(firstServer, pointsPlayed) {
   return block % 2 === 0 ? otherSide(firstServer) : firstServer
 }
 
-function hasWonRace(scores, winnerIndex, target) {
+function hasWonRace(scores, winnerIndex, target, difference = 2) {
   const loserIndex = winnerIndex === 0 ? 1 : 0
-  return scores[winnerIndex] >= target && scores[winnerIndex] - scores[loserIndex] >= 2
+  return scores[winnerIndex] >= target && scores[winnerIndex] - scores[loserIndex] >= difference
 }
 
 function completeSet(state, winnerIndex, config) {
@@ -173,7 +176,7 @@ function applyPoint(currentState, winner, match = {}) {
     return state
   }
 
-  if (hasWonRace(currentSet.games, winnerIndex, 6)) {
+  if (hasWonRace(currentSet.games, winnerIndex, config.gamesPerSet, config.gamesDifference)) {
     completeSet(state, winnerIndex, config)
   }
 
@@ -182,7 +185,7 @@ function applyPoint(currentState, winner, match = {}) {
 
 function applyEvent(currentState, event, match = {}) {
   const state = cloneState(currentState)
-  if (!['punto', 'primera_falta', 'let'].includes(event.tipo)) {
+  if (!['punto', 'primera_falta', 'let', 'cambio_servidor'].includes(event.tipo)) {
     throw { status: 400, message: 'Tipo de evento inválido' }
   }
   if (state.winner || state.mode === 'completed') {
@@ -198,6 +201,22 @@ function applyEvent(currentState, event, match = {}) {
   }
 
   if (event.tipo === 'let') return state
+
+  if (event.tipo === 'cambio_servidor') {
+    if (!['jugador1', 'jugador2'].includes(event.ganador)) {
+      throw { status: 400, message: 'Selecciona quién queda al servicio' }
+    }
+    state.server = event.ganador
+    state.serviceAttempt = 1
+    if (state.mode === 'tiebreak' || state.mode === 'match_tiebreak') {
+      const pointsPlayed = state.points[0] + state.points[1]
+      state.tieBreakFirstServer =
+        serverForTieBreak(event.ganador, pointsPlayed) === event.ganador
+          ? event.ganador
+          : otherSide(event.ganador)
+    }
+    return state
+  }
 
   if (!POINT_REASONS.includes(event.motivo)) {
     throw { status: 400, message: 'Selecciona cómo terminó el punto' }

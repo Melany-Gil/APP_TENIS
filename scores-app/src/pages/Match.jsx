@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Star, CalendarDays, MessageSquareText } from 'lucide-react'
+import { ArrowLeft, BarChart3, CalendarDays, Clock3, MapPin, MessageSquareText, Star } from 'lucide-react'
 import LiveBadge from '../components/match/LiveBadge'
+import MatchStats from '../components/match/MatchStats'
 import { MatchCardSkeleton } from '../components/ui/Skeleton'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { useMatch } from '../hooks/useMatches'
@@ -8,12 +9,14 @@ import { formatClockTime, formatDate } from '../utils/formatDate'
 import { cn } from '../utils/cn'
 import { useLoginRequired } from '../hooks/useLoginRequired'
 import { getParticipantName } from '../utils/matchParticipants'
+import { useMatchTimer } from '../hooks/useMatchTimer'
 
 export default function Match() {
   const { id } = useParams()
   const { match, loading } = useMatch(id)
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
+  const matchTimer = useMatchTimer(match?.en_vivo, match?.estado)
 
   if (loading)
     return (
@@ -58,6 +61,7 @@ export default function Match() {
   const setCount = Math.max(3, p1Scores.length, p2Scores.length)
   const p1Sets = Array.from({ length: setCount }, (_, index) => p1Scores[index] ?? '/')
   const p2Sets = Array.from({ length: setCount }, (_, index) => p2Scores[index] ?? '/')
+  const { formatted: elapsed, isPaused } = matchTimer
 
   return (
     <div className='space-y-5 animate-fade-up'>
@@ -92,6 +96,9 @@ export default function Match() {
           style={{ color: 'var(--text-muted)' }}
         >
           {match.categoria?.nombre && <span className='badge-brand'>{match.categoria.nombre}</span>}
+          {match.cancha?.nombre && (
+            <span className='inline-flex items-center gap-1'><MapPin className='w-3 h-3' />{match.cancha.nombre}</span>
+          )}
         </div>
 
         <div className='space-y-4'>
@@ -106,7 +113,14 @@ export default function Match() {
           <div className='flex items-center gap-3'>
             <div className='flex-1 h-px' style={{ backgroundColor: 'var(--border-color)' }} />
             {isLive ? (
-              <LiveBadge />
+              <div className='flex items-center gap-2'>
+                <LiveBadge />
+                {match.en_vivo && (
+                  <span className='inline-flex items-center gap-1 rounded-full px-2 py-1 font-mono text-xs' style={{ backgroundColor: 'var(--bg-hover)', color: isPaused ? 'var(--club-clay)' : 'var(--text-secondary)' }}>
+                    <Clock3 className='w-3 h-3' /> {elapsed}{isPaused ? ' · PAUSADO' : ''}
+                  </span>
+                )}
+              </div>
             ) : (
               <span className='text-xs px-2' style={{ color: 'var(--text-muted)' }}>
                 {statusLabel}
@@ -160,6 +174,15 @@ export default function Match() {
             </p>
           </div>
         </div>
+      )}
+
+      {(isLive || match.estado === 'finalizado') && match.deporte === 'tenis' && (
+        <section className='card p-4 sm:p-5'>
+          <h2 className='font-bold flex items-center gap-2 mb-4' style={{ color: 'var(--text-primary)' }}>
+            <BarChart3 className='w-4 h-4' /> Estadísticas del partido
+          </h2>
+          <MatchStats matchId={match.id} player1={p1.name} player2={p2.name} />
+        </section>
       )}
     </div>
   )

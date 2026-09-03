@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { ArrowLeft, ClipboardCheck, LogOut } from 'lucide-react'
+import { ArrowLeft, LogOut } from 'lucide-react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import ContentLoader from '../components/ui/ContentLoader'
 import SponsorDock from '../components/sponsors/SponsorDock'
@@ -29,12 +29,7 @@ export default function JudgeLayout() {
           <ArrowLeft className='w-5 h-5' />
         </Link>
         <Link to='/juez' className='flex items-center gap-2 min-w-0'>
-          <span
-            className='w-9 h-9 rounded-xl grid place-items-center shrink-0'
-            style={{ backgroundColor: 'var(--color-brand)', color: 'white' }}
-          >
-            <ClipboardCheck className='w-5 h-5' />
-          </span>
+          <img src='/branding/subcomite-tenis-club-union.png' alt='Subcomité de Tenis Club Unión' className='w-10 h-10 object-contain shrink-0' />
           <span className='min-w-0'>
             <strong className='block text-sm leading-tight' style={{ color: 'var(--text-primary)' }}>
               Control de cancha
@@ -45,6 +40,9 @@ export default function JudgeLayout() {
           </span>
         </Link>
         <div className='ml-auto flex items-center gap-1'>
+          <a href='https://www.instagram.com/legal.branding' target='_blank' rel='noreferrer' className='hidden md:block mr-2' aria-label='Instagram de Legal Branding'>
+            <img src='/branding/legal-branding.png' alt='Legal Branding' className='h-8 w-auto object-contain' />
+          </a>
           {user?.rol === 'admin' && (
             <Link to='/admin' className='btn-ghost text-xs px-3 py-2 hidden sm:flex'>
               Administración

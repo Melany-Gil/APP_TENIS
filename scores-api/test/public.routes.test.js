@@ -44,6 +44,7 @@ test('las consultas necesarias para ver marcadores no exigen autenticación', ()
     [routes.jugadores, '/:id'],
     [routes.partidos, '/'],
     [routes.partidos, '/:id'],
+    [routes.partidos, '/:id/estadisticas'],
     [routes.anuncios, '/'],
   ]
 
@@ -59,6 +60,9 @@ test('las operaciones de administración siguen protegidas', () => {
     [routes.jugadores, 'post', '/', requireAdmin],
     [routes.partidos, 'post', '/', requireOfficial],
     [routes.partidos, 'put', '/:id/marcador', requireOfficial],
+    [routes.partidos, 'post', '/:id/iniciar', requireOfficial],
+    [routes.partidos, 'put', '/:id/pausa', requireOfficial],
+    [routes.partidos, 'put', '/:id/saque', requireOfficial],
     [routes.anuncios, 'post', '/', requireAdmin],
   ]
 

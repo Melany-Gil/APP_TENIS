@@ -202,7 +202,10 @@ CREATE TABLE partidos (
   origen_partido1_id INT    NULL,
   origen_partido2_id INT    NULL,
   juez_id      INT         NULL,
+  cancha_id    INT         NULL,
   mejor_de_sets TINYINT    NOT NULL DEFAULT 3,
+  juegos_por_set TINYINT   NOT NULL DEFAULT 6,
+  diferencia_juegos TINYINT NOT NULL DEFAULT 2,
   modo_game    ENUM('ventaja','sin_ventaja') NOT NULL DEFAULT 'ventaja',
   set_decisivo ENUM('set_completo','match_tiebreak') NOT NULL DEFAULT 'set_completo',
   tiebreak_en  TINYINT     NOT NULL DEFAULT 6,
@@ -224,6 +227,7 @@ CREATE TABLE partidos (
   KEY idx_partidos_origen1 (origen_partido1_id),
   KEY idx_partidos_origen2 (origen_partido2_id),
   KEY idx_partidos_juez (juez_id),
+  KEY idx_partidos_cancha (cancha_id),
   FOREIGN KEY (categoria_id) REFERENCES categorias(id),
   FOREIGN KEY (jugador1_id) REFERENCES jugadores(id),
   FOREIGN KEY (jugador2_id) REFERENCES jugadores(id),
@@ -232,6 +236,7 @@ CREATE TABLE partidos (
   FOREIGN KEY (origen_partido1_id) REFERENCES partidos(id) ON DELETE SET NULL,
   FOREIGN KEY (origen_partido2_id) REFERENCES partidos(id) ON DELETE SET NULL,
   FOREIGN KEY (juez_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (cancha_id) REFERENCES canchas(id) ON DELETE SET NULL,
   FOREIGN KEY (created_by)  REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -242,7 +247,7 @@ CREATE TABLE eventos_partido (
   id               BIGINT NOT NULL AUTO_INCREMENT,
   partido_id       INT NOT NULL,
   secuencia        INT NOT NULL,
-  tipo             ENUM('punto','primera_falta','let') NOT NULL,
+  tipo             ENUM('punto','primera_falta','let','cambio_servidor') NOT NULL,
   ganador          ENUM('jugador1','jugador2') NULL,
   motivo           VARCHAR(40) NULL,
   servidor         ENUM('jugador1','jugador2') NOT NULL,
@@ -259,6 +264,18 @@ CREATE TABLE eventos_partido (
   FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by) REFERENCES users(id),
   FOREIGN KEY (anulado_por) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Estado temporal del partido para cronómetro y pausas
+CREATE TABLE estado_en_vivo_partido (
+  partido_id      INT NOT NULL,
+  iniciado_at     DATETIME NULL,
+  pausado_at      DATETIME NULL,
+  segundos_pausa  INT NOT NULL DEFAULT 0,
+  finalizado_at   DATETIME NULL,
+  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (partido_id),
+  FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ─────────────────────────────────────────────────────

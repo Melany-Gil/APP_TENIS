@@ -14,7 +14,10 @@ const MATCH_SELECT = `
     p.origen_partido1_id,
     p.origen_partido2_id,
     p.juez_id,
+    p.cancha_id,
     p.mejor_de_sets,
+    p.juegos_por_set,
+    p.diferencia_juegos,
     p.modo_game,
     p.set_decisivo,
     p.tiebreak_en,
@@ -30,6 +33,14 @@ const MATCH_SELECT = `
     ) AS marcador_actual,
     uj.nombre AS juez_nombre,
     uj.apellido AS juez_apellido,
+    ch.nombre AS cancha_nombre,
+    ch.superficie AS cancha_superficie,
+    s.id AS sede_id,
+    s.nombre AS sede_nombre,
+    ev.iniciado_at,
+    ev.pausado_at,
+    ev.segundos_pausa,
+    ev.finalizado_at,
     cat.id     AS categoria_id,
     cat.nombre AS categoria_nombre,
     j1.id       AS j1_id,
@@ -61,6 +72,9 @@ const MATCH_SELECT = `
   LEFT JOIN equipos_padel e1 ON e1.id = p.equipo1_id
   LEFT JOIN equipos_padel e2 ON e2.id = p.equipo2_id
   LEFT JOIN users uj ON uj.id = p.juez_id
+  LEFT JOIN canchas ch ON ch.id = p.cancha_id
+  LEFT JOIN sedes s ON s.id = ch.sede_id
+  LEFT JOIN estado_en_vivo_partido ev ON ev.partido_id = p.id
   LEFT JOIN partidos op1 ON op1.id = p.origen_partido1_id
   LEFT JOIN jugadores op1j1 ON op1j1.id = op1.jugador1_id
   LEFT JOIN jugadores op1j2 ON op1j2.id = op1.jugador2_id
@@ -83,6 +97,7 @@ exports.getAll = async ({
   hasta,
   orden,
   juez_id,
+  cancha_id,
 }) => {
   let query = `${MATCH_SELECT} WHERE 1 = 1`
   const params = []
@@ -124,6 +139,10 @@ exports.getAll = async ({
   if (juez_id) {
     query += ' AND p.juez_id = ?'
     params.push(juez_id)
+  }
+  if (cancha_id) {
+    query += ' AND p.cancha_id = ?'
+    params.push(cancha_id)
   }
 
   const direction = orden === 'asc' ? 'ASC' : 'DESC'
@@ -183,9 +202,10 @@ exports.create = async (body, actor) => {
     `INSERT INTO partidos
        (deporte, categoria_id, jugador1_id, jugador2_id, equipo1_id, equipo2_id,
         estado, fecha_inicio, hora_inicio, notas, origen_partido1_id, origen_partido2_id,
-        created_by, juez_id, mejor_de_sets, modo_game, set_decisivo, tiebreak_en,
-        tiebreak_puntos, match_tiebreak_puntos, servidor_inicial)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        created_by, juez_id, cancha_id, mejor_de_sets, juegos_por_set, diferencia_juegos,
+        modo_game, set_decisivo, tiebreak_en, tiebreak_puntos, match_tiebreak_puntos,
+        servidor_inicial)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       match.deporte,
       match.categoria_id,
@@ -201,7 +221,10 @@ exports.create = async (body, actor) => {
       match.origen_partido2_id,
       requester.id,
       judgeId,
+      match.cancha_id,
       scoring.mejor_de_sets,
+      scoring.juegos_por_set,
+      scoring.diferencia_juegos,
       scoring.modo_game,
       scoring.set_decisivo,
       scoring.tiebreak_en,
@@ -231,7 +254,8 @@ exports.update = async (id, body, actor) => {
     `UPDATE partidos
      SET deporte = ?, categoria_id = ?, jugador1_id = ?, jugador2_id = ?,
          equipo1_id = ?, equipo2_id = ?, estado = ?, fecha_inicio = ?, hora_inicio = ?, notas = ?,
-         origen_partido1_id = ?, origen_partido2_id = ?, juez_id = ?, mejor_de_sets = ?,
+         origen_partido1_id = ?, origen_partido2_id = ?, juez_id = ?, cancha_id = ?,
+         mejor_de_sets = ?, juegos_por_set = ?, diferencia_juegos = ?,
          modo_game = ?, set_decisivo = ?, tiebreak_en = ?, tiebreak_puntos = ?,
          match_tiebreak_puntos = ?, servidor_inicial = ?
      WHERE id = ?`,
@@ -249,7 +273,10 @@ exports.update = async (id, body, actor) => {
       match.origen_partido1_id,
       match.origen_partido2_id,
       judgeId,
+      match.cancha_id,
       scoring.mejor_de_sets,
+      scoring.juegos_por_set,
+      scoring.diferencia_juegos,
       scoring.modo_game,
       scoring.set_decisivo,
       scoring.tiebreak_en,
@@ -311,6 +338,22 @@ exports.updateMarcador = async (id, { sets, estado, ganador }, actor) => {
       ganador || null,
       id,
     ])
+
+    if (estado === 'en_vivo') {
+      await connection.query(
+        `INSERT INTO estado_en_vivo_partido (partido_id, iniciado_at)
+         VALUES (?, CURRENT_TIMESTAMP)
+         ON DUPLICATE KEY UPDATE finalizado_at = NULL`,
+        [id]
+      )
+    } else if (estado === 'finalizado' || estado === 'cancelado') {
+      await connection.query(
+        `UPDATE estado_en_vivo_partido
+         SET finalizado_at = COALESCE(finalizado_at, CURRENT_TIMESTAMP), pausado_at = NULL
+         WHERE partido_id = ?`,
+        [id]
+      )
+    }
 
     const setPlaceholders = sets.map(() => '?').join(',')
     await connection.query(
@@ -411,6 +454,20 @@ async function validateBasicMatch(body, currentMatchId = null) {
   const equipo2Id = positiveId(body.equipo2_id)
   const source1Id = positiveId(body.origen_partido1_id)
   const source2Id = positiveId(body.origen_partido2_id)
+  const canchaId = positiveId(body.cancha_id)
+
+  if (canchaId) {
+    const [courts] = await db.query(
+      `SELECT id
+       FROM canchas
+       WHERE id = ? AND activa = TRUE AND deporte IN (?, 'ambos')
+       LIMIT 1`,
+      [canchaId, deporte]
+    )
+    if (!courts.length) {
+      throw { status: 400, message: 'La cancha seleccionada no está disponible para este deporte' }
+    }
+  }
 
   if (source1Id && source2Id && source1Id === source2Id) {
     throw { status: 400, message: 'Cada participante debe provenir de un partido diferente' }
@@ -455,6 +512,7 @@ async function validateBasicMatch(body, currentMatchId = null) {
     equipo2_id: resolvedTeam2,
     origen_partido1_id: source1Id,
     origen_partido2_id: source2Id,
+    cancha_id: canchaId,
     estado,
     fecha_inicio: fechaInicio,
     hora_inicio: horaInicio,
@@ -482,12 +540,20 @@ function normalizeOptionalTime(value) {
 
 function normalizeScoringConfig(body) {
   const bestOfSets = Number(body.mejor_de_sets || 3)
+  const gamesPerSet = Number(body.juegos_por_set || 6)
+  const gamesDifference = Number(body.diferencia_juegos || 2)
   const tieBreakAt = Number(body.tiebreak_en ?? 6)
   const tieBreakPoints = Number(body.tiebreak_puntos || 7)
   const matchTieBreakPoints = Number(body.match_tiebreak_puntos || 10)
 
   if (![1, 3, 5].includes(bestOfSets)) {
     throw { status: 400, message: 'El formato debe ser al mejor de 1, 3 o 5 sets' }
+  }
+  if (!Number.isInteger(gamesPerSet) || gamesPerSet < 1 || gamesPerSet > 12) {
+    throw { status: 400, message: 'Los juegos por set deben estar entre 1 y 12' }
+  }
+  if (!Number.isInteger(gamesDifference) || gamesDifference < 1 || gamesDifference > 6) {
+    throw { status: 400, message: 'La diferencia de juegos debe estar entre 1 y 6' }
   }
   if (!['ventaja', 'sin_ventaja'].includes(body.modo_game || 'ventaja')) {
     throw { status: 400, message: 'Selecciona un modo de game válido' }
@@ -507,6 +573,8 @@ function normalizeScoringConfig(body) {
 
   return {
     mejor_de_sets: bestOfSets,
+    juegos_por_set: gamesPerSet,
+    diferencia_juegos: gamesDifference,
     modo_game: body.modo_game || 'ventaja',
     set_decisivo: body.set_decisivo || 'set_completo',
     tiebreak_en: tieBreakAt,
@@ -619,11 +687,29 @@ function formatSummary(row) {
     hora_inicio: row.hora_inicio || null,
     notas: row.notas || null,
     marcador_actual: parseScoreSnapshot(row.marcador_actual),
+    cancha: row.cancha_id
+      ? {
+          id: row.cancha_id,
+          nombre: row.cancha_nombre,
+          superficie: row.cancha_superficie || null,
+          sede: row.sede_id ? { id: row.sede_id, nombre: row.sede_nombre } : null,
+        }
+      : null,
+    en_vivo: row.iniciado_at
+      ? {
+          iniciado_at: row.iniciado_at,
+          pausado_at: row.pausado_at || null,
+          segundos_pausa: Number(row.segundos_pausa || 0),
+          finalizado_at: row.finalizado_at || null,
+        }
+      : null,
     juez: row.juez_id
       ? { id: row.juez_id, nombre: row.juez_nombre, apellido: row.juez_apellido }
       : null,
     formato: {
       mejor_de_sets: Number(row.mejor_de_sets || 3),
+      juegos_por_set: Number(row.juegos_por_set || 6),
+      diferencia_juegos: Number(row.diferencia_juegos || 2),
       modo_game: row.modo_game || 'ventaja',
       set_decisivo: row.set_decisivo || 'set_completo',
       tiebreak_en: Number(row.tiebreak_en ?? 6),

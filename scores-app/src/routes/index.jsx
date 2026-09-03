@@ -1,4 +1,4 @@
-import { lazy } from 'react'
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import AuthLayout from '../layouts/AuthLayout'
 import AppLayout from '../layouts/AppLayout'
@@ -25,6 +25,7 @@ const Favorites = lazy(() => import('../pages/Favorites'))
 const Profile = lazy(() => import('../pages/Profile'))
 const Settings = lazy(() => import('../pages/Settings'))
 const Sponsors = lazy(() => import('../pages/Sponsors'))
+const Pantalla = lazy(() => import('../pages/Pantalla'))
 
 // ── Admin ─────────────────────────────────────────────────
 const Dashboard = lazy(() => import('../pages/admin/Dashboard'))
@@ -55,6 +56,8 @@ export default function AppRouter() {
         <Route path='/register' element={<Register />} />
         <Route path='/forgot-password' element={<ForgotPassword />} />
       </Route>
+
+      <Route path='/pantalla' element={<Suspense fallback={<div className='fixed inset-0 bg-[#07110d]' />}><Pantalla /></Suspense>} />
 
       {/* Consulta pública de marcadores */}
       <Route element={<AppLayout />}>

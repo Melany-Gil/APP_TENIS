@@ -6,8 +6,12 @@ const { requireAuth, requireAdmin, requireOfficial } = require('../../middleware
 router.get('/', controller.getAll)
 router.get('/gestion/mis-partidos', requireAuth, requireOfficial, controller.getManaged)
 // GET  /api/partidos/:id
+router.get('/:id/estadisticas', controller.getStats)
 router.get('/:id', controller.getById)
 router.get('/:id/control', requireAuth, requireOfficial, controller.getControl)
+router.post('/:id/iniciar', requireAuth, requireOfficial, controller.startMatch)
+router.put('/:id/pausa', requireAuth, requireOfficial, controller.setPaused)
+router.put('/:id/saque', requireAuth, requireOfficial, controller.changeServer)
 router.post('/:id/eventos', requireAuth, requireOfficial, controller.addEvent)
 router.post('/:id/deshacer', requireAuth, requireOfficial, controller.undoEvent)
 // POST /api/partidos

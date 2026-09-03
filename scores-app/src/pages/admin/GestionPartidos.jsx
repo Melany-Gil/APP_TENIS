@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, X, Radio, Gavel, SlidersHorizontal } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Radio, Gavel, SlidersHorizontal, MapPin } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { matchService } from '../../services/matchService'
 import { playerService } from '../../services/playerService'
 import { teamService } from '../../services/teamService'
 import { categoriaService } from '../../services/categoriaService'
 import { userService } from '../../services/userService'
+import { sedeService } from '../../services/sedeService'
 import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
@@ -36,6 +37,7 @@ export default function GestionPartidos() {
   const [equipos, setEquipos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [jueces, setJueces] = useState([])
+  const [canchas, setCanchas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showMarcador, setShowMarcador] = useState(null)
@@ -83,13 +85,21 @@ export default function GestionPartidos() {
       teamService.getAll(),
       categoriaService.getAll(),
       userService.getAll(),
+      sedeService.getAll(),
     ])
-      .then(([p, j, e, c, u]) => {
+      .then(async ([p, j, e, c, u, locations]) => {
         setPartidos(p.data || [])
         setJugadores(j.data || [])
         setEquipos(e.data || [])
         setCategorias(c.data || [])
         setJueces((u.data || []).filter((usuario) => ['juez', 'admin'].includes(usuario.rol)))
+        const courtResponses = await Promise.all(
+          (locations.data || []).map(async (location) => {
+            const response = await sedeService.getCanchasBySede(location.id)
+            return (response.data || []).map((court) => ({ ...court, sede_nombre: location.nombre }))
+          })
+        )
+        setCanchas(courtResponses.flat())
       })
       .catch(() => addToast({ type: 'error', title: 'Error al cargar datos' }))
       .finally(() => setLoading(false))
@@ -113,7 +123,10 @@ export default function GestionPartidos() {
       participante1_tipo: 'fijo',
       participante2_tipo: 'fijo',
       juez_id: '',
+      cancha_id: '',
       mejor_de_sets: '3',
+      juegos_por_set: '6',
+      diferencia_juegos: '2',
       modo_game: 'ventaja',
       set_decisivo: 'set_completo',
       tiebreak_en: '6',
@@ -143,7 +156,10 @@ export default function GestionPartidos() {
       origen_partido2_id: partido.origen_partido2?.id || '',
       notas: partido.notas || '',
       juez_id: partido.juez?.id || '',
+      cancha_id: partido.cancha?.id || '',
       mejor_de_sets: String(partido.formato?.mejor_de_sets || 3),
+      juegos_por_set: String(partido.formato?.juegos_por_set || 6),
+      diferencia_juegos: String(partido.formato?.diferencia_juegos || 2),
       modo_game: partido.formato?.modo_game || 'ventaja',
       set_decisivo: partido.formato?.set_decisivo || 'set_completo',
       tiebreak_en: String(partido.formato?.tiebreak_en ?? 6),
@@ -184,7 +200,10 @@ export default function GestionPartidos() {
         origen_partido2_id: data.participante2_tipo === 'ganador' ? data.origen_partido2_id : null,
         notas: data.notas,
         juez_id: data.juez_id || null,
+        cancha_id: data.cancha_id || null,
         mejor_de_sets: data.mejor_de_sets,
+        juegos_por_set: data.juegos_por_set,
+        diferencia_juegos: data.diferencia_juegos,
         modo_game: data.modo_game,
         set_decisivo: data.set_decisivo,
         tiebreak_en: data.tiebreak_en,
@@ -358,6 +377,18 @@ export default function GestionPartidos() {
               </select>
             </div>
 
+            <div className='form-group'>
+              <label className='form-label'>Cancha (opcional)</label>
+              <select className='form-input' {...register('cancha_id')}>
+                <option value=''>Sin asignar</option>
+                {canchas
+                  .filter((court) => court.deporte === selectedDeporte || court.deporte === 'ambos')
+                  .map((court) => (
+                    <option key={court.id} value={court.id}>{court.nombre} · {court.sede_nombre}</option>
+                  ))}
+              </select>
+            </div>
+
             <div
               className='sm:col-span-2 rounded-xl p-4 space-y-3'
               style={{ backgroundColor: 'var(--bg-hover)' }}
@@ -381,6 +412,14 @@ export default function GestionPartidos() {
                   </select>
                 </label>
                 <label className='form-group'>
+                  <span className='form-label'>Juegos por set</span>
+                  <input type='number' min='1' max='12' className='form-input' {...register('juegos_por_set')} />
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Diferencia de juegos</span>
+                  <input type='number' min='1' max='6' className='form-input' {...register('diferencia_juegos')} />
+                </label>
+                <label className='form-group'>
                   <span className='form-label'>Games</span>
                   <select className='form-input' {...register('modo_game')}>
                     <option value='ventaja'>Con ventaja</option>
@@ -396,10 +435,8 @@ export default function GestionPartidos() {
                 </label>
                 <label className='form-group'>
                   <span className='form-label'>Tiebreak en</span>
-                  <select className='form-input' {...register('tiebreak_en')}>
-                    <option value='6'>6–6</option>
-                    <option value='0'>Sin tiebreak</option>
-                  </select>
+                  <input type='number' min='0' max='12' className='form-input' {...register('tiebreak_en')} />
+                  <span className='text-[11px]' style={{ color: 'var(--text-muted)' }}>Usa 0 para jugar sin tiebreak.</span>
                 </label>
                 <label className='form-group'>
                   <span className='form-label'>Tiebreak a</span>
@@ -698,6 +735,11 @@ export default function GestionPartidos() {
                   {p.juez && (
                     <p className='text-[11px] mt-1 flex items-center gap-1' style={{ color: 'var(--text-muted)' }}>
                       <Gavel className='w-3 h-3' /> Juez: {p.juez.nombre} {p.juez.apellido}
+                    </p>
+                  )}
+                  {p.cancha && (
+                    <p className='text-[11px] mt-1 flex items-center gap-1' style={{ color: 'var(--text-muted)' }}>
+                      <MapPin className='w-3 h-3' /> {p.cancha.nombre}
                     </p>
                   )}
                 </div>

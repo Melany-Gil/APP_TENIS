@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Clock3, Pencil, Play, Plus, SlidersHorizontal, X } from 'lucide-react'
+import { CalendarDays, Clock3, MapPin, Pencil, Play, Plus, SlidersHorizontal, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import { categoriaService } from '../../services/categoriaService'
 import { matchService } from '../../services/matchService'
 import { playerService } from '../../services/playerService'
+import { sedeService } from '../../services/sedeService'
 import useAuthStore from '../../store/useAuthStore'
 import useUIStore from '../../store/useUIStore'
 import { formatClockTime, formatDate } from '../../utils/formatDate'
@@ -17,7 +18,10 @@ const EMPTY_FORM = {
   fecha_inicio: '',
   hora_inicio: '',
   notas: '',
+  cancha_id: '',
   mejor_de_sets: '3',
+  juegos_por_set: '6',
+  diferencia_juegos: '2',
   modo_game: 'ventaja',
   set_decisivo: 'set_completo',
   tiebreak_en: '6',
@@ -30,6 +34,7 @@ export default function JudgeDashboard() {
   const [partidos, setPartidos] = useState([])
   const [jugadores, setJugadores] = useState([])
   const [categorias, setCategorias] = useState([])
+  const [canchas, setCanchas] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -40,8 +45,8 @@ export default function JudgeDashboard() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([matchService.getManaged(), playerService.getAll(), categoriaService.getAll()])
-      .then(([matches, players, categories]) => {
+    Promise.all([matchService.getManaged(), playerService.getAll(), categoriaService.getAll(), sedeService.getAll()])
+      .then(async ([matches, players, categories, locations]) => {
         setPartidos(matches.data || [])
         setJugadores((players.data || []).filter((player) => player.deporte === 'tenis'))
         setCategorias(
@@ -49,6 +54,13 @@ export default function JudgeDashboard() {
             (category) => category.deporte === 'tenis' || category.deporte === 'ambos'
           )
         )
+        const courtResponses = await Promise.all(
+          (locations.data || []).map(async (location) => {
+            const response = await sedeService.getCanchasBySede(location.id)
+            return (response.data || []).map((court) => ({ ...court, sede_nombre: location.nombre }))
+          })
+        )
+        setCanchas(courtResponses.flat().filter((court) => ['tenis', 'ambos'].includes(court.deporte)))
       })
       .catch((error) =>
         addToast({ type: 'error', title: 'No se pudieron cargar los partidos', message: error.message })
@@ -84,7 +96,10 @@ export default function JudgeDashboard() {
       fecha_inicio: match.fecha_inicio?.slice(0, 10) || '',
       hora_inicio: match.hora_inicio?.slice(0, 5) || '',
       notas: match.notas || '',
+      cancha_id: String(match.cancha?.id || ''),
       mejor_de_sets: String(match.formato?.mejor_de_sets || 3),
+      juegos_por_set: String(match.formato?.juegos_por_set || 6),
+      diferencia_juegos: String(match.formato?.diferencia_juegos || 2),
       modo_game: match.formato?.modo_game || 'ventaja',
       set_decisivo: match.formato?.set_decisivo || 'set_completo',
       tiebreak_en: String(match.formato?.tiebreak_en ?? 6),
@@ -197,6 +212,14 @@ export default function JudgeDashboard() {
             <Field label='Hora (opcional)'>
               <input type='time' className='form-input' name='hora_inicio' value={form.hora_inicio} onChange={updateField} />
             </Field>
+            <Field label='Cancha (opcional)'>
+              <select className='form-input' name='cancha_id' value={form.cancha_id} onChange={updateField}>
+                <option value=''>Sin asignar</option>
+                {canchas.map((court) => (
+                  <option key={court.id} value={court.id}>{court.nombre} · {court.sede_nombre}</option>
+                ))}
+              </select>
+            </Field>
           </div>
 
           <div className='rounded-xl p-4 space-y-3' style={{ backgroundColor: 'var(--bg-hover)' }}>
@@ -210,6 +233,12 @@ export default function JudgeDashboard() {
                   <option value='1'>1 set</option><option value='3'>3 sets</option><option value='5'>5 sets</option>
                 </select>
               </Field>
+              <Field label='Juegos por set'>
+                <input type='number' min='1' max='12' className='form-input' name='juegos_por_set' value={form.juegos_por_set} onChange={updateField} />
+              </Field>
+              <Field label='Diferencia de juegos'>
+                <input type='number' min='1' max='6' className='form-input' name='diferencia_juegos' value={form.diferencia_juegos} onChange={updateField} />
+              </Field>
               <Field label='Games'>
                 <select className='form-input' name='modo_game' value={form.modo_game} onChange={updateField}>
                   <option value='ventaja'>Con ventaja</option><option value='sin_ventaja'>Punto decisivo</option>
@@ -221,9 +250,8 @@ export default function JudgeDashboard() {
                 </select>
               </Field>
               <Field label='Tiebreak al llegar a'>
-                <select className='form-input' name='tiebreak_en' value={form.tiebreak_en} onChange={updateField}>
-                  <option value='6'>6–6</option><option value='0'>Sin tiebreak</option>
-                </select>
+                <input type='number' min='0' max='12' className='form-input' name='tiebreak_en' value={form.tiebreak_en} onChange={updateField} />
+                <p className='mt-1 text-[11px]' style={{ color: 'var(--text-muted)' }}>Usa 0 para jugar sin tiebreak.</p>
               </Field>
               <Field label='Tiebreak a puntos'>
                 <input type='number' min='5' max='99' className='form-input' name='tiebreak_puntos' value={form.tiebreak_puntos} onChange={updateField} />
@@ -271,6 +299,11 @@ export default function JudgeDashboard() {
                 <p className='text-xs mt-2 flex items-center gap-2' style={{ color: 'var(--text-muted)' }}>
                   {match.fecha_inicio && <><CalendarDays className='w-3.5 h-3.5' />{formatDate(match.fecha_inicio)}</>}
                   {match.hora_inicio && <><Clock3 className='w-3.5 h-3.5 ml-1' />{formatClockTime(match.hora_inicio)}</>}
+                </p>
+              )}
+              {match.cancha?.nombre && (
+                <p className='text-xs mt-1 flex items-center gap-1.5' style={{ color: 'var(--text-muted)' }}>
+                  <MapPin className='w-3.5 h-3.5' /> {match.cancha.nombre}
                 </p>
               )}
             </div>

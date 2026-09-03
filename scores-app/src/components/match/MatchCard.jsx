@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Star } from 'lucide-react'
+import { Clock3, MapPin, Star } from 'lucide-react'
 import LiveBadge from './LiveBadge'
 import ScoreDisplay from './ScoreDisplay'
 import useFavoritesStore from '../../store/useFavoritesStore'
@@ -7,6 +7,7 @@ import { formatClockTime, formatDate } from '../../utils/formatDate'
 import { cn } from '../../utils/cn'
 import { useLoginRequired } from '../../hooks/useLoginRequired'
 import { getParticipantName } from '../../utils/matchParticipants'
+import { useMatchTimer } from '../../hooks/useMatchTimer'
 
 export default function MatchCard({ match }) {
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
@@ -15,6 +16,7 @@ export default function MatchCard({ match }) {
   const isLive = match.estado === 'en_vivo'
   const isFinished = match.estado === 'finalizado'
   const winner = match.ganador
+  const timer = useMatchTimer(match.en_vivo, match.estado)
 
   const p1Sets = match.sets?.map((s) => s.games_j1) ?? []
   const p2Sets = match.sets?.map((s) => s.games_j2) ?? []
@@ -35,7 +37,16 @@ export default function MatchCard({ match }) {
             </span>
           </div>
           <div className='flex items-center gap-2 shrink-0 ml-2'>
-            {isLive && <LiveBadge />}
+            {isLive && (
+              <span className='flex items-center gap-1.5'>
+                <LiveBadge />
+                {match.en_vivo?.iniciado_at && (
+                  <span className='flex items-center gap-1 text-[10px] tabular-nums' style={{ color: 'var(--text-muted)' }}>
+                    <Clock3 className='h-3 w-3' /> {timer.formatted}
+                  </span>
+                )}
+              </span>
+            )}
             {isFinished && (
               <span className='text-[10px] font-medium' style={{ color: 'var(--text-muted)' }}>
                 FIN
@@ -85,6 +96,13 @@ export default function MatchCard({ match }) {
             isLive={isLive}
           />
         </div>
+
+        {match.cancha && (
+          <div className='px-4 py-2 text-[11px] flex items-center gap-1.5' style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)' }}>
+            <MapPin className='w-3 h-3' /> {match.cancha.nombre}
+            {match.cancha.superficie ? ` · ${match.cancha.superficie}` : ''}
+          </div>
+        )}
 
         {match.notas && (
           <div

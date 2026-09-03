@@ -256,7 +256,8 @@ test('create asigna la categoría directamente al partido', async () => {
     calls[1].sql,
     /fecha_inicio, hora_inicio, notas, origen_partido1_id, origen_partido2_id/
   )
-  assert.doesNotMatch(calls[1].sql, /torneo_id|ronda|cancha_id/)
+  assert.doesNotMatch(calls[1].sql, /torneo_id|ronda/)
+  assert.match(calls[1].sql, /cancha_id/)
   assert.equal(calls[1].params[1], 3)
   assert.equal(calls[1].params[7], '2026-08-01')
   assert.equal(calls[1].params[8], '09:00')

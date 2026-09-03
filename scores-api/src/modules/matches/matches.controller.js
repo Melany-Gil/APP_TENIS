@@ -60,6 +60,38 @@ exports.getControl = async (req, res) => {
   }
 }
 
+exports.getStats = async (req, res) => {
+  try {
+    return success(res, await eventService.getStats(req.params.id, req.query.set))
+  } catch (err) {
+    return error(res, err.message, err.status || 500)
+  }
+}
+
+exports.startMatch = async (req, res) => {
+  try {
+    return success(res, await eventService.startMatch(req.params.id, req.user))
+  } catch (err) {
+    return error(res, err.message, err.status || 500)
+  }
+}
+
+exports.setPaused = async (req, res) => {
+  try {
+    return success(res, await eventService.setPaused(req.params.id, Boolean(req.body.pausado), req.user))
+  } catch (err) {
+    return error(res, err.message, err.status || 500)
+  }
+}
+
+exports.changeServer = async (req, res) => {
+  try {
+    return success(res, await eventService.changeServer(req.params.id, req.body.servidor, req.user))
+  } catch (err) {
+    return error(res, err.message, err.status || 500)
+  }
+}
+
 exports.addEvent = async (req, res) => {
   try {
     return success(res, await eventService.addEvent(req.params.id, req.body, req.user), 201)
