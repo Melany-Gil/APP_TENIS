@@ -7,6 +7,7 @@ import useUIStore from '../../store/useUIStore'
 import { confirm } from '../../utils/confirm'
 import { formatDate } from '../../utils/formatDate'
 import Button from '../../components/ui/Button'
+import Avatar from '../../components/ui/Avatar'
 
 export default function GestionUsuarios() {
   const [usuarios, setUsuarios] = useState([])
@@ -268,20 +269,12 @@ export default function GestionUsuarios() {
               }}
             >
               {/* Avatar */}
-              <div
-                className='w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0'
-                style={{
-                  backgroundColor: u.id === me?.id ? 'var(--color-brand-dim)' : 'var(--bg-hover)',
-                  color: u.id === me?.id ? 'var(--color-brand)' : 'var(--text-secondary)',
-                  border:
-                    u.id === me?.id
-                      ? '2px solid var(--color-brand)'
-                      : '1px solid var(--border-color)',
-                }}
-              >
-                {u.nombre?.charAt(0)}
-                {u.apellido?.charAt(0)}
-              </div>
+              <Avatar
+                src={u.avatar}
+                name={`${u.nombre || ''} ${u.apellido || ''}`}
+                size='sm'
+                className={u.id === me?.id ? 'ring-2 ring-[var(--color-brand)]' : ''}
+              />
 
               {/* Info */}
               <div className='flex-1 min-w-0'>
@@ -307,6 +300,11 @@ export default function GestionUsuarios() {
                 <p className='text-[10px]' style={{ color: 'var(--text-muted)' }}>
                   Registrado {formatDate(u.created_at)}
                 </p>
+                {u.jugador && (
+                  <p className='text-[10px] font-medium' style={{ color: 'var(--color-brand)' }}>
+                    Jugador: {u.jugador.nombre} {u.jugador.apellido}
+                  </p>
+                )}
               </div>
 
               {/* Rol */}

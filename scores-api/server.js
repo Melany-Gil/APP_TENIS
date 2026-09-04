@@ -8,6 +8,7 @@ const cors = require('cors')
 const helmet = require('helmet')
 const { rateLimit } = require('express-rate-limit')
 const { ensureSchema } = require('./src/config/schema')
+const { UPLOAD_ROOT } = require('./src/middlewares/upload.middleware')
 
 const authRoutes = require('./src/modules/auth/auth.routes')
 const jugadoresRoutes = require('./src/modules/jugadores/jugadores.routes')
@@ -79,6 +80,16 @@ app.get('/api/health', (_req, res) => {
 })
 
 const frontendDist = path.resolve(__dirname, '..', 'scores-app', 'dist')
+app.use(
+  '/uploads',
+  express.static(UPLOAD_ROOT, {
+    maxAge: '1d',
+    immutable: false,
+    setHeaders(res) {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+    },
+  })
+)
 const setNoStoreHeaders = (res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
   res.setHeader('Pragma', 'no-cache')

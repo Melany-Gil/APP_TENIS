@@ -17,6 +17,14 @@ exports.getAll = async (req, res) => {
   }
 }
 
+exports.getMyMatches = async (req, res) => {
+  try {
+    return success(res, await service.getMyMatches(req.user.id))
+  } catch (err) {
+    return error(res, err.message || 'Error al obtener tus partidos', err.status || 500)
+  }
+}
+
 exports.getById = async (req, res) => {
   try {
     return success(res, await service.getById(req.params.id))

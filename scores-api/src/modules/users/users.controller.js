@@ -1,5 +1,6 @@
 const service = require('./users.service')
 const { success, error } = require('../../utils/response')
+const { deleteUpload, toPublicUploadPath } = require('../../middlewares/upload.middleware')
 
 // GET /api/users — solo admin
 exports.getAll = async (req, res) => {
@@ -51,6 +52,31 @@ exports.updateMe = async (req, res) => {
     return success(res, await service.updateMe(req.user.id, req.body))
   } catch (err) {
     return error(res, err.message || 'Error al actualizar perfil', err.status || 500)
+  }
+}
+
+exports.uploadAvatar = async (req, res) => {
+  if (!req.file) return error(res, 'No se envió ninguna imagen', 400)
+  const avatarPath = toPublicUploadPath(req.file)
+  try {
+    const previous = await service.getById(req.user.id)
+    const updated = await service.updateAvatar(req.user.id, avatarPath)
+    deleteUpload(previous.avatar)
+    return success(res, updated)
+  } catch (err) {
+    deleteUpload(avatarPath)
+    return error(res, err.message || 'Error al subir el avatar', err.status || 500)
+  }
+}
+
+exports.deleteAvatar = async (req, res) => {
+  try {
+    const previous = await service.getById(req.user.id)
+    const updated = await service.updateAvatar(req.user.id, null)
+    deleteUpload(previous.avatar)
+    return success(res, updated)
+  } catch (err) {
+    return error(res, err.message || 'Error al eliminar el avatar', err.status || 500)
   }
 }
 

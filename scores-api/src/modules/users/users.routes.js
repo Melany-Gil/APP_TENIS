@@ -2,11 +2,25 @@ const router = require('express').Router()
 const { body } = require('express-validator')
 const controller = require('./users.controller')
 const { requireAuth, requireAdmin } = require('../../middlewares/auth.middleware')
+const { uploadAvatar } = require('../../middlewares/upload.middleware')
 const validate = require('../../middlewares/validate.middleware')
 
 // Rutas del propio usuario — primero, para que /me no choque con /:id
 router.get('/me', requireAuth, controller.getMe)
-router.put('/me', requireAuth, controller.updateMe)
+router.put(
+  '/me',
+  requireAuth,
+  [
+    body('nombre').optional().trim().isLength({ min: 2, max: 100 }),
+    body('apellido').optional().trim().isLength({ min: 2, max: 100 }),
+    body('email').optional().normalizeEmail().isEmail(),
+    body('telefono').optional({ values: 'falsy' }).trim().isLength({ max: 20 }),
+  ],
+  validate,
+  controller.updateMe
+)
+router.put('/me/avatar', requireAuth, uploadAvatar, controller.uploadAvatar)
+router.delete('/me/avatar', requireAuth, controller.deleteAvatar)
 router.put('/me/password', requireAuth, controller.changePassword)
 
 // Rutas de administración

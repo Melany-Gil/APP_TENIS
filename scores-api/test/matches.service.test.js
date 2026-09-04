@@ -120,6 +120,77 @@ test('getAll permite ordenar los próximos partidos desde la fecha más cercana'
   assert.deepEqual(calls[0].params, ['programado', 'tenis'])
 })
 
+test('getMyMatches separa agenda e historial y calcula victoria o derrota', async () => {
+  let call = 0
+  const fakeDb = {
+    async query() {
+      call += 1
+      if (call === 1) {
+        return [[{ id: 8, nombre: 'Laura', apellido: 'Díaz', foto: '/uploads/players/laura.jpg' }]]
+      }
+      if (call === 2) {
+        return [[
+          {
+            id: 30,
+            deporte: 'tenis',
+            estado: 'finalizado',
+            ganador: 'jugador2',
+            fecha_inicio: '2026-08-20',
+            j1_id: 8,
+            j1_nombre: 'Laura',
+            j1_apellido: 'Díaz',
+            j1_foto: '/uploads/players/laura.jpg',
+            j2_id: 9,
+            j2_nombre: 'Ana',
+            j2_apellido: 'Rojas',
+          },
+          {
+            id: 31,
+            deporte: 'tenis',
+            estado: 'programado',
+            ganador: null,
+            fecha_inicio: '2026-09-10',
+            hora_inicio: '10:00:00',
+            j1_id: 9,
+            j1_nombre: 'Ana',
+            j1_apellido: 'Rojas',
+            j2_id: 8,
+            j2_nombre: 'Laura',
+            j2_apellido: 'Díaz',
+            j2_foto: '/uploads/players/laura.jpg',
+          },
+          {
+            id: 32,
+            deporte: 'tenis',
+            estado: 'en_vivo',
+            ganador: null,
+            fecha_inicio: '2026-09-04',
+            j1_id: 8,
+            j1_nombre: 'Laura',
+            j1_apellido: 'Díaz',
+            j2_id: 10,
+            j2_nombre: 'Sara',
+            j2_apellido: 'León',
+          },
+        ]]
+      }
+      return [[
+        { partido_id: 30, numero_set: 1, games_j1: 3, games_j2: 6, completado: 1 },
+        { partido_id: 30, numero_set: 2, games_j1: 4, games_j2: 6, completado: 1 },
+      ]]
+    },
+  }
+
+  const result = await loadService(fakeDb).getMyMatches(4)
+
+  assert.equal(result.jugador.id, 8)
+  assert.deepEqual(result.en_vivo.map((match) => match.id), [32])
+  assert.deepEqual(result.proximos.map((match) => match.id), [31])
+  assert.deepEqual(result.historial.map((match) => match.id), [30])
+  assert.equal(result.historial[0].resultado, 'derrota')
+  assert.equal(result.historial[0].jugador1.foto, '/uploads/players/laura.jpg')
+})
+
 test('updateMarcador rechaza sets duplicados antes de escribir', async () => {
   const fakeDb = {
     async query() {

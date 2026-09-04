@@ -4,6 +4,7 @@ import { usePlayer } from '../hooks/usePlayers'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { cn } from '../utils/cn'
 import { useLoginRequired } from '../hooks/useLoginRequired'
+import Avatar from '../components/ui/Avatar'
 
 export default function Player() {
   const { id } = useParams()
@@ -28,7 +29,6 @@ export default function Player() {
     statsByCategory[0] ||
     null
   const isFav = isJugadorFavorite(player.id)
-  const initials = `${player.nombre?.[0] || ''}${player.apellido?.[0] || ''}`.toUpperCase()
 
   return (
     <div className='space-y-5 animate-fade-up'>
@@ -57,16 +57,12 @@ export default function Player() {
 
       <div className='card p-5'>
         <div className='flex items-center gap-4'>
-          <div
-            className='w-16 h-16 rounded-2xl border flex items-center justify-center text-lg font-bold shrink-0'
-            style={{
-              backgroundColor: 'var(--bg-hover)',
-              borderColor: 'var(--border-color)',
-              color: 'var(--color-brand)',
-            }}
-          >
-            {initials || 'JG'}
-          </div>
+          <Avatar
+            src={player.foto}
+            name={`${player.nombre || ''} ${player.apellido || ''}`}
+            size='lg'
+            className='rounded-2xl'
+          />
           <div className='flex-1 min-w-0'>
             <p
               className='text-xs font-semibold uppercase tracking-wider mb-1'

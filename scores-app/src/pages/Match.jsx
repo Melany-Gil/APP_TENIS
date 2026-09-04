@@ -10,6 +10,7 @@ import { cn } from '../utils/cn'
 import { useLoginRequired } from '../hooks/useLoginRequired'
 import { getParticipantName } from '../utils/matchParticipants'
 import { useMatchTimer } from '../hooks/useMatchTimer'
+import Avatar from '../components/ui/Avatar'
 
 export default function Match() {
   const { id } = useParams()
@@ -48,12 +49,14 @@ export default function Match() {
     : {
         name: getParticipantName(match, 1),
         ranking: match.jugador1?.ranking,
+        photo: match.jugador1?.foto,
       }
   const p2 = isPadel
     ? { name: getParticipantName(match, 2) }
     : {
         name: getParticipantName(match, 2),
         ranking: match.jugador2?.ranking,
+        photo: match.jugador2?.foto,
       }
 
   const p1Scores = match.sets?.map((set) => set.games_j1) ?? []
@@ -195,6 +198,7 @@ function ScoreRow({ player, sets, points, isServing, isWinner, isLive }) {
         {isServing && isLive && (
           <span className='w-2.5 h-2.5 rounded-full shrink-0' style={{ backgroundColor: 'var(--club-clay)' }} />
         )}
+        <Avatar src={player.photo} name={player.name} size='sm' />
         <div>
           <p
             className='font-semibold'

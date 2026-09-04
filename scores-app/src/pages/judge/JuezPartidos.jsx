@@ -8,6 +8,7 @@ import useUIStore from '../../store/useUIStore'
 import { useMatchTimer } from '../../hooks/useMatchTimer'
 import { useMatchRealtime } from '../../hooks/useMatchRealtime'
 import { cn } from '../../utils/cn'
+import Avatar from '../../components/ui/Avatar'
 
 export default function JuezPartidos() {
   const [matches, setMatches] = useState([])
@@ -90,6 +91,8 @@ export default function JuezPartidos() {
 
   const p1 = selected && getParticipantName(selected, 1)
   const p2 = selected && getParticipantName(selected, 2)
+  const p1Photo = selected?.jugador1?.foto
+  const p2Photo = selected?.jugador2?.foto
   const score = state?.marcador
   const liveData = state?.en_vivo
   const timerInput = liveData
@@ -212,11 +215,11 @@ export default function JuezPartidos() {
                   ))}
                   <span className='text-center'>Pts</span>
                 </div>
-                <PlayerRow name={p1} score={score} playerKey='j1' pointKey='punto_j1'
+                <PlayerRow name={p1} photo={p1Photo} score={score} playerKey='j1' pointKey='punto_j1'
                   isWinner={score.ganador === 'jugador1'} isServing={liveData?.saca === 'jugador1'}
                   isFinished={isFinished} totalSetsToShow={Math.max(score.sets.length + (isFinished ? 0 : 1), 3)} />
                 <div className='h-px' style={{ backgroundColor: 'var(--border-color)' }} />
-                <PlayerRow name={p2} score={score} playerKey='j2' pointKey='punto_j2'
+                <PlayerRow name={p2} photo={p2Photo} score={score} playerKey='j2' pointKey='punto_j2'
                   isWinner={score.ganador === 'jugador2'} isServing={liveData?.saca === 'jugador2'}
                   isFinished={isFinished} totalSetsToShow={Math.max(score.sets.length + (isFinished ? 0 : 1), 3)} />
               </div>
@@ -542,7 +545,7 @@ function PointDetailPanel({ ganador, p1, p2, isServing, onConfirm, onCancel, loa
 }
 
 /* ── Player Row ── */
-function PlayerRow({ name, score, playerKey, pointKey, isWinner, isServing, isFinished, totalSetsToShow }) {
+function PlayerRow({ name, photo, score, playerKey, pointKey, isWinner, isServing, isFinished, totalSetsToShow }) {
   const gamesKey = `games_${playerKey}`
   const point = score?.[pointKey] ?? '0'
 
@@ -558,6 +561,7 @@ function PlayerRow({ name, score, playerKey, pointKey, isWinner, isServing, isFi
         {isServing && !isFinished && (
           <Circle className='w-2.5 h-2.5 fill-[var(--color-live)] text-[var(--color-live)] shrink-0' />
         )}
+        <Avatar src={photo} name={name} size='xs' />
         <span className={cn('truncate text-sm', isWinner ? 'font-bold' : 'font-medium')}
           style={{ color: isWinner ? 'var(--color-live)' : 'var(--text-primary)' }}>
           {name || '—'}

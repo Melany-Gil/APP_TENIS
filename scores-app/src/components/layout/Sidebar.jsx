@@ -5,6 +5,7 @@ import useUIStore from '../../store/useUIStore'
 import useAuthStore from '../../store/useAuthStore'
 import { authService } from '../../services/authService'
 import { cn } from '../../utils/cn'
+import Avatar from '../ui/Avatar'
 
 const NAV = [
   { to: '/', icon: Home, label: 'Inicio', exact: true },
@@ -134,16 +135,11 @@ export default function Sidebar() {
         <div className='p-2 shrink-0' style={{ borderTop: '1px solid var(--border-color)' }}>
           {user && (
             <div className='flex items-center gap-2 px-2 py-2 mb-1'>
-              <div
-                className='w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0'
-                style={{
-                  backgroundColor: 'var(--color-brand-dim)',
-                  color: 'var(--color-brand)',
-                  border: '1px solid var(--border-focus)',
-                }}
-              >
-                {user.nombre?.charAt(0)?.toUpperCase()}
-              </div>
+              <Avatar
+                src={user.avatar}
+                name={`${user.nombre || ''} ${user.apellido || ''}`}
+                size='xs'
+              />
               <div className='flex-1 min-w-0'>
                 <div className='flex items-center gap-1.5'>
                   <p

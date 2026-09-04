@@ -73,3 +73,22 @@ test('las operaciones de administración siguen protegidas', () => {
     assert.ok(handlers.includes(roleGuard))
   }
 })
+
+test('las nuevas rutas de perfiles y fotos exigen la autorización adecuada', () => {
+  const memberReads = handlersFor(routes.partidos, 'get', '/mios')
+  assert.ok(memberReads.includes(requireAuth))
+
+  const adminRoutes = [
+    ['get', '/gestion'],
+    ['put', '/:id/foto'],
+    ['delete', '/:id/foto'],
+    ['put', '/:id/usuario'],
+    ['delete', '/:id/usuario'],
+  ]
+
+  for (const [method, path] of adminRoutes) {
+    const handlers = handlersFor(routes.jugadores, method, path)
+    assert.ok(handlers.includes(requireAuth))
+    assert.ok(handlers.includes(requireAdmin))
+  }
+})

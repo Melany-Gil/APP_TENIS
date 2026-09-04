@@ -46,9 +46,11 @@ const MATCH_SELECT = `
     j1.id       AS j1_id,
     j1.nombre   AS j1_nombre,
     j1.apellido AS j1_apellido,
+    j1.foto     AS j1_foto,
     j2.id       AS j2_id,
     j2.nombre   AS j2_nombre,
     j2.apellido AS j2_apellido,
+    j2.foto     AS j2_foto,
     e1.id     AS e1_id,
     e1.nombre AS e1_nombre,
     e2.id     AS e2_id,
@@ -171,6 +173,79 @@ exports.getAll = async ({
     ...formatSummary(row),
     sets: setsByMatch.get(row.id) || [],
   }))
+}
+
+exports.getMyMatches = async (userId) => {
+  const [playerRows] = await db.query(
+    `SELECT id, nombre, apellido, foto
+     FROM jugadores
+     WHERE user_id = ?
+     LIMIT 1`,
+    [userId]
+  )
+  if (!playerRows.length) {
+    throw { status: 404, message: 'Tu cuenta todavía no está vinculada a un jugador' }
+  }
+
+  const player = playerRows[0]
+  const [rows] = await db.query(
+    `${MATCH_SELECT}
+     WHERE p.jugador1_id = ? OR p.jugador2_id = ?
+     ORDER BY p.fecha_inicio IS NULL, p.fecha_inicio DESC,
+              p.hora_inicio IS NULL, p.hora_inicio DESC, p.id DESC`,
+    [player.id, player.id]
+  )
+
+  if (!rows.length) {
+    return {
+      jugador: { id: player.id, nombre: player.nombre, apellido: player.apellido, foto: player.foto || null },
+      en_vivo: [],
+      proximos: [],
+      historial: [],
+    }
+  }
+
+  const ids = rows.map((row) => row.id)
+  const placeholders = ids.map(() => '?').join(',')
+  const [sets] = await db.query(
+    `SELECT partido_id, numero_set, games_j1, games_j2, tiebreak_j1, tiebreak_j2, completado
+     FROM sets_partido
+     WHERE partido_id IN (${placeholders})
+     ORDER BY partido_id, numero_set`,
+    ids
+  )
+  const setsByMatch = new Map()
+  for (const set of sets) {
+    if (!setsByMatch.has(set.partido_id)) setsByMatch.set(set.partido_id, [])
+    setsByMatch.get(set.partido_id).push(formatSet(set))
+  }
+
+  const matches = rows.map((row) => {
+    const match = { ...formatSummary(row), sets: setsByMatch.get(row.id) || [] }
+    const mySide = Number(row.j1_id) === Number(player.id) ? 'jugador1' : 'jugador2'
+    return {
+      ...match,
+      mi_lado: mySide,
+      resultado: match.estado === 'finalizado'
+        ? match.ganador === mySide
+          ? 'victoria'
+          : match.ganador
+            ? 'derrota'
+            : 'sin_resultado'
+        : null,
+    }
+  })
+
+  const upcoming = matches
+    .filter((match) => match.estado === 'programado')
+    .sort(compareScheduleAscending)
+
+  return {
+    jugador: { id: player.id, nombre: player.nombre, apellido: player.apellido, foto: player.foto || null },
+    en_vivo: matches.filter((match) => match.estado === 'en_vivo'),
+    proximos: upcoming,
+    historial: matches.filter((match) => match.estado === 'finalizado'),
+  }
 }
 
 exports.getById = async (id) => {
@@ -735,15 +810,23 @@ function formatSummary(row) {
       id: row.j1_id,
       nombre: row.j1_nombre,
       apellido: row.j1_apellido,
+      foto: row.j1_foto || null,
     }
     match.jugador2 = {
       id: row.j2_id,
       nombre: row.j2_nombre,
       apellido: row.j2_apellido,
+      foto: row.j2_foto || null,
     }
   }
 
   return match
+}
+
+function compareScheduleAscending(left, right) {
+  const leftValue = `${left.fecha_inicio || '9999-12-31'}T${left.hora_inicio || '23:59:59'}`
+  const rightValue = `${right.fecha_inicio || '9999-12-31'}T${right.hora_inicio || '23:59:59'}`
+  return leftValue.localeCompare(rightValue) || Number(left.id) - Number(right.id)
 }
 
 function formatSet(set) {

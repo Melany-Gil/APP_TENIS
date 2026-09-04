@@ -8,6 +8,7 @@ import { cn } from '../../utils/cn'
 import { useLoginRequired } from '../../hooks/useLoginRequired'
 import { getParticipantName } from '../../utils/matchParticipants'
 import { useMatchTimer } from '../../hooks/useMatchTimer'
+import Avatar from '../ui/Avatar'
 
 export default function MatchCard({ match }) {
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
@@ -81,6 +82,7 @@ export default function MatchCard({ match }) {
         <div className='px-4 py-3 space-y-2.5'>
           <PlayerRow
             name={p1Name}
+            photo={match.jugador1?.foto}
             sets={p1Sets}
             points={match.marcador_actual?.displayPoints?.[0]}
             isServing={match.marcador_actual?.server === 'jugador1'}
@@ -89,6 +91,7 @@ export default function MatchCard({ match }) {
           />
           <PlayerRow
             name={p2Name}
+            photo={match.jugador2?.foto}
             sets={p2Sets}
             points={match.marcador_actual?.displayPoints?.[1]}
             isServing={match.marcador_actual?.server === 'jugador2'}
@@ -121,12 +124,13 @@ export default function MatchCard({ match }) {
   )
 }
 
-function PlayerRow({ name, sets, points, isServing, isWinner, isLive }) {
+function PlayerRow({ name, photo, sets, points, isServing, isWinner, isLive }) {
   return (
     <div className='flex items-center gap-2'>
       {isServing && isLive && (
         <span className='w-2 h-2 rounded-full shrink-0' style={{ backgroundColor: 'var(--club-clay)' }} />
       )}
+      <Avatar src={photo} name={name} size='xs' />
       <span
         className={cn('flex-1 text-sm truncate')}
         style={{

@@ -10,6 +10,7 @@ const playerRow = {
   apellido: 'Díaz',
   deporte: 'tenis',
   activo: 1,
+  foto: '/uploads/players/laura.jpg',
 }
 
 const matchStatsRows = [
@@ -117,5 +118,67 @@ test('crear jugador guarda únicamente nombre, apellido y deporte', async () => 
   assert.equal(
     calls.some((call) => /INSERT INTO jugador_stats/.test(call.sql)),
     false
+  )
+})
+
+test('la lista pública expone la foto pero no la cuenta vinculada', async () => {
+  let call = 0
+  const fakeDb = {
+    async query() {
+      call += 1
+      return call === 1
+        ? [[{ ...playerRow, user_id: 4, usuario_email: 'laura@example.com' }]]
+        : [[]]
+    },
+  }
+
+  const [player] = await loadService(fakeDb).getAll({})
+
+  assert.equal(player.foto, '/uploads/players/laura.jpg')
+  assert.equal(Object.hasOwn(player, 'usuario'), false)
+})
+
+test('la gestión administrativa incluye la cuenta vinculada', async () => {
+  let call = 0
+  const fakeDb = {
+    async query() {
+      call += 1
+      return call === 1
+        ? [[{
+            ...playerRow,
+            user_id: 4,
+            usuario_nombre: 'Laura',
+            usuario_apellido: 'Díaz',
+            usuario_email: 'laura@example.com',
+          }]]
+        : [[]]
+    },
+  }
+
+  const [player] = await loadService(fakeDb).getAll({ includeAccount: true })
+
+  assert.deepEqual(player.usuario, {
+    id: 4,
+    nombre: 'Laura',
+    apellido: 'Díaz',
+    email: 'laura@example.com',
+  })
+})
+
+test('una cuenta no puede vincularse a dos jugadores', async () => {
+  let call = 0
+  const fakeDb = {
+    async query() {
+      call += 1
+      if (call <= 2) return [[{ id: call }]]
+      const error = new Error('duplicate')
+      error.code = 'ER_DUP_ENTRY'
+      throw error
+    },
+  }
+
+  await assert.rejects(
+    loadService(fakeDb).linkUser(8, 4),
+    (error) => error.status === 409 && /ya está vinculada/.test(error.message)
   )
 })

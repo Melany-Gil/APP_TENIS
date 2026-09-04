@@ -118,7 +118,8 @@ CREATE TABLE jugadores (
   activo       BOOLEAN      NOT NULL DEFAULT TRUE,
   created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  FOREIGN KEY (user_id)      REFERENCES users(id),
+  UNIQUE KEY uq_jugadores_user_id (user_id),
+  FOREIGN KEY (user_id)      REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (country_id)   REFERENCES countries(id),
   FOREIGN KEY (categoria_id) REFERENCES categorias(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

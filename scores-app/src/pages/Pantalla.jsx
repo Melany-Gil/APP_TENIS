@@ -7,6 +7,7 @@ import { useMatchRealtime } from '../hooks/useMatchRealtime'
 import { useMatchTimer } from '../hooks/useMatchTimer'
 import { matchService } from '../services/matchService'
 import { getParticipantName } from '../utils/matchParticipants'
+import Avatar from '../components/ui/Avatar'
 
 const REFRESH_MS = 30000
 const SCREEN_SPONSOR = SPONSORS.find((sponsor) => sponsor.name === 'Induleche')
@@ -217,9 +218,9 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
             )}
           </div>
         </div>
-        <ScreenPlayer name={p1} side='jugador1' index={0} marker={marker} visibleSets={visibleSets} featured={featured} />
+        <ScreenPlayer name={p1} photo={match.jugador1?.foto} side='jugador1' index={0} marker={marker} visibleSets={visibleSets} featured={featured} />
         <div className='h-px bg-white/10 my-2' />
-        <ScreenPlayer name={p2} side='jugador2' index={1} marker={marker} visibleSets={visibleSets} featured={featured} />
+        <ScreenPlayer name={p2} photo={match.jugador2?.foto} side='jugador2' index={1} marker={marker} visibleSets={visibleSets} featured={featured} />
         {featured && (
           <>
             <section
@@ -261,11 +262,12 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
   )
 }
 
-function ScreenPlayer({ name, side, index, marker, visibleSets, featured }) {
+function ScreenPlayer({ name, photo, side, index, marker, visibleSets, featured }) {
   return (
     <div className='grid items-center gap-2 py-2 overflow-x-auto' style={{ gridTemplateColumns: `minmax(${featured ? '180px' : '110px'},1fr) repeat(${visibleSets},${featured ? '52px' : '36px'}) ${featured ? '68px' : '48px'}` }}>
       <div className='flex items-center gap-2 min-w-0'>
         <span className='w-2.5 h-2.5 rounded-full shrink-0' style={{ backgroundColor: marker?.server === side ? '#c65d32' : 'transparent' }} />
+        <Avatar src={photo} name={name} size={featured ? 'md' : 'xs'} className='border-white/15' />
         <strong className={`truncate ${featured ? 'text-lg sm:text-2xl lg:text-3xl' : 'text-sm sm:text-base'}`}>{name}</strong>
         {marker?.winner === side && <Trophy className='w-4 h-4 text-amber-400 shrink-0' />}
       </div>

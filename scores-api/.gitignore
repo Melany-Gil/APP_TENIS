@@ -37,3 +37,6 @@ Thumbs.db
 
 # ── Vite ─────────────────────────────────────────────
 *.local
+
+# ── Archivos cargados en ejecución ────────────────────
+uploads/

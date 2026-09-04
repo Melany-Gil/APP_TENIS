@@ -3,15 +3,19 @@ const { getPlayerStats } = require('../../utils/playerStats')
 
 // Las categorías pertenecen a los partidos, no al perfil del jugador.
 // Por eso las estadísticas se calculan desde los resultados finalizados.
-exports.getAll = async ({ deporte, categoria_id, activo }) => {
+exports.getAll = async ({ deporte, categoria_id, activo, includeAccount = false }) => {
   let query = `
     SELECT
       j.id,
       j.nombre,
       j.apellido,
       j.deporte,
-      j.activo
+      j.activo,
+      j.foto,
+      j.user_id
+      ${includeAccount ? ', u.nombre AS usuario_nombre, u.apellido AS usuario_apellido, u.email AS usuario_email' : ''}
     FROM jugadores j
+    ${includeAccount ? 'LEFT JOIN users u ON u.id = j.user_id' : ''}
     WHERE 1 = 1
   `
   const params = []
@@ -34,13 +38,13 @@ exports.getAll = async ({ deporte, categoria_id, activo }) => {
   const statsByPlayer = new Map(stats.map((entry) => [entry.jugador_id, entry]))
 
   return rows
-    .map((row) => formatListItem(row, statsByPlayer.get(row.id)))
+    .map((row) => formatListItem(row, statsByPlayer.get(row.id), includeAccount))
     .filter((player) => !categoryId || player.stats)
 }
 
 exports.getById = async (id) => {
   const [rows] = await db.query(
-    `SELECT id, nombre, apellido, deporte, activo
+    `SELECT id, nombre, apellido, deporte, activo, foto
      FROM jugadores
      WHERE id = ?
      LIMIT 1`,
@@ -102,15 +106,64 @@ exports.remove = async (id) => {
   return { message: 'Jugador eliminado correctamente' }
 }
 
-function formatListItem(row, stats) {
-  return {
+exports.updateFoto = async (id, fotoPath) => {
+  const [existing] = await db.query('SELECT id FROM jugadores WHERE id = ?', [id])
+  if (!existing.length) throw { status: 404, message: 'Jugador no encontrado' }
+
+  await db.query('UPDATE jugadores SET foto = ? WHERE id = ?', [fotoPath, id])
+  return exports.getById(id)
+}
+
+exports.linkUser = async (id, userId) => {
+  const normalizedUserId = positiveId(userId)
+  if (!normalizedUserId) throw { status: 400, message: 'Selecciona una cuenta válida' }
+
+  const [players] = await db.query('SELECT id FROM jugadores WHERE id = ?', [id])
+  if (!players.length) throw { status: 404, message: 'Jugador no encontrado' }
+
+  const [users] = await db.query('SELECT id FROM users WHERE id = ? AND activo = TRUE', [normalizedUserId])
+  if (!users.length) throw { status: 404, message: 'Usuario no encontrado o inactivo' }
+
+  try {
+    await db.query('UPDATE jugadores SET user_id = ? WHERE id = ?', [normalizedUserId, id])
+  } catch (linkError) {
+    if (linkError.code === 'ER_DUP_ENTRY') {
+      throw { status: 409, message: 'Esa cuenta ya está vinculada a otro jugador' }
+    }
+    throw linkError
+  }
+  return exports.getAll({ includeAccount: true }).then((playersList) => (
+    playersList.find((player) => Number(player.id) === Number(id))
+  ))
+}
+
+exports.unlinkUser = async (id) => {
+  const [result] = await db.query('UPDATE jugadores SET user_id = NULL WHERE id = ?', [id])
+  if (!result.affectedRows) throw { status: 404, message: 'Jugador no encontrado' }
+  return exports.getById(id)
+}
+
+function formatListItem(row, stats, includeAccount = false) {
+  const player = {
     id: row.id,
     nombre: row.nombre,
     apellido: row.apellido,
     deporte: row.deporte,
     activo: !!row.activo,
+    foto: row.foto || null,
     stats: stats || null,
   }
+  if (includeAccount) {
+    player.usuario = row.user_id
+      ? {
+          id: row.user_id,
+          nombre: row.usuario_nombre,
+          apellido: row.usuario_apellido,
+          email: row.usuario_email,
+        }
+      : null
+  }
+  return player
 }
 
 function positiveId(value) {

@@ -17,7 +17,11 @@ api.interceptors.response.use(
       localStorage.removeItem('auth-storage-v2')
       if (window.location.pathname !== '/login') window.location.href = '/login'
     }
-    return Promise.reject(error.response?.data || error)
+    const payload = error.response?.data || error
+    if (payload && typeof payload === 'object' && error.response?.status) {
+      payload.status = error.response.status
+    }
+    return Promise.reject(payload)
   }
 )
 

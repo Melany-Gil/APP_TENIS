@@ -3,12 +3,12 @@ import { Star } from 'lucide-react'
 import useFavoritesStore from '../../store/useFavoritesStore'
 import { cn } from '../../utils/cn'
 import { useLoginRequired } from '../../hooks/useLoginRequired'
+import Avatar from '../ui/Avatar'
 
 export default function PlayerCard({ player, categoryId }) {
   const { toggleJugador, isJugadorFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
   const isFav = isJugadorFavorite(player.id)
-  const initials = `${player.nombre?.[0] || ''}${player.apellido?.[0] || ''}`.toUpperCase()
   const playerUrl = `/player/${player.id}${categoryId ? `?categoria_id=${categoryId}` : ''}`
 
   return (
@@ -24,16 +24,10 @@ export default function PlayerCard({ player, categoryId }) {
             #{player.stats?.ranking ?? '—'}
           </span>
 
-          <div
-            className='w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border'
-            style={{
-              backgroundColor: 'var(--bg-hover)',
-              borderColor: 'var(--border-color)',
-              color: 'var(--color-brand)',
-            }}
-          >
-            {initials || 'JG'}
-          </div>
+          <Avatar
+            src={player.foto}
+            name={`${player.nombre || ''} ${player.apellido || ''}`}
+          />
 
           <div className='flex-1 min-w-0'>
             <p className='font-semibold text-sm truncate' style={{ color: 'var(--text-primary)' }}>

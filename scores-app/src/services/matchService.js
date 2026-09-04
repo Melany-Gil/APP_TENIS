@@ -55,6 +55,7 @@ const pointReason = (result) => ({
 export const matchService = {
   getAll: (params = {}) => api.get('/partidos', { params }),
   getById: (id) => api.get(`/partidos/${id}`),
+  getMyMatches: () => api.get('/partidos/mios'),
   getLive: () => api.get('/partidos', { params: { estado: 'en_vivo' } }),
   getUpcoming: () => api.get('/partidos', { params: { estado: 'programado' } }),
   getFinished: () => api.get('/partidos', { params: { estado: 'finalizado' } }),

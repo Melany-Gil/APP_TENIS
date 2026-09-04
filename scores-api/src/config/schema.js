@@ -50,6 +50,19 @@ const columnIndexExists = async (tableName, columnName) => {
   return Number(rows[0].total) > 0
 }
 
+const uniqueColumnIndexExists = async (tableName, columnName) => {
+  const [rows] = await db.query(
+    `SELECT COUNT(*) AS total
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?
+       AND NON_UNIQUE = 0`,
+    [tableName, columnName]
+  )
+  return Number(rows[0].total) > 0
+}
+
 const columnForeignKeyExists = async (tableName, columnName) => {
   const [rows] = await db.query(
     `SELECT COUNT(*) AS total
@@ -132,6 +145,37 @@ exports.ensureSchema = async () => {
     await db.query(
       "ALTER TABLE users MODIFY rol ENUM('admin','juez','miembro') NOT NULL DEFAULT 'miembro'"
     )
+  }
+
+  if (!(await columnExists('users', 'avatar'))) {
+    await db.query('ALTER TABLE users ADD COLUMN avatar VARCHAR(255) NULL AFTER telefono')
+  }
+  if (!(await columnExists('jugadores', 'user_id'))) {
+    await db.query('ALTER TABLE jugadores ADD COLUMN user_id INT NULL AFTER id')
+  }
+  if (!(await columnExists('jugadores', 'foto'))) {
+    await db.query('ALTER TABLE jugadores ADD COLUMN foto VARCHAR(255) NULL AFTER deporte')
+  }
+  if (!(await columnForeignKeyExists('jugadores', 'user_id'))) {
+    await db.query(
+      `ALTER TABLE jugadores
+       ADD CONSTRAINT fk_jugadores_user
+       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`
+    )
+  }
+  if (!(await uniqueColumnIndexExists('jugadores', 'user_id'))) {
+    const [duplicates] = await db.query(
+      `SELECT user_id
+       FROM jugadores
+       WHERE user_id IS NOT NULL
+       GROUP BY user_id
+       HAVING COUNT(*) > 1
+       LIMIT 1`
+    )
+    if (duplicates.length) {
+      throw new Error('Hay cuentas vinculadas a más de un jugador; corrige los duplicados antes de continuar')
+    }
+    await db.query('ALTER TABLE jugadores ADD UNIQUE KEY uq_jugadores_user_id (user_id)')
   }
 
   const tournamentStart = await getColumn('torneos', 'fecha_inicio')

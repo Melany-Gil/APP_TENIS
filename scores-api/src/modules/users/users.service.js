@@ -2,19 +2,27 @@ const db = require('../../config/db')
 const bcrypt = require('bcryptjs')
 
 const SAFE_FIELDS =
-  'id, numero_documento, nombre, apellido, email, telefono, avatar, rol, activo, created_at'
+  'u.id, u.numero_documento, u.nombre, u.apellido, u.email, u.telefono, u.avatar, u.rol, u.activo, u.created_at'
+
+const USER_WITH_PLAYER = `
+  SELECT ${SAFE_FIELDS},
+         j.id AS jugador_id,
+         j.nombre AS jugador_nombre,
+         j.apellido AS jugador_apellido,
+         j.foto AS jugador_foto
+  FROM users u
+  LEFT JOIN jugadores j ON j.user_id = u.id
+`
 
 exports.getAll = async () => {
-  const [rows] = await db.query(
-    `SELECT ${SAFE_FIELDS} FROM users WHERE activo = TRUE ORDER BY created_at DESC`
-  )
-  return rows
+  const [rows] = await db.query(`${USER_WITH_PLAYER} WHERE u.activo = TRUE ORDER BY u.created_at DESC`)
+  return rows.map(formatUser)
 }
 
 exports.getById = async (id) => {
-  const [rows] = await db.query(`SELECT ${SAFE_FIELDS} FROM users WHERE id = ? LIMIT 1`, [id])
+  const [rows] = await db.query(`${USER_WITH_PLAYER} WHERE u.id = ? LIMIT 1`, [id])
   if (!rows.length) throw { status: 404, message: 'Usuario no encontrado' }
-  return rows[0]
+  return formatUser(rows[0])
 }
 
 exports.create = async ({
@@ -106,4 +114,35 @@ exports.changePassword = async (id, currentPassword, newPassword) => {
   await db.query('UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?', [hashed, id])
 
   return { message: 'Contraseña actualizada correctamente' }
+}
+
+exports.updateAvatar = async (id, avatarPath) => {
+  const [existing] = await db.query('SELECT id FROM users WHERE id = ?', [id])
+  if (!existing.length) throw { status: 404, message: 'Usuario no encontrado' }
+
+  await db.query('UPDATE users SET avatar = ?, updated_at = NOW() WHERE id = ?', [avatarPath, id])
+  return exports.getById(id)
+}
+
+function formatUser(row) {
+  return {
+    id: row.id,
+    numero_documento: row.numero_documento,
+    nombre: row.nombre,
+    apellido: row.apellido,
+    email: row.email,
+    telefono: row.telefono || null,
+    avatar: row.avatar || null,
+    rol: row.rol,
+    activo: Boolean(row.activo),
+    created_at: row.created_at,
+    jugador: row.jugador_id
+      ? {
+          id: row.jugador_id,
+          nombre: row.jugador_nombre,
+          apellido: row.jugador_apellido,
+          foto: row.jugador_foto || null,
+        }
+      : null,
+  }
 }

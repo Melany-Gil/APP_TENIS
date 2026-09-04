@@ -9,7 +9,7 @@ Aplicación web para el Subcomité de Tenis del Club Unión en Bucaramanga. Incl
 - Creación de los demás miembros y del segundo administrador desde el panel.
 - Recuperación de contraseña mediante OTP enviado por SMTP.
 - Gestión de usuarios, jugadores, categorías, torneos, sedes, partidos y marcadores.
-- Actualización de partidos en vivo cada 5 segundos.
+- Actualización de partidos en vivo en tiempo real mediante SSE, con recarga periódica de respaldo.
 - Historial filtrable por fecha, jugador y categoría.
 - Marcador con tres sets fijos y posibilidad de agregar o quitar sets adicionales.
 - Partidos encadenados: un participante puede ser el ganador de otro partido de la misma categoría.
@@ -18,6 +18,8 @@ Aplicación web para el Subcomité de Tenis del Club Unión en Bucaramanga. Incl
 - Motivo de cada punto: ace, tiro ganador, error forzado/no forzado, doble falta, penalización o infracción.
 - Formato configurable por partido: mejor de 1/3/5, ventaja o punto decisivo, tiebreak y match tiebreak.
 - Estadísticas detalladas por encuentro y puntos actuales visibles en el marcador público.
+- Fotos de usuarios y jugadores, con reemplazo y eliminación desde sus interfaces.
+- Vinculación uno-a-uno entre cuenta y jugador para consultar agenda, partidos en vivo e historial propio.
 
 ## Rol de juez
 
@@ -75,7 +77,7 @@ Si la base ya fue creada con el script anterior, ejecuta una sola vez:
 scores-api/migrations/001_security_and_search.sql
 ```
 
-Para incorporar el control de jueces manualmente también está disponible `scores-api/migrations/005_judge_scoring.sql`. En el despliegue normal, el backend aplica estos cambios de forma idempotente antes de iniciar el servidor.
+Para incorporar el control de jueces manualmente también está disponible `scores-api/migrations/005_judge_scoring.sql`; para cuentas de jugador y fotos, `scores-api/migrations/007_player_accounts_and_media.sql`. En el despliegue normal, el backend aplica estos cambios de forma idempotente antes de iniciar el servidor.
 
 ## Despliegue gratuito recomendado
 
@@ -87,6 +89,8 @@ Para una primera versión de bajo tráfico:
 4. Configura las variables de `scores-api/.env.example` en Koyeb.
 5. Usa `PORT=8000`, `NODE_ENV=production`, `VITE_API_URL=/api`, `DB_SSL=true` y el host/puerto/usuario de Aiven.
 6. Define `FRONTEND_URL` con la URL pública final de Koyeb.
+
+Las imágenes se guardan bajo `UPLOAD_DIR`. En producción, configura esta variable con la ruta absoluta de un disco persistente (por ejemplo, `/var/data/uploads`); si se deja como `uploads`, los archivos dependerán del disco efímero del contenedor y pueden perderse al redesplegar.
 
 El contenedor sirve la interfaz y la API bajo el mismo dominio, por lo que no hace falta desplegar dos proyectos. El plan gratuito es adecuado para un piloto; puede entrar en reposo y no ofrece alta disponibilidad.
 

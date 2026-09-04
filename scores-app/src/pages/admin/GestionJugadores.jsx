@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, Search, X } from 'lucide-react'
+import { Camera, Link2, Plus, Pencil, Trash2, Search, X } from 'lucide-react'
 import { playerService } from '../../services/playerService'
+import { userService } from '../../services/userService'
 import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import Avatar from '../../components/ui/Avatar'
 
 const DEPORTES = ['tenis', 'padel', 'ambos']
 
@@ -15,6 +17,8 @@ export default function GestionJugadores() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [search, setSearch] = useState('')
+  const [usuarios, setUsuarios] = useState([])
+  const [mediaBusy, setMediaBusy] = useState(false)
   const { addToast } = useUIStore()
 
   const {
@@ -24,13 +28,24 @@ export default function GestionJugadores() {
     formState: { errors, isSubmitting },
   } = useForm()
 
-  const fetchAll = () => {
+  const fetchAll = async (editingId = null) => {
     setLoading(true)
-    playerService
-      .getAll()
-      .then((response) => setJugadores(response.data || []))
-      .catch(() => addToast({ type: 'error', title: 'Error al cargar datos' }))
-      .finally(() => setLoading(false))
+    try {
+      const [playersResponse, usersResponse] = await Promise.all([
+        playerService.getAdminAll(),
+        userService.getAll(),
+      ])
+      const nextPlayers = playersResponse.data || []
+      setJugadores(nextPlayers)
+      setUsuarios(usersResponse.data || [])
+      if (editingId) {
+        setEditing(nextPlayers.find((player) => Number(player.id) === Number(editingId)) || null)
+      }
+    } catch {
+      addToast({ type: 'error', title: 'Error al cargar datos' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -92,6 +107,56 @@ export default function GestionJugadores() {
     }
   }
 
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !editing) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+      addToast({ type: 'error', title: 'Imagen no válida', message: 'Usa JPG, PNG o WebP de máximo 2 MB.' })
+      return
+    }
+    setMediaBusy(true)
+    try {
+      await playerService.uploadFoto(editing.id, file)
+      await fetchAll(editing.id)
+      addToast({ type: 'success', title: 'Foto del jugador actualizada' })
+    } catch (error) {
+      addToast({ type: 'error', title: 'No se pudo subir la foto', message: error.message })
+    } finally {
+      setMediaBusy(false)
+    }
+  }
+
+  const handleDeletePhoto = async () => {
+    if (!editing) return
+    setMediaBusy(true)
+    try {
+      await playerService.deleteFoto(editing.id)
+      await fetchAll(editing.id)
+      addToast({ type: 'success', title: 'Foto eliminada' })
+    } catch (error) {
+      addToast({ type: 'error', title: 'No se pudo eliminar la foto', message: error.message })
+    } finally {
+      setMediaBusy(false)
+    }
+  }
+
+  const handleAccountChange = async (event) => {
+    if (!editing) return
+    const userId = event.target.value
+    setMediaBusy(true)
+    try {
+      if (userId) await playerService.linkUser(editing.id, Number(userId))
+      else await playerService.unlinkUser(editing.id)
+      await fetchAll(editing.id)
+      addToast({ type: 'success', title: userId ? 'Cuenta vinculada' : 'Cuenta desvinculada' })
+    } catch (error) {
+      addToast({ type: 'error', title: 'No se pudo cambiar la vinculación', message: error.message })
+    } finally {
+      setMediaBusy(false)
+    }
+  }
+
   const filtered = jugadores.filter((j) =>
     `${j.nombre} ${j.apellido}`.toLowerCase().includes(search.toLowerCase())
   )
@@ -150,6 +215,48 @@ export default function GestionJugadores() {
               </select>
             </div>
 
+            {editing && (
+              <div className='sm:col-span-2 rounded-xl p-4 grid gap-4 sm:grid-cols-[auto_1fr]' style={{ backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)' }}>
+                <Avatar
+                  src={editing.foto}
+                  name={`${editing.nombre || ''} ${editing.apellido || ''}`}
+                  size='xl'
+                  className='rounded-2xl'
+                />
+                <div className='space-y-4 min-w-0'>
+                  <div>
+                    <p className='form-label'>Foto del jugador</p>
+                    <div className='flex flex-wrap gap-2'>
+                      <label className='btn-secondary inline-flex cursor-pointer items-center gap-2 text-xs px-3 py-2'>
+                        <Camera className='w-4 h-4' /> Cambiar foto
+                        <input type='file' accept='image/jpeg,image/png,image/webp' onChange={handlePhotoUpload} disabled={mediaBusy} className='hidden' />
+                      </label>
+                      {editing.foto && (
+                        <Button type='button' variant='ghost' size='sm' onClick={handleDeletePhoto} disabled={mediaBusy} leftIcon={<Trash2 className='w-4 h-4 text-red-500' />}>
+                          Quitar foto
+                        </Button>
+                      )}
+                    </div>
+                    <p className='form-hint'>JPG, PNG o WebP · máximo 2 MB.</p>
+                  </div>
+                  <label className='form-group'>
+                    <span className='form-label inline-flex items-center gap-1.5'><Link2 className='w-3.5 h-3.5' /> Cuenta de acceso</span>
+                    <select className='form-input' value={editing.usuario?.id || ''} onChange={handleAccountChange} disabled={mediaBusy}>
+                      <option value=''>Sin cuenta vinculada</option>
+                      {usuarios
+                        .filter((usuario) => !usuario.jugador || Number(usuario.jugador.id) === Number(editing.id))
+                        .map((usuario) => (
+                          <option key={usuario.id} value={usuario.id}>
+                            {usuario.nombre} {usuario.apellido} · {usuario.email}
+                          </option>
+                        ))}
+                    </select>
+                    <span className='form-hint'>Esta asociación habilita “Mis partidos” en el perfil del usuario.</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
             <div className='sm:col-span-2 flex gap-3 pt-2'>
               <Button type='submit' loading={isSubmitting}>
                 {editing ? 'Guardar cambios' : 'Crear jugador'}
@@ -195,13 +302,7 @@ export default function GestionJugadores() {
                 borderBottom: i < filtered.length - 1 ? '1px solid var(--border-color)' : 'none',
               }}
             >
-              <div
-                className='w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0'
-                style={{ backgroundColor: 'var(--color-brand-dim)', color: 'var(--color-brand)' }}
-              >
-                {j.nombre?.charAt(0)}
-                {j.apellido?.charAt(0)}
-              </div>
+              <Avatar src={j.foto} name={`${j.nombre || ''} ${j.apellido || ''}`} size='sm' />
               <div className='flex-1 min-w-0'>
                 <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
                   {j.nombre} {j.apellido}
@@ -218,6 +319,11 @@ export default function GestionJugadores() {
                   >
                     {j.deporte}
                   </span>
+                  {j.usuario && (
+                    <span className='text-[10px]' style={{ color: 'var(--text-muted)' }}>
+                      Cuenta: {j.usuario.email}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className='flex items-center gap-1 shrink-0'>

@@ -1,57 +1,86 @@
+const fs = require('fs')
 const multer = require('multer')
 const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 const { error } = require('../utils/response')
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || 'uploads'
-const MAX_SIZE_MB = parseInt(process.env.MAX_FILE_SIZE_MB || '5')
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const configuredUploadDir = process.env.UPLOAD_DIR || 'uploads'
+const UPLOAD_ROOT = path.isAbsolute(configuredUploadDir)
+  ? path.resolve(configuredUploadDir)
+  : path.resolve(__dirname, '..', '..', configuredUploadDir)
+const configuredMaxSize = Number.parseInt(process.env.MAX_FILE_SIZE_MB || '2', 10)
+const MAX_SIZE_MB = Number.isInteger(configuredMaxSize) && configuredMaxSize > 0
+  ? configuredMaxSize
+  : 2
+const EXTENSIONS_BY_MIME = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+}
 
-// ── Configuración de almacenamiento ──────────────────────────────────────────
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, path.join(__dirname, '..', '..', UPLOAD_DIR, 'logos'))
+  destination: (_req, file, callback) => {
+    const subfolder = file.fieldname === 'avatar'
+      ? 'avatars'
+      : file.fieldname === 'foto'
+        ? 'players'
+        : 'logos'
+    const destination = path.join(UPLOAD_ROOT, subfolder)
+    fs.mkdirSync(destination, { recursive: true })
+    callback(null, destination)
   },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname)
-    const uniqueName = `${Date.now()}-${uuidv4()}${ext}`
-    cb(null, uniqueName)
+  filename: (_req, file, callback) => {
+    const extension = EXTENSIONS_BY_MIME[file.mimetype]
+    callback(null, `${Date.now()}-${uuidv4()}${extension}`)
   },
 })
-
-// ── Filtro de archivos ───────────────────────────────────────────────────────
-const fileFilter = (_req, file, cb) => {
-  if (ALLOWED_TYPES.includes(file.mimetype)) {
-    cb(null, true)
-  } else {
-    cb(new Error('Tipo de archivo no permitido. Solo se aceptan: JPEG, PNG, WEBP'), false)
-  }
-}
 
 const upload = multer({
   storage,
-  fileFilter,
-  limits: { fileSize: MAX_SIZE_MB * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    if (EXTENSIONS_BY_MIME[file.mimetype]) return callback(null, true)
+    return callback(new Error('Tipo de archivo no permitido. Usa JPEG, PNG o WEBP.'), false)
+  },
+  limits: { fileSize: MAX_SIZE_MB * 1024 * 1024, files: 1 },
 })
 
-/**
- * Middleware para subir un logo de equipo.
- * Espera un campo 'logo' en el form-data.
- * Maneja errores de multer y los convierte en respuesta estándar.
- */
-exports.uploadLogo = (req, res, next) => {
-  const singleUpload = upload.single('logo')
-
-  singleUpload(req, res, (err) => {
-    if (err instanceof multer.MulterError) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return error(res, `El archivo excede el tamaño máximo de ${MAX_SIZE_MB}MB`, 400)
-      }
-      return error(res, err.message, 400)
+const handleUpload = (fieldName) => (req, res, next) => {
+  upload.single(fieldName)(req, res, (uploadError) => {
+    if (uploadError instanceof multer.MulterError) {
+      const message = uploadError.code === 'LIMIT_FILE_SIZE'
+        ? `El archivo excede el tamaño máximo de ${MAX_SIZE_MB}MB`
+        : uploadError.message
+      return error(res, message, 400)
     }
-    if (err) {
-      return error(res, err.message, 400)
-    }
-    next()
+    if (uploadError) return error(res, uploadError.message, 400)
+    return next()
   })
 }
+
+const toPublicUploadPath = (file) => {
+  if (!file?.path) return null
+  const relativePath = path.relative(UPLOAD_ROOT, file.path).split(path.sep).join('/')
+  return `/uploads/${relativePath}`
+}
+
+const deleteUpload = (publicPath) => {
+  if (!publicPath || !String(publicPath).startsWith('/uploads/')) return
+  const relativePath = String(publicPath).slice('/uploads/'.length)
+  const resolvedPath = path.resolve(UPLOAD_ROOT, relativePath)
+  const uploadPrefix = `${UPLOAD_ROOT}${path.sep}`
+  if (!resolvedPath.startsWith(uploadPrefix)) return
+  try {
+    fs.unlinkSync(resolvedPath)
+  } catch (fileError) {
+    if (fileError.code !== 'ENOENT') {
+      console.warn(`No se pudo eliminar el archivo ${resolvedPath}: ${fileError.message}`)
+    }
+  }
+}
+
+exports.UPLOAD_ROOT = UPLOAD_ROOT
+exports.uploadAvatar = handleUpload('avatar')
+exports.uploadFoto = handleUpload('foto')
+exports.uploadLogo = handleUpload('logo')
+exports.toPublicUploadPath = toPublicUploadPath
+exports.deleteUpload = deleteUpload

@@ -16,6 +16,7 @@ import {
 import useAuthStore from '../../store/useAuthStore'
 import { cn } from '../../utils/cn'
 import ThemeToggle from '../common/ThemeToggle'
+import Avatar from '../ui/Avatar'
 
 const MOCK_NOTIFS = []
 
@@ -141,7 +142,12 @@ export default function Header() {
               className='top-navigation-avatar'
               aria-label={`Abrir perfil de ${user.nombre}`}
             >
-              {user.nombre?.charAt(0)?.toUpperCase()}
+              <Avatar
+                src={user.avatar}
+                name={`${user.nombre || ''} ${user.apellido || ''}`}
+                size='sm'
+                className='w-full h-full border-0'
+              />
             </Link>
           ) : (
             <Link to='/login' className='top-navigation-login'>
