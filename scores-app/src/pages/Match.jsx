@@ -41,17 +41,17 @@ export default function Match() {
       cancelado: 'CANCELADO',
     }[match.estado] || match.estado
   const winner = match.ganador
-  const isPadel = match.deporte === 'padel'
+  const isDoubles = match.modalidad === 'dobles'
   const isFav = isPartidoFavorite(match.id)
 
-  const p1 = isPadel
+  const p1 = isDoubles
     ? { name: getParticipantName(match, 1) }
     : {
         name: getParticipantName(match, 1),
         ranking: match.jugador1?.ranking,
         photo: match.jugador1?.foto,
       }
-  const p2 = isPadel
+  const p2 = isDoubles
     ? { name: getParticipantName(match, 2) }
     : {
         name: getParticipantName(match, 2),
@@ -99,6 +99,7 @@ export default function Match() {
           style={{ color: 'var(--text-muted)' }}
         >
           {match.categoria?.nombre && <span className='badge-brand'>{match.categoria.nombre}</span>}
+          {match.torneo?.nombre && <span className='font-semibold'>{match.torneo.nombre}</span>}
           {match.cancha?.nombre && (
             <span className='inline-flex items-center gap-1'><MapPin className='w-3 h-3' />{match.cancha.nombre}</span>
           )}

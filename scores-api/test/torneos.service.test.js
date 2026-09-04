@@ -15,18 +15,23 @@ const loadService = (fakeDb) => {
   return require(servicePath)
 }
 
-test('crear torneo guarda únicamente la información básica', async () => {
+test('crear torneo guarda modalidad, sistema y categoría', async () => {
   const calls = []
   const fakeDb = {
     async query(sql, params) {
       calls.push({ sql, params })
-      if (calls.length === 1) return [{ insertId: 4 }]
+      if (/SELECT deporte FROM categorias/.test(sql)) return [[{ deporte: 'tenis' }]]
+      if (/INSERT INTO torneos/.test(sql)) return [{ insertId: 4 }]
       return [
         [
           {
             id: 4,
             nombre: 'Torneo interno',
             deporte: 'tenis',
+            categoria_id: 99,
+            categoria_nombre: '4ta',
+            modalidad: 'individual',
+            sistema: 'todos_contra_todos',
             fecha_inicio: null,
             fecha_fin: null,
             estado: 'proximo',
@@ -43,18 +48,27 @@ test('crear torneo guarda únicamente la información básica', async () => {
     fecha_fin: '',
     estado: 'proximo',
     categoria_id: 99,
+    modalidad: 'individual',
+    sistema: 'todos_contra_todos',
     premio: 'No debe guardarse',
   })
 
-  assert.match(calls[0].sql, /nombre, deporte, fecha_inicio, fecha_fin, estado/)
-  assert.doesNotMatch(calls[0].sql, /categoria_id|premio/)
-  assert.deepEqual(calls[0].params, ['Torneo interno', 'tenis', null, null, 'proximo'])
+  const insert = calls.find((call) => /INSERT INTO torneos/.test(call.sql))
+  assert.match(insert.sql, /categoria_id, modalidad, sistema/)
+  assert.doesNotMatch(insert.sql, /premio/)
+  assert.deepEqual(insert.params, [
+    'Torneo interno', 'tenis', 99, 'individual', 'todos_contra_todos', null, null, 'proximo',
+  ])
   assert.deepEqual(Object.keys(result), [
     'id',
     'nombre',
     'deporte',
+    'modalidad',
+    'sistema',
+    'categoria',
     'fecha_inicio',
     'fecha_fin',
     'estado',
+    'partidos_count',
   ])
 })

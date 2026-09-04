@@ -7,6 +7,7 @@ const validate = require('../../middlewares/validate.middleware')
 // ── Validaciones ────────────────────────────────────────────────────────────────
 const equipoRules = [
   body('nombre').notEmpty().withMessage('El nombre es obligatorio'),
+  body('deporte').isIn(['tenis', 'padel']).withMessage('Selecciona tenis o pádel'),
   body('jugador1_id').isInt({ min: 1 }).withMessage('jugador1_id debe ser un entero válido'),
   body('jugador2_id').isInt({ min: 1 }).withMessage('jugador2_id debe ser un entero válido'),
   body('categoria_id').isInt({ min: 1 }).withMessage('categoria_id debe ser un entero válido'),

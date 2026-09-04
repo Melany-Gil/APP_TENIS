@@ -5,11 +5,15 @@ const MAX_SETS = 127
 const MATCH_SELECT = `
   SELECT
     p.id,
+    p.torneo_id,
     p.deporte,
     p.estado,
     p.ganador,
     p.fecha_inicio,
     p.hora_inicio,
+    p.fase,
+    p.grupo,
+    p.ronda,
     p.notas,
     p.origen_partido1_id,
     p.origen_partido2_id,
@@ -43,6 +47,9 @@ const MATCH_SELECT = `
     ev.finalizado_at,
     cat.id     AS categoria_id,
     cat.nombre AS categoria_nombre,
+    t.nombre AS torneo_nombre,
+    t.modalidad AS torneo_modalidad,
+    t.sistema AS torneo_sistema,
     j1.id       AS j1_id,
     j1.nombre   AS j1_nombre,
     j1.apellido AS j1_apellido,
@@ -68,6 +75,7 @@ const MATCH_SELECT = `
     op2e1.nombre   AS op2_e1_nombre,
     op2e2.nombre   AS op2_e2_nombre
   FROM partidos p
+  LEFT JOIN torneos t ON t.id = p.torneo_id
   LEFT JOIN categorias cat ON cat.id = p.categoria_id
   LEFT JOIN jugadores j1 ON j1.id = p.jugador1_id
   LEFT JOIN jugadores j2 ON j2.id = p.jugador2_id
@@ -100,6 +108,7 @@ exports.getAll = async ({
   orden,
   juez_id,
   cancha_id,
+  torneo_id,
 }) => {
   let query = `${MATCH_SELECT} WHERE 1 = 1`
   const params = []
@@ -145,6 +154,10 @@ exports.getAll = async ({
   if (cancha_id) {
     query += ' AND p.cancha_id = ?'
     params.push(cancha_id)
+  }
+  if (torneo_id) {
+    query += ' AND p.torneo_id = ?'
+    params.push(torneo_id)
   }
 
   const direction = orden === 'asc' ? 'ASC' : 'DESC'
@@ -275,13 +288,15 @@ exports.create = async (body, actor) => {
   await validateJudge(judgeId)
   const [result] = await db.query(
     `INSERT INTO partidos
-       (deporte, categoria_id, jugador1_id, jugador2_id, equipo1_id, equipo2_id,
-        estado, fecha_inicio, hora_inicio, notas, origen_partido1_id, origen_partido2_id,
+       (torneo_id, deporte, categoria_id, jugador1_id, jugador2_id, equipo1_id, equipo2_id,
+        estado, fecha_inicio, hora_inicio, fase, grupo, ronda, notas,
+        origen_partido1_id, origen_partido2_id,
         created_by, juez_id, cancha_id, mejor_de_sets, juegos_por_set, diferencia_juegos,
         modo_game, set_decisivo, tiebreak_en, tiebreak_puntos, match_tiebreak_puntos,
         servidor_inicial)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
+      match.torneo_id,
       match.deporte,
       match.categoria_id,
       match.jugador1_id,
@@ -291,6 +306,9 @@ exports.create = async (body, actor) => {
       match.estado,
       match.fecha_inicio,
       match.hora_inicio,
+      match.fase,
+      match.grupo,
+      match.ronda,
       match.notas,
       match.origen_partido1_id,
       match.origen_partido2_id,
@@ -327,14 +345,16 @@ exports.update = async (id, body, actor) => {
   await validateJudge(judgeId)
   await db.query(
     `UPDATE partidos
-     SET deporte = ?, categoria_id = ?, jugador1_id = ?, jugador2_id = ?,
-         equipo1_id = ?, equipo2_id = ?, estado = ?, fecha_inicio = ?, hora_inicio = ?, notas = ?,
+     SET torneo_id = ?, deporte = ?, categoria_id = ?, jugador1_id = ?, jugador2_id = ?,
+         equipo1_id = ?, equipo2_id = ?, estado = ?, fecha_inicio = ?, hora_inicio = ?,
+         fase = ?, grupo = ?, ronda = ?, notas = ?,
          origen_partido1_id = ?, origen_partido2_id = ?, juez_id = ?, cancha_id = ?,
          mejor_de_sets = ?, juegos_por_set = ?, diferencia_juegos = ?,
          modo_game = ?, set_decisivo = ?, tiebreak_en = ?, tiebreak_puntos = ?,
          match_tiebreak_puntos = ?, servidor_inicial = ?
      WHERE id = ?`,
     [
+      match.torneo_id,
       match.deporte,
       match.categoria_id,
       match.jugador1_id,
@@ -344,6 +364,9 @@ exports.update = async (id, body, actor) => {
       match.estado,
       match.fecha_inicio,
       match.hora_inicio,
+      match.fase,
+      match.grupo,
+      match.ronda,
       match.notas,
       match.origen_partido1_id,
       match.origen_partido2_id,
@@ -368,9 +391,11 @@ exports.update = async (id, body, actor) => {
 exports.updateMarcador = async (id, { sets, estado, ganador }, actor) => {
   const requester = normalizeActor(actor)
   const [existing] = await db.query(
-    `SELECT id, deporte, jugador1_id, jugador2_id, equipo1_id, equipo2_id, juez_id, created_by
-     FROM partidos
-     WHERE id = ?`,
+    `SELECT p.id, p.deporte, p.jugador1_id, p.jugador2_id, p.equipo1_id, p.equipo2_id,
+            p.juez_id, p.created_by, t.modalidad
+     FROM partidos p
+     LEFT JOIN torneos t ON t.id = p.torneo_id
+     WHERE p.id = ?`,
     [id]
   )
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
@@ -497,30 +522,34 @@ exports.remove = async (id) => {
 }
 
 async function validateBasicMatch(body, currentMatchId = null) {
-  const deporte = body.deporte
-  const categoriaId = Number(body.categoria_id)
+  const torneoId = positiveId(body.torneo_id)
   const fechaInicio = normalizeOptionalDate(body.fecha_inicio)
   const horaInicio = normalizeOptionalTime(body.hora_inicio)
   const estado = body.estado || 'programado'
 
-  if (!['tenis', 'padel'].includes(deporte)) {
-    throw { status: 400, message: 'Selecciona un deporte válido' }
-  }
-  if (!Number.isInteger(categoriaId) || categoriaId < 1) {
-    throw { status: 400, message: 'Selecciona la categoría del partido' }
-  }
+  if (!torneoId) throw { status: 400, message: 'Selecciona el torneo del partido' }
   if (!['programado', 'en_vivo', 'finalizado', 'cancelado'].includes(estado)) {
     throw { status: 400, message: 'Selecciona un estado válido' }
   }
 
-  const [categories] = await db.query('SELECT deporte FROM categorias WHERE id = ? LIMIT 1', [
-    categoriaId,
-  ])
-  if (!categories.length) {
-    throw { status: 400, message: 'La categoría seleccionada no existe' }
-  }
-  if (![deporte, 'ambos'].includes(categories[0].deporte)) {
-    throw { status: 400, message: 'La categoría no corresponde al deporte del partido' }
+  const [tournaments] = await db.query(
+    `SELECT id, deporte, categoria_id, modalidad, sistema, estado
+     FROM torneos
+     WHERE id = ?
+     LIMIT 1`,
+    [torneoId]
+  )
+  if (!tournaments.length) throw { status: 400, message: 'El torneo seleccionado no existe' }
+
+  const tournament = tournaments[0]
+  const deporte = tournament.deporte
+  const categoriaId = Number(tournament.categoria_id)
+  const modalidad = tournament.modalidad || (deporte === 'padel' ? 'dobles' : 'individual')
+  const fase = normalizePhase(tournament.sistema, body.fase)
+  const grupo = fase === 'grupos' ? normalizeOptionalLabel(body.grupo, 20) : null
+  const ronda = normalizeOptionalLabel(body.ronda, 50)
+  if (!Number.isInteger(categoriaId) || categoriaId < 1) {
+    throw { status: 409, message: 'El torneo debe tener una categoría antes de crear partidos' }
   }
 
   const jugador1Id = positiveId(body.jugador1_id)
@@ -549,36 +578,45 @@ async function validateBasicMatch(body, currentMatchId = null) {
   }
 
   const source1 = source1Id
-    ? await resolveMatchSource(source1Id, deporte, categoriaId, currentMatchId)
+    ? await resolveMatchSource(source1Id, torneoId, modalidad, currentMatchId)
     : null
   const source2 = source2Id
-    ? await resolveMatchSource(source2Id, deporte, categoriaId, currentMatchId)
+    ? await resolveMatchSource(source2Id, torneoId, modalidad, currentMatchId)
     : null
 
   const resolvedPlayer1 =
-    deporte === 'tenis' ? (source1Id ? source1.participantId : jugador1Id) : null
+    modalidad === 'individual' ? (source1Id ? source1.participantId : jugador1Id) : null
   const resolvedPlayer2 =
-    deporte === 'tenis' ? (source2Id ? source2.participantId : jugador2Id) : null
-  const resolvedTeam1 = deporte === 'padel' ? (source1Id ? source1.participantId : equipo1Id) : null
-  const resolvedTeam2 = deporte === 'padel' ? (source2Id ? source2.participantId : equipo2Id) : null
+    modalidad === 'individual' ? (source2Id ? source2.participantId : jugador2Id) : null
+  const resolvedTeam1 =
+    modalidad === 'dobles' ? (source1Id ? source1.participantId : equipo1Id) : null
+  const resolvedTeam2 =
+    modalidad === 'dobles' ? (source2Id ? source2.participantId : equipo2Id) : null
 
   if (
-    deporte === 'tenis' &&
+    modalidad === 'individual' &&
     ((!resolvedPlayer1 && !source1Id) || (!resolvedPlayer2 && !source2Id))
   ) {
     throw { status: 400, message: 'Selecciona un jugador o un partido de origen para cada lado' }
   }
-  if (deporte === 'padel' && ((!resolvedTeam1 && !source1Id) || (!resolvedTeam2 && !source2Id))) {
-    throw { status: 400, message: 'Selecciona un equipo o un partido de origen para cada lado' }
+  if (modalidad === 'dobles' && ((!resolvedTeam1 && !source1Id) || (!resolvedTeam2 && !source2Id))) {
+    throw { status: 400, message: 'Selecciona una pareja o un partido de origen para cada lado' }
   }
   if (resolvedPlayer1 && resolvedPlayer2 && resolvedPlayer1 === resolvedPlayer2) {
     throw { status: 400, message: 'Los jugadores del partido deben ser diferentes' }
   }
   if (resolvedTeam1 && resolvedTeam2 && resolvedTeam1 === resolvedTeam2) {
-    throw { status: 400, message: 'Los equipos del partido deben ser diferentes' }
+    throw { status: 400, message: 'Las parejas del partido deben ser diferentes' }
+  }
+
+  if (modalidad === 'individual') {
+    await validatePlayers([resolvedPlayer1, resolvedPlayer2].filter(Boolean), deporte)
+  } else {
+    await validateTeams([resolvedTeam1, resolvedTeam2].filter(Boolean), deporte, categoriaId)
   }
 
   return {
+    torneo_id: torneoId,
     deporte,
     categoria_id: categoriaId,
     jugador1_id: resolvedPlayer1,
@@ -591,7 +629,61 @@ async function validateBasicMatch(body, currentMatchId = null) {
     estado,
     fecha_inicio: fechaInicio,
     hora_inicio: horaInicio,
+    fase,
+    grupo,
+    ronda,
     notas: String(body.notas || '').trim() || null,
+  }
+}
+
+function normalizePhase(system, value) {
+  if (system === 'todos_contra_todos') return 'liga'
+  if (system === 'eliminacion_directa') return 'eliminacion'
+  if (system === 'grupos_eliminacion') {
+    return value === 'eliminacion' ? 'eliminacion' : 'grupos'
+  }
+  return null
+}
+
+function normalizeOptionalLabel(value, maxLength) {
+  const normalized = String(value || '').trim()
+  if (!normalized) return null
+  if (normalized.length > maxLength) {
+    throw { status: 400, message: `El texto no puede superar ${maxLength} caracteres` }
+  }
+  return normalized
+}
+
+async function validatePlayers(ids, deporte) {
+  if (!ids.length) return
+  const placeholders = ids.map(() => '?').join(',')
+  const [rows] = await db.query(
+    `SELECT id
+     FROM jugadores
+     WHERE id IN (${placeholders})
+       AND activo = TRUE
+       AND deporte IN (?, 'ambos')`,
+    [...ids, deporte]
+  )
+  if (rows.length !== new Set(ids).size) {
+    throw { status: 400, message: 'Los jugadores deben estar activos en el deporte del torneo' }
+  }
+}
+
+async function validateTeams(ids, deporte, categoriaId) {
+  if (!ids.length) return
+  const placeholders = ids.map(() => '?').join(',')
+  const [rows] = await db.query(
+    `SELECT id
+     FROM equipos_padel
+     WHERE id IN (${placeholders})
+       AND activo = TRUE
+       AND deporte = ?
+       AND categoria_id = ?`,
+    [...ids, deporte, categoriaId]
+  )
+  if (rows.length !== new Set(ids).size) {
+    throw { status: 400, message: 'Las parejas deben estar activas en la categoría del torneo' }
   }
 }
 
@@ -692,13 +784,13 @@ async function validateJudge(judgeId) {
   if (!rows.length) throw { status: 400, message: 'El juez seleccionado no está disponible' }
 }
 
-async function resolveMatchSource(sourceId, deporte, categoriaId, currentMatchId) {
+async function resolveMatchSource(sourceId, torneoId, modalidad, currentMatchId) {
   if (currentMatchId && sourceId >= currentMatchId) {
     throw { status: 400, message: 'El partido de origen debe ser anterior al partido actual' }
   }
 
   const [rows] = await db.query(
-    `SELECT id, deporte, categoria_id, estado, ganador,
+    `SELECT id, torneo_id, estado, ganador,
             jugador1_id, jugador2_id, equipo1_id, equipo2_id
      FROM partidos
      WHERE id = ?
@@ -710,17 +802,17 @@ async function resolveMatchSource(sourceId, deporte, categoriaId, currentMatchId
   }
 
   const source = rows[0]
-  if (source.deporte !== deporte || Number(source.categoria_id) !== categoriaId) {
+  if (Number(source.torneo_id) !== torneoId) {
     throw {
       status: 400,
-      message: 'El partido de origen debe pertenecer al mismo deporte y categoría',
+      message: 'El partido de origen debe pertenecer al mismo torneo',
     }
   }
 
   return {
     participantId:
       source.estado === 'finalizado' && source.ganador
-        ? getWinnerParticipantId(source, source.ganador)
+        ? getWinnerParticipantId({ ...source, modalidad }, source.ganador)
         : null,
   }
 }
@@ -728,7 +820,7 @@ async function resolveMatchSource(sourceId, deporte, categoriaId, currentMatchId
 function getWinnerParticipantId(match, winner) {
   const position = winner === 'jugador1' ? 1 : winner === 'jugador2' ? 2 : null
   if (!position) return null
-  return match.deporte === 'padel'
+  return match.modalidad === 'dobles' || match.equipo1_id || match.equipo2_id
     ? match[`equipo${position}_id`] || null
     : match[`jugador${position}_id`] || null
 }
@@ -736,7 +828,8 @@ function getWinnerParticipantId(match, winner) {
 async function propagateWinner(connection, match, estado, ganador) {
   const participantId =
     estado === 'finalizado' && ganador ? getWinnerParticipantId(match, ganador) : null
-  const participantColumn = match.deporte === 'padel' ? 'equipo' : 'jugador'
+  const participantColumn =
+    match.modalidad === 'dobles' || match.equipo1_id || match.equipo2_id ? 'equipo' : 'jugador'
 
   await connection.query(
     `UPDATE partidos
@@ -756,10 +849,22 @@ function formatSummary(row) {
   const match = {
     id: row.id,
     deporte: row.deporte,
+    modalidad: row.torneo_modalidad || (row.e1_id || row.e2_id ? 'dobles' : 'individual'),
+    torneo: row.torneo_id
+      ? {
+          id: row.torneo_id,
+          nombre: row.torneo_nombre,
+          modalidad: row.torneo_modalidad,
+          sistema: row.torneo_sistema,
+        }
+      : null,
     estado: row.estado,
     ganador: row.ganador,
     fecha_inicio: row.fecha_inicio || null,
     hora_inicio: row.hora_inicio || null,
+    fase: row.fase || null,
+    grupo: row.grupo || null,
+    ronda: row.ronda || null,
     notas: row.notas || null,
     marcador_actual: parseScoreSnapshot(row.marcador_actual),
     cancha: row.cancha_id
@@ -802,7 +907,7 @@ function formatSummary(row) {
       : null,
   }
 
-  if (row.deporte === 'padel') {
+  if (match.modalidad === 'dobles') {
     match.equipo1 = { id: row.e1_id, nombre: row.e1_nombre }
     match.equipo2 = { id: row.e2_id, nombre: row.e2_nombre }
   } else {
@@ -856,11 +961,11 @@ function formatMatchSource(row, position) {
 
   const prefix = `op${position}`
   const participant1 =
-    row.deporte === 'padel'
+    row.torneo_modalidad === 'dobles' || row.e1_id || row.e2_id
       ? row[`${prefix}_e1_nombre`]
       : [row[`${prefix}_j1_nombre`], row[`${prefix}_j1_apellido`]].filter(Boolean).join(' ')
   const participant2 =
-    row.deporte === 'padel'
+    row.torneo_modalidad === 'dobles' || row.e1_id || row.e2_id
       ? row[`${prefix}_e2_nombre`]
       : [row[`${prefix}_j2_nombre`], row[`${prefix}_j2_apellido`]].filter(Boolean).join(' ')
 

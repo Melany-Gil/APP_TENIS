@@ -8,8 +8,15 @@ const validate = require('../../middlewares/validate.middleware')
 const torneoRules = [
   body('nombre').notEmpty().withMessage('El nombre es obligatorio'),
   body('deporte')
-    .isIn(['tenis', 'padel', 'ambos'])
-    .withMessage('El deporte debe ser tenis, padel o ambos'),
+    .isIn(['tenis', 'padel'])
+    .withMessage('El deporte debe ser tenis o padel'),
+  body('categoria_id').isInt({ min: 1 }).withMessage('Selecciona una categoría'),
+  body('modalidad')
+    .isIn(['individual', 'dobles'])
+    .withMessage('La modalidad debe ser individual o dobles'),
+  body('sistema')
+    .isIn(['eliminacion_directa', 'todos_contra_todos', 'grupos_eliminacion'])
+    .withMessage('Selecciona un sistema de competencia válido'),
   body('fecha_inicio')
     .optional({ values: 'falsy' })
     .isDate()

@@ -1,14 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import {
+  ArrowRight,
+  CalendarDays,
+  Network,
+  Pencil,
+  Plus,
+  Trash2,
+  Trophy,
+  UsersRound,
+  X,
+} from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { tournamentService } from '../../services/tournamentService'
+import { categoriaService } from '../../services/categoriaService'
 import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import { formatDate } from '../../utils/formatDate'
 
-const DEPORTES = ['tenis', 'padel', 'ambos']
 const ESTADOS = [
   { value: 'proximo', label: 'Próximo' },
   { value: 'en_curso', label: 'En curso' },
@@ -21,27 +32,54 @@ const ESTADO_BADGE = {
   finalizado: 'badge-atp',
   cancelado: 'badge',
 }
+const SISTEMAS = [
+  {
+    value: 'eliminacion_directa',
+    label: 'Eliminación directa',
+    description: 'Quien pierde sale; ideal para un cuadro rápido y fácil de seguir.',
+  },
+  {
+    value: 'todos_contra_todos',
+    label: 'Todos contra todos',
+    description: 'Cada participante juega varias veces y se ordena por resultados.',
+  },
+  {
+    value: 'grupos_eliminacion',
+    label: 'Grupos + fase final',
+    description: 'Primero grupos y luego llaves; útil cuando hay más participantes.',
+  },
+]
 
 export default function GestionTorneos() {
   const [torneos, setTorneos] = useState([])
+  const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const { addToast } = useUIStore()
-
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm()
 
+  const selectedSport = watch('deporte') || 'tenis'
+  const selectedSystem = watch('sistema') || 'eliminacion_directa'
+  const availableCategories = categorias.filter(
+    (category) => category.deporte === selectedSport || category.deporte === 'ambos'
+  )
+  const systemInfo = SISTEMAS.find((system) => system.value === selectedSystem)
+
   const fetchAll = () => {
     setLoading(true)
-    tournamentService
-      .getAll()
-      .then((response) => setTorneos(response.data || []))
-      .catch(() => addToast({ type: 'error', title: 'Error al cargar datos' }))
+    Promise.all([tournamentService.getAll(), categoriaService.getAll()])
+      .then(([tournaments, categories]) => {
+        setTorneos(tournaments.data || [])
+        setCategorias(categories.data || [])
+      })
+      .catch(() => addToast({ type: 'error', title: 'Error al cargar los torneos' }))
       .finally(() => setLoading(false))
   }
 
@@ -50,7 +88,16 @@ export default function GestionTorneos() {
   }, [])
 
   const openCreate = () => {
-    reset({ estado: 'proximo', deporte: 'tenis' })
+    reset({
+      nombre: '',
+      deporte: 'tenis',
+      categoria_id: '',
+      modalidad: 'individual',
+      sistema: 'eliminacion_directa',
+      estado: 'proximo',
+      fecha_inicio: '',
+      fecha_fin: '',
+    })
     setEditing(null)
     setShowForm(true)
   }
@@ -60,11 +107,19 @@ export default function GestionTorneos() {
     reset({
       nombre: torneo.nombre,
       deporte: torneo.deporte,
+      categoria_id: torneo.categoria?.id || '',
+      modalidad: torneo.modalidad,
+      sistema: torneo.sistema,
       fecha_inicio: torneo.fecha_inicio?.split('T')[0] || '',
       fecha_fin: torneo.fecha_fin?.split('T')[0] || '',
       estado: torneo.estado,
     })
     setShowForm(true)
+  }
+
+  const closeForm = () => {
+    setShowForm(false)
+    setEditing(null)
   }
 
   const onSubmit = async (data) => {
@@ -74,58 +129,78 @@ export default function GestionTorneos() {
         addToast({ type: 'success', title: 'Torneo actualizado' })
       } else {
         await tournamentService.create(data)
-        addToast({ type: 'success', title: 'Torneo creado' })
+        addToast({
+          type: 'success',
+          title: 'Torneo creado',
+          message: 'Ya puedes asignarle partidos desde el módulo de Partidos.',
+        })
       }
-      setShowForm(false)
+      closeForm()
       fetchAll()
-    } catch (err) {
-      addToast({ type: 'error', title: 'Error', message: err.message })
+    } catch (error) {
+      addToast({ type: 'error', title: 'No se pudo guardar', message: error.message })
     }
   }
 
   const handleDelete = async (torneo) => {
     const ok = await confirm({
       title: 'Eliminar torneo',
-      message: `Esta acción eliminará permanentemente el torneo "${torneo.nombre}". No se puede deshacer.`,
-      confirmLabel: 'Eliminar',
-      danger: true,
-      requireText: torneo.nombre,
+      message:
+        torneo.partidos_count > 0
+          ? 'Este torneo tiene partidos y no se puede eliminar hasta reasignarlos o borrarlos.'
+          : `Esta acción eliminará permanentemente el torneo "${torneo.nombre}".`,
+      confirmLabel: torneo.partidos_count > 0 ? 'Entendido' : 'Eliminar',
+      danger: torneo.partidos_count === 0,
+      requireText: torneo.partidos_count > 0 ? undefined : torneo.nombre,
     })
-    if (!ok) return
+    if (!ok || torneo.partidos_count > 0) return
     try {
       await tournamentService.remove(torneo.id)
       addToast({ type: 'success', title: 'Torneo eliminado' })
       fetchAll()
-    } catch (err) {
-      addToast({ type: 'error', title: 'Error', message: err.message })
+    } catch (error) {
+      addToast({ type: 'error', title: 'No se pudo eliminar', message: error.message })
     }
   }
 
   return (
     <div className='space-y-6 animate-fade-up'>
-      <div className='flex items-center justify-between'>
+      <header className='flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4'>
         <div>
-          <h1 className='text-xl font-bold' style={{ color: 'var(--text-primary)' }}>
+          <p className='text-xs font-bold uppercase tracking-[0.16em]' style={{ color: 'var(--color-brand)' }}>
+            Organización deportiva
+          </p>
+          <h1 className='text-2xl font-black mt-1' style={{ color: 'var(--text-primary)' }}>
             Torneos
           </h1>
-          <p className='text-sm mt-0.5' style={{ color: 'var(--text-muted)' }}>
-            {torneos.length} torneo{torneos.length !== 1 ? 's' : ''} registrado
-            {torneos.length !== 1 ? 's' : ''}
+          <p className='text-sm mt-1 max-w-xl' style={{ color: 'var(--text-muted)' }}>
+            Crea la competencia una sola vez. Sus partidos usarán automáticamente el mismo deporte,
+            categoría y modalidad.
           </p>
         </div>
         <Button onClick={openCreate} leftIcon={<Plus className='w-4 h-4' />}>
-          Nuevo torneo
+          Crear torneo
         </Button>
-      </div>
+      </header>
 
-      {/* Formulario */}
+      <section className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
+        <GuideStep number='1' title='Crea el torneo' text='Define solo sus datos esenciales.' />
+        <GuideStep number='2' title='Prepara participantes' text='Jugadores en individual; parejas en dobles.' />
+        <GuideStep number='3' title='Programa partidos' text='Elige el torneo y arma sus cruces.' />
+      </section>
+
       {showForm && (
-        <div className='card p-5 animate-fade-up'>
-          <div className='flex items-center justify-between mb-4'>
-            <h2 className='text-base font-semibold' style={{ color: 'var(--text-primary)' }}>
-              {editing ? 'Editar torneo' : 'Nuevo torneo'}
-            </h2>
-            <button onClick={() => setShowForm(false)} className='btn-ghost p-1'>
+        <section className='card p-5 sm:p-6 animate-fade-up'>
+          <div className='flex items-start justify-between gap-3 mb-5'>
+            <div>
+              <h2 className='text-lg font-bold' style={{ color: 'var(--text-primary)' }}>
+                {editing ? 'Editar torneo' : 'Nuevo torneo'}
+              </h2>
+              <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
+                Los campos avanzados del marcador se configuran después, en cada partido.
+              </p>
+            </div>
+            <button type='button' onClick={closeForm} className='btn-ghost p-2' aria-label='Cerrar formulario'>
               <X className='w-4 h-4' />
             </button>
           </div>
@@ -133,107 +208,186 @@ export default function GestionTorneos() {
           <form onSubmit={handleSubmit(onSubmit)} className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             <div className='sm:col-span-2'>
               <Input
-                label='Nombre *'
-                placeholder='Copa Club Norte 2025'
+                label='Nombre del torneo *'
+                placeholder='Ej.: Copa Club Unión 2026'
                 error={errors.nombre?.message}
-                {...register('nombre', { required: 'Requerido' })}
+                {...register('nombre', { required: 'Escribe el nombre del torneo' })}
               />
             </div>
 
-            <div className='form-group'>
-              <label className='form-label'>Deporte *</label>
-              <select className='form-input' {...register('deporte', { required: true })}>
-                {DEPORTES.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
+            <Field label='Deporte *' error={errors.deporte?.message}>
+              <select className='form-input' {...register('deporte', { required: 'Selecciona el deporte' })}>
+                <option value='tenis'>Tenis</option>
+                <option value='padel'>Pádel</option>
               </select>
-            </div>
+            </Field>
 
-            <div className='form-group'>
-              <label className='form-label'>Estado</label>
-              <select className='form-input' {...register('estado')}>
-                {ESTADOS.map((e) => (
-                  <option key={e.value} value={e.value}>
-                    {e.label}
-                  </option>
+            <Field label='Categoría *' error={errors.categoria_id?.message}>
+              <select className='form-input' {...register('categoria_id', { required: 'Selecciona una categoría' })}>
+                <option value=''>Seleccionar categoría</option>
+                {availableCategories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.nombre}</option>
                 ))}
               </select>
+            </Field>
+
+            <Field label='Modalidad *'>
+              <select className='form-input' {...register('modalidad', { required: true })}>
+                <option value='individual'>Individual · 1 vs 1</option>
+                <option value='dobles'>Dobles · pareja vs pareja</option>
+              </select>
+            </Field>
+
+            <Field label='Sistema de competencia *'>
+              <select className='form-input' {...register('sistema', { required: true })}>
+                {SISTEMAS.map((system) => (
+                  <option key={system.value} value={system.value}>{system.label}</option>
+                ))}
+              </select>
+            </Field>
+
+            <div
+              className='sm:col-span-2 rounded-xl p-3 flex gap-3'
+              style={{ backgroundColor: 'var(--color-brand-dim)' }}
+            >
+              <Network className='w-5 h-5 shrink-0 mt-0.5' style={{ color: 'var(--color-brand)' }} />
+              <div>
+                <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>{systemInfo?.label}</p>
+                <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>{systemInfo?.description}</p>
+              </div>
             </div>
 
             <Input label='Fecha de inicio' type='date' {...register('fecha_inicio')} />
             <Input label='Fecha de finalización' type='date' {...register('fecha_fin')} />
 
-            <div className='sm:col-span-2 flex gap-3 pt-2'>
+            <Field label='Estado'>
+              <select className='form-input' {...register('estado')}>
+                {ESTADOS.map((status) => (
+                  <option key={status.value} value={status.value}>{status.label}</option>
+                ))}
+              </select>
+            </Field>
+
+            <div className='sm:col-span-2 flex flex-wrap gap-3 pt-1'>
               <Button type='submit' loading={isSubmitting}>
                 {editing ? 'Guardar cambios' : 'Crear torneo'}
               </Button>
-              <Button type='button' variant='secondary' onClick={() => setShowForm(false)}>
-                Cancelar
-              </Button>
+              <Button type='button' variant='secondary' onClick={closeForm}>Cancelar</Button>
             </div>
           </form>
-        </div>
+        </section>
       )}
 
-      {/* Lista */}
-      <div className='card overflow-hidden'>
+      <section className='space-y-3'>
         {loading ? (
-          Array(3)
-            .fill(0)
-            .map((_, i) => <div key={i} className='skeleton h-16 m-3 rounded-lg' />)
+          Array.from({ length: 3 }, (_, index) => <div key={index} className='skeleton h-36 rounded-2xl' />)
         ) : torneos.length === 0 ? (
-          <p className='text-center py-12 text-sm' style={{ color: 'var(--text-muted)' }}>
-            No hay torneos registrados
-          </p>
+          <div className='card p-10 text-center'>
+            <Trophy className='w-10 h-10 mx-auto mb-3' style={{ color: 'var(--text-muted)' }} />
+            <p className='font-semibold' style={{ color: 'var(--text-primary)' }}>Aún no hay torneos</p>
+            <p className='text-sm mt-1 mb-4' style={{ color: 'var(--text-muted)' }}>
+              Crea el primero para comenzar a organizar sus partidos.
+            </p>
+            <Button onClick={openCreate} leftIcon={<Plus className='w-4 h-4' />}>Crear torneo</Button>
+          </div>
         ) : (
-          torneos.map((t, i) => (
-            <div
-              key={t.id}
-              className='list-row'
-              style={{
-                borderBottom: i < torneos.length - 1 ? '1px solid var(--border-color)' : 'none',
-              }}
-            >
-              <div className='flex-1 min-w-0'>
-                <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
-                  {t.nombre}
-                </p>
-                <div className='flex items-center gap-2 mt-0.5'>
-                  <span className={ESTADO_BADGE[t.estado] || 'badge'}>
-                    {ESTADOS.find((e) => e.value === t.estado)?.label || t.estado}
-                  </span>
-                  <span className={t.deporte === 'tenis' ? 'badge-atp' : 'badge-padel'}>
-                    {t.deporte}
-                  </span>
-                  {(t.fecha_inicio || t.fecha_fin) && (
-                    <span className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                      {t.fecha_inicio && t.fecha_fin
-                        ? `${formatDate(t.fecha_inicio)} → ${formatDate(t.fecha_fin)}`
-                        : t.fecha_inicio
-                          ? `Desde ${formatDate(t.fecha_inicio)}`
-                          : `Hasta ${formatDate(t.fecha_fin)}`}
+          torneos.map((tournament) => (
+            <article key={tournament.id} className='card p-4 sm:p-5'>
+              <div className='flex flex-col lg:flex-row lg:items-center gap-4'>
+                <div
+                  className='w-12 h-12 rounded-2xl flex items-center justify-center shrink-0'
+                  style={{ backgroundColor: 'var(--color-brand-dim)', color: 'var(--color-brand)' }}
+                >
+                  <Trophy className='w-6 h-6' />
+                </div>
+                <div className='flex-1 min-w-0'>
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <h2 className='font-bold text-base' style={{ color: 'var(--text-primary)' }}>{tournament.nombre}</h2>
+                    <span className={ESTADO_BADGE[tournament.estado] || 'badge'}>
+                      {ESTADOS.find((status) => status.value === tournament.estado)?.label}
                     </span>
-                  )}
+                  </div>
+                  <div className='flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs' style={{ color: 'var(--text-muted)' }}>
+                    <span className='inline-flex items-center gap-1.5'>
+                      <UsersRound className='w-3.5 h-3.5' />
+                      {tournament.modalidad === 'dobles' ? 'Dobles' : 'Individual'} · {tournament.deporte === 'padel' ? 'Pádel' : 'Tenis'}
+                    </span>
+                    <span className='inline-flex items-center gap-1.5'>
+                      <Network className='w-3.5 h-3.5' />
+                      {SISTEMAS.find((system) => system.value === tournament.sistema)?.label}
+                    </span>
+                    <span>{tournament.categoria?.nombre || 'Sin categoría'}</span>
+                    {(tournament.fecha_inicio || tournament.fecha_fin) && (
+                      <span className='inline-flex items-center gap-1.5'>
+                        <CalendarDays className='w-3.5 h-3.5' />
+                        {formatPeriod(tournament)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className='flex items-center gap-2 shrink-0'>
+                  <span className='text-xs font-semibold px-3' style={{ color: 'var(--text-muted)' }}>
+                    {tournament.partidos_count} partido{tournament.partidos_count !== 1 ? 's' : ''}
+                  </span>
+                  <Link
+                    to={`/admin/partidos?torneo=${tournament.id}`}
+                    className='btn-secondary px-3 py-2 flex items-center gap-1.5 text-xs'
+                  >
+                    Partidos <ArrowRight className='w-3.5 h-3.5' />
+                  </Link>
+                  <button onClick={() => openEdit(tournament)} className='btn-ghost p-2' aria-label='Editar torneo'>
+                    <Pencil className='w-4 h-4' />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(tournament)}
+                    className='btn-ghost p-2'
+                    style={{ color: '#ef4444' }}
+                    aria-label='Eliminar torneo'
+                  >
+                    <Trash2 className='w-4 h-4' />
+                  </button>
                 </div>
               </div>
-              <div className='flex items-center gap-1 shrink-0'>
-                <button onClick={() => openEdit(t)} className='btn-ghost p-2'>
-                  <Pencil className='w-4 h-4' />
-                </button>
-                <button
-                  onClick={() => handleDelete(t)}
-                  className='btn-ghost p-2'
-                  style={{ color: '#ef4444' }}
-                >
-                  <Trash2 className='w-4 h-4' />
-                </button>
-              </div>
-            </div>
+            </article>
           ))
         )}
+      </section>
+    </div>
+  )
+}
+
+function GuideStep({ number, title, text }) {
+  return (
+    <div className='card p-4 flex gap-3'>
+      <span
+        className='w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0'
+        style={{ backgroundColor: 'var(--color-brand-dim)', color: 'var(--color-brand)' }}
+      >
+        {number}
+      </span>
+      <div>
+        <p className='text-sm font-bold' style={{ color: 'var(--text-primary)' }}>{title}</p>
+        <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>{text}</p>
       </div>
     </div>
   )
+}
+
+function Field({ label, error, children }) {
+  return (
+    <label className='form-group'>
+      <span className='form-label'>{label}</span>
+      {children}
+      {error && <span className='form-error'>{error}</span>}
+    </label>
+  )
+}
+
+function formatPeriod(tournament) {
+  if (tournament.fecha_inicio && tournament.fecha_fin) {
+    return `${formatDate(tournament.fecha_inicio)} → ${formatDate(tournament.fecha_fin)}`
+  }
+  return tournament.fecha_inicio
+    ? `Desde ${formatDate(tournament.fecha_inicio)}`
+    : `Hasta ${formatDate(tournament.fecha_fin)}`
 }

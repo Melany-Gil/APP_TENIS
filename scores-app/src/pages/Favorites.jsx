@@ -4,6 +4,7 @@ import { Star, Trash2 } from 'lucide-react'
 import Tabs from '../components/ui/Tabs'
 import EmptyState from '../components/common/EmptyState'
 import useFavoritesStore from '../store/useFavoritesStore'
+import { getParticipantName } from '../utils/matchParticipants'
 
 const TABS = [
   { value: 'jugadores', label: 'Jugadores' },
@@ -105,14 +106,8 @@ export default function Favorites() {
         ) : (
           <div className='space-y-3'>
             {partidos.map((p) => {
-              const p1 =
-                p.deporte === 'padel'
-                  ? p.equipo1?.nombre
-                  : `${p.jugador1?.nombre || ''} ${p.jugador1?.apellido || ''}`.trim()
-              const p2 =
-                p.deporte === 'padel'
-                  ? p.equipo2?.nombre
-                  : `${p.jugador2?.nombre || ''} ${p.jugador2?.apellido || ''}`.trim()
+              const p1 = getParticipantName(p, 1)
+              const p2 = getParticipantName(p, 2)
               return (
                 <div key={p.id} className='card p-4 flex items-center gap-3'>
                   <Link to={`/match/${p.id}`} className='flex-1'>

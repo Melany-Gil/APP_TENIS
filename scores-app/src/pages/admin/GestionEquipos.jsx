@@ -22,6 +22,7 @@ export default function GestionEquipos() {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm()
 
@@ -29,8 +30,8 @@ export default function GestionEquipos() {
     setLoading(true)
     Promise.all([
       teamService.getAll(),
-      playerService.getAll({ deporte: 'padel' }),
-      categoriaService.getAll({ deporte: 'padel' }),
+      playerService.getAll(),
+      categoriaService.getAll(),
     ])
       .then(([e, j, c]) => {
         setEquipos(e.data || [])
@@ -46,7 +47,7 @@ export default function GestionEquipos() {
   }, [])
 
   const openCreate = () => {
-    reset({})
+    reset({ deporte: 'tenis', categoria_id: '' })
     setEditing(null)
     setShowForm(true)
   }
@@ -55,12 +56,21 @@ export default function GestionEquipos() {
     setEditing(equipo)
     reset({
       nombre: equipo.nombre,
+      deporte: equipo.deporte || 'padel',
       jugador1_id: equipo.jugador1?.id || '',
       jugador2_id: equipo.jugador2?.id || '',
       categoria_id: equipo.categoria?.id || '',
     })
     setShowForm(true)
   }
+
+  const selectedDeporte = watch('deporte') || 'tenis'
+  const jugadoresDisponibles = jugadores.filter(
+    (jugador) => jugador.deporte === selectedDeporte || jugador.deporte === 'ambos'
+  )
+  const categoriasDisponibles = categorias.filter(
+    (categoria) => categoria.deporte === selectedDeporte || categoria.deporte === 'ambos'
+  )
 
   const onSubmit = async (data) => {
     try {
@@ -101,7 +111,7 @@ export default function GestionEquipos() {
       <div className='flex items-center justify-between'>
         <div>
           <h1 className='text-xl font-bold' style={{ color: 'var(--text-primary)' }}>
-            Equipos de Pádel
+            Parejas
           </h1>
           <p className='text-sm mt-0.5' style={{ color: 'var(--text-muted)' }}>
             {equipos.length} pareja{equipos.length !== 1 ? 's' : ''} registrada
@@ -135,6 +145,17 @@ export default function GestionEquipos() {
               />
             </div>
 
+            <div className='form-group sm:col-span-2'>
+              <label className='form-label'>Deporte *</label>
+              <select className='form-input' {...register('deporte', { required: true })}>
+                <option value='tenis'>Tenis</option>
+                <option value='padel'>Pádel</option>
+              </select>
+              <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
+                Estas parejas estarán disponibles en torneos de dobles del mismo deporte.
+              </p>
+            </div>
+
             <div className='form-group'>
               <label className='form-label'>Jugador 1 *</label>
               <select
@@ -142,7 +163,7 @@ export default function GestionEquipos() {
                 {...register('jugador1_id', { required: 'Requerido' })}
               >
                 <option value=''>Seleccionar jugador</option>
-                {jugadores.map((j) => (
+                {jugadoresDisponibles.map((j) => (
                   <option key={j.id} value={j.id}>
                     {j.nombre} {j.apellido}
                   </option>
@@ -158,7 +179,7 @@ export default function GestionEquipos() {
                 {...register('jugador2_id', { required: 'Requerido' })}
               >
                 <option value=''>Seleccionar jugador</option>
-                {jugadores.map((j) => (
+                {jugadoresDisponibles.map((j) => (
                   <option key={j.id} value={j.id}>
                     {j.nombre} {j.apellido}
                   </option>
@@ -168,15 +189,19 @@ export default function GestionEquipos() {
             </div>
 
             <div className='form-group'>
-              <label className='form-label'>Categoría</label>
-              <select className='form-input' {...register('categoria_id')}>
-                <option value=''>Sin categoría</option>
-                {categorias.map((c) => (
+              <label className='form-label'>Categoría *</label>
+              <select
+                className='form-input'
+                {...register('categoria_id', { required: 'Requerido' })}
+              >
+                <option value=''>Seleccionar categoría</option>
+                {categoriasDisponibles.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nombre}
                   </option>
                 ))}
               </select>
+              {errors.categoria_id && <p className='form-error'>{errors.categoria_id.message}</p>}
             </div>
 
             <div className='sm:col-span-2 flex gap-3 pt-2'>
@@ -199,7 +224,7 @@ export default function GestionEquipos() {
             .map((_, i) => <div key={i} className='skeleton h-16 m-3 rounded-lg' />)
         ) : equipos.length === 0 ? (
           <p className='text-center py-12 text-sm' style={{ color: 'var(--text-muted)' }}>
-            No hay equipos registrados
+            No hay parejas registradas
           </p>
         ) : (
           equipos.map((e, i) => (
@@ -231,7 +256,9 @@ export default function GestionEquipos() {
                   {e.nombre}
                 </p>
                 <div className='flex items-center gap-2 mt-0.5'>
-                  <span className='badge-padel'>Pádel</span>
+                  <span className={e.deporte === 'tenis' ? 'badge-atp' : 'badge-padel'}>
+                    {e.deporte === 'tenis' ? 'Tenis' : 'Pádel'}
+                  </span>
                   {e.categoria && (
                     <span className='text-xs' style={{ color: 'var(--text-muted)' }}>
                       {e.categoria.nombre}

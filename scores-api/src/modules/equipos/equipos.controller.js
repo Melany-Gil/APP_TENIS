@@ -4,8 +4,8 @@ const { success, error } = require('../../utils/response')
 // ── Listar todos ────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
   try {
-    const { categoria_id, activo } = req.query
-    const data = await equiposService.getAll({ categoria_id, activo })
+    const { categoria_id, deporte, activo } = req.query
+    const data = await equiposService.getAll({ categoria_id, deporte, activo })
     return success(res, data)
   } catch (err) {
     return error(res, err.message || 'Error al obtener equipos', err.status || 500)

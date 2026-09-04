@@ -186,9 +186,54 @@ exports.ensureSchema = async () => {
   if (tournamentEnd?.isNullable === 'NO') {
     await db.query('ALTER TABLE torneos MODIFY fecha_fin DATE NULL')
   }
+  if (!(await columnExists('torneos', 'categoria_id'))) {
+    await db.query('ALTER TABLE torneos ADD COLUMN categoria_id INT NULL AFTER deporte')
+  }
+  if (!(await columnExists('torneos', 'modalidad'))) {
+    await db.query(
+      "ALTER TABLE torneos ADD COLUMN modalidad ENUM('individual','dobles') NOT NULL DEFAULT 'individual' AFTER categoria_id"
+    )
+    await db.query("UPDATE torneos SET modalidad = 'dobles' WHERE deporte = 'padel'")
+  }
+  if (!(await columnExists('torneos', 'sistema'))) {
+    await db.query(
+      "ALTER TABLE torneos ADD COLUMN sistema ENUM('eliminacion_directa','todos_contra_todos','grupos_eliminacion') NOT NULL DEFAULT 'eliminacion_directa' AFTER modalidad"
+    )
+  }
+  if (!(await columnIndexExists('torneos', 'categoria_id'))) {
+    await db.query('CREATE INDEX idx_torneos_categoria ON torneos (categoria_id)')
+  }
+  if (!(await columnForeignKeyExists('torneos', 'categoria_id'))) {
+    await db.query(
+      `ALTER TABLE torneos
+       ADD CONSTRAINT fk_torneos_categoria
+       FOREIGN KEY (categoria_id) REFERENCES categorias(id)`
+    )
+  }
+
+  if (!(await columnExists('equipos_padel', 'deporte'))) {
+    await db.query(
+      "ALTER TABLE equipos_padel ADD COLUMN deporte ENUM('tenis','padel') NOT NULL DEFAULT 'padel' AFTER nombre"
+    )
+  }
+
+  if (!(await columnExists('partidos', 'torneo_id'))) {
+    await db.query('ALTER TABLE partidos ADD COLUMN torneo_id INT NULL AFTER id')
+  }
 
   if (!(await columnExists('partidos', 'hora_inicio'))) {
     await db.query('ALTER TABLE partidos ADD COLUMN hora_inicio TIME NULL AFTER fecha_inicio')
+  }
+  if (!(await columnExists('partidos', 'fase'))) {
+    await db.query(
+      "ALTER TABLE partidos ADD COLUMN fase ENUM('liga','grupos','eliminacion') NULL AFTER hora_inicio"
+    )
+  }
+  if (!(await columnExists('partidos', 'grupo'))) {
+    await db.query('ALTER TABLE partidos ADD COLUMN grupo VARCHAR(20) NULL AFTER fase')
+  }
+  if (!(await columnExists('partidos', 'ronda'))) {
+    await db.query('ALTER TABLE partidos ADD COLUMN ronda VARCHAR(50) NULL AFTER grupo')
   }
 
   const matchStart = await getColumn('partidos', 'fecha_inicio')
@@ -299,6 +344,17 @@ exports.ensureSchema = async () => {
 
   if (!(await columnIndexExists('partidos', 'categoria_id'))) {
     await db.query('CREATE INDEX idx_partidos_categoria ON partidos (categoria_id)')
+  }
+
+  if (!(await columnIndexExists('partidos', 'torneo_id'))) {
+    await db.query('CREATE INDEX idx_partidos_torneo ON partidos (torneo_id)')
+  }
+  if (!(await columnForeignKeyExists('partidos', 'torneo_id'))) {
+    await db.query(
+      `ALTER TABLE partidos
+       ADD CONSTRAINT fk_partidos_torneo
+       FOREIGN KEY (torneo_id) REFERENCES torneos(id)`
+    )
   }
 
   if (!(await columnForeignKeyExists('partidos', 'categoria_id'))) {

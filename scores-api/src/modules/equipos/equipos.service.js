@@ -1,11 +1,12 @@
 const db = require('../../config/db')
 
 // ── Listar todos ────────────────────────────────────────────────────────────────
-exports.getAll = async ({ categoria_id, activo }) => {
+exports.getAll = async ({ categoria_id, deporte, activo }) => {
   let query = `
     SELECT
       e.id,
       e.nombre,
+      e.deporte,
       e.activo,
       j1.id       AS j1_id,
       j1.nombre   AS j1_nombre,
@@ -37,6 +38,11 @@ exports.getAll = async ({ categoria_id, activo }) => {
     params.push(categoria_id)
   }
 
+  if (deporte) {
+    query += ' AND e.deporte = ?'
+    params.push(deporte)
+  }
+
   if (activo !== undefined) {
     query += ' AND e.activo = ?'
     params.push(activo === 'true' || activo === '1' ? 1 : 0)
@@ -55,6 +61,7 @@ exports.getById = async (id) => {
     `SELECT
       e.id,
       e.nombre,
+      e.deporte,
       e.activo,
       j1.id       AS j1_id,
       j1.nombre   AS j1_nombre,
@@ -90,12 +97,12 @@ exports.getById = async (id) => {
 
 // ── Crear ────────────────────────────────────────────────────────────────────────
 exports.create = async (body) => {
-  const { nombre, jugador1_id, jugador2_id, categoria_id } = body
+  const equipo = await validateEquipo(body)
 
   const [result] = await db.query(
-    `INSERT INTO equipos_padel (nombre, jugador1_id, jugador2_id, categoria_id)
-     VALUES (?, ?, ?, ?)`,
-    [nombre, jugador1_id, jugador2_id, categoria_id]
+    `INSERT INTO equipos_padel (nombre, deporte, jugador1_id, jugador2_id, categoria_id)
+     VALUES (?, ?, ?, ?, ?)`,
+    [equipo.nombre, equipo.deporte, equipo.jugador1_id, equipo.jugador2_id, equipo.categoria_id]
   )
 
   return exports.getById(result.insertId)
@@ -108,13 +115,13 @@ exports.update = async (id, body) => {
     throw { status: 404, message: 'Equipo no encontrado' }
   }
 
-  const { nombre, jugador1_id, jugador2_id, categoria_id } = body
+  const equipo = await validateEquipo(body)
 
   await db.query(
     `UPDATE equipos_padel
-     SET nombre = ?, jugador1_id = ?, jugador2_id = ?, categoria_id = ?
+     SET nombre = ?, deporte = ?, jugador1_id = ?, jugador2_id = ?, categoria_id = ?
      WHERE id = ?`,
-    [nombre, jugador1_id, jugador2_id, categoria_id, id]
+    [equipo.nombre, equipo.deporte, equipo.jugador1_id, equipo.jugador2_id, equipo.categoria_id, id]
   )
 
   return exports.getById(id)
@@ -137,6 +144,7 @@ function formatEquipo(row) {
   return {
     id: row.id,
     nombre: row.nombre,
+    deporte: row.deporte || 'padel',
     jugador1: {
       id: row.j1_id,
       nombre: row.j1_nombre,
@@ -162,5 +170,44 @@ function formatEquipo(row) {
       nombre: row.categoria_nombre,
     },
     activo: !!row.activo,
+  }
+}
+
+async function validateEquipo(body) {
+  const nombre = String(body.nombre || '').trim()
+  const deporte = body.deporte
+  const jugador1Id = Number(body.jugador1_id)
+  const jugador2Id = Number(body.jugador2_id)
+  const categoriaId = Number(body.categoria_id)
+
+  if (!nombre) throw { status: 400, message: 'El nombre es obligatorio' }
+  if (!['tenis', 'padel'].includes(deporte)) {
+    throw { status: 400, message: 'Selecciona el deporte de la pareja' }
+  }
+  if (![jugador1Id, jugador2Id, categoriaId].every((id) => Number.isInteger(id) && id > 0)) {
+    throw { status: 400, message: 'Selecciona categoría y dos jugadores válidos' }
+  }
+  if (jugador1Id === jugador2Id) {
+    throw { status: 400, message: 'Los integrantes de la pareja deben ser diferentes' }
+  }
+
+  const [categories] = await db.query('SELECT deporte FROM categorias WHERE id = ? LIMIT 1', [categoriaId])
+  if (!categories.length || ![deporte, 'ambos'].includes(categories[0].deporte)) {
+    throw { status: 400, message: 'La categoría no corresponde al deporte de la pareja' }
+  }
+  const [players] = await db.query(
+    `SELECT id, deporte FROM jugadores WHERE id IN (?, ?) AND activo = TRUE`,
+    [jugador1Id, jugador2Id]
+  )
+  if (players.length !== 2 || players.some((player) => ![deporte, 'ambos'].includes(player.deporte))) {
+    throw { status: 400, message: 'Ambos jugadores deben estar activos en el deporte seleccionado' }
+  }
+
+  return {
+    nombre,
+    deporte,
+    jugador1_id: jugador1Id,
+    jugador2_id: jugador2Id,
+    categoria_id: categoriaId,
   }
 }

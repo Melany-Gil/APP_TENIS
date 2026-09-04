@@ -202,7 +202,9 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
       <div className={featured ? 'p-5 sm:p-8 lg:p-10' : 'p-4 sm:p-5'}>
         <div className='flex flex-col items-start justify-between gap-3 mb-4 sm:flex-row sm:items-center'>
           <div>
-            <p className='text-xs uppercase tracking-wider font-bold text-lime-300'>{match.categoria?.nombre || 'Tenis'}</p>
+            <p className='text-xs uppercase tracking-wider font-bold text-lime-300'>
+              {match.torneo?.nombre ? `${match.torneo.nombre} · ` : ''}{match.categoria?.nombre || 'Tenis'}
+            </p>
             <p className='text-xs text-white/45 mt-1'>{match.cancha?.nombre || 'Cancha por confirmar'}</p>
           </div>
           <div className='flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end'>

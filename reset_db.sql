@@ -146,6 +146,7 @@ CREATE TABLE jugador_stats (
 CREATE TABLE equipos_padel (
   id           INT          NOT NULL AUTO_INCREMENT,
   nombre       VARCHAR(100) NOT NULL,
+  deporte      ENUM('tenis','padel') NOT NULL DEFAULT 'padel',
   jugador1_id  INT          NOT NULL,
   jugador2_id  INT          NOT NULL,
   categoria_id INT              NULL,
@@ -163,13 +164,17 @@ CREATE TABLE equipos_padel (
 CREATE TABLE torneos (
   id           INT          NOT NULL AUTO_INCREMENT,
   nombre       VARCHAR(150) NOT NULL,
-  deporte      ENUM('tenis','padel','ambos') NOT NULL,
+  deporte      ENUM('tenis','padel') NOT NULL,
+  categoria_id INT          NOT NULL,
+  modalidad    ENUM('individual','dobles') NOT NULL DEFAULT 'individual',
+  sistema      ENUM('eliminacion_directa','todos_contra_todos','grupos_eliminacion') NOT NULL DEFAULT 'eliminacion_directa',
   fecha_inicio DATE             NULL,
   fecha_fin    DATE             NULL,
   estado       ENUM('proximo','en_curso','finalizado','cancelado') NOT NULL DEFAULT 'proximo',
   created_by   INT              NULL,
   created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  FOREIGN KEY (categoria_id) REFERENCES categorias(id),
   FOREIGN KEY (created_by)   REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -194,6 +199,7 @@ CREATE TABLE inscripciones (
 -- ─────────────────────────────────────────────────────
 CREATE TABLE partidos (
   id           INT     NOT NULL AUTO_INCREMENT,
+  torneo_id    INT         NULL,
   deporte      ENUM('tenis','padel') NOT NULL,
   categoria_id INT         NOT NULL,
   jugador1_id  INT         NULL,
@@ -217,18 +223,23 @@ CREATE TABLE partidos (
   ganador      ENUM('jugador1','jugador2') NULL,
   fecha_inicio DATE            NULL,
   hora_inicio  TIME            NULL,
+  fase         ENUM('liga','grupos','eliminacion') NULL,
+  grupo        VARCHAR(20)     NULL,
+  ronda        VARCHAR(50)     NULL,
   notas        TEXT            NULL,
   created_by   INT         NULL,
   created_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_partidos_estado_fecha (estado, fecha_inicio),
+  KEY idx_partidos_torneo (torneo_id),
   KEY idx_partidos_jugador1 (jugador1_id),
   KEY idx_partidos_jugador2 (jugador2_id),
   KEY idx_partidos_origen1 (origen_partido1_id),
   KEY idx_partidos_origen2 (origen_partido2_id),
   KEY idx_partidos_juez (juez_id),
   KEY idx_partidos_cancha (cancha_id),
+  FOREIGN KEY (torneo_id) REFERENCES torneos(id),
   FOREIGN KEY (categoria_id) REFERENCES categorias(id),
   FOREIGN KEY (jugador1_id) REFERENCES jugadores(id),
   FOREIGN KEY (jugador2_id) REFERENCES jugadores(id),

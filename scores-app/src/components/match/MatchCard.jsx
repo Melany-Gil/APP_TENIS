@@ -36,6 +36,11 @@ export default function MatchCard({ match }) {
             <span className='badge-brand shrink-0'>
               {match.categoria?.nombre || 'Sin categoría'}
             </span>
+            {match.torneo?.nombre && (
+              <span className='text-[10px] font-semibold truncate' style={{ color: 'var(--text-muted)' }}>
+                {match.torneo.nombre}
+              </span>
+            )}
           </div>
           <div className='flex items-center gap-2 shrink-0 ml-2'>
             {isLive && (

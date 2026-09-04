@@ -6,6 +6,7 @@ import { teamService } from '../../services/teamService'
 import { tournamentService } from '../../services/tournamentService'
 import { matchService } from '../../services/matchService'
 import { formatRelative } from '../../utils/formatDate'
+import { getParticipantName } from '../../utils/matchParticipants'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ jugadores: 0, equipos: 0, torneos: 0, enVivo: 0 })
@@ -152,13 +153,8 @@ export default function Dashboard() {
           </div>
           <div className='card overflow-hidden'>
             {recent.map((m, i) => {
-              const isPadel = m.deporte === 'padel'
-              const p1 = isPadel
-                ? m.equipo1?.nombre
-                : `${m.jugador1?.nombre || ''} ${m.jugador1?.apellido || ''}`.trim()
-              const p2 = isPadel
-                ? m.equipo2?.nombre
-                : `${m.jugador2?.nombre || ''} ${m.jugador2?.apellido || ''}`.trim()
+              const p1 = getParticipantName(m, 1)
+              const p2 = getParticipantName(m, 2)
               const ganadorNombre = m.ganador === 'jugador1' ? p1 : p2
 
               return (

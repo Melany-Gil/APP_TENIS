@@ -2,7 +2,7 @@ export function getParticipantName(match, position) {
   if (!match) return `Participante ${position}`
 
   const participant =
-    match.deporte === 'padel'
+    match.modalidad === 'dobles' || match.torneo?.modalidad === 'dobles'
       ? match[`equipo${position}`]?.nombre
       : [match[`jugador${position}`]?.nombre, match[`jugador${position}`]?.apellido]
           .filter(Boolean)
@@ -13,8 +13,8 @@ export function getParticipantName(match, position) {
   const source = match[`origen_partido${position}`]
   if (source) return getWinnerSourceLabel(source)
 
-  return match.deporte === 'padel'
-    ? `Equipo ${position} por definir`
+  return match.modalidad === 'dobles' || match.torneo?.modalidad === 'dobles'
+    ? `Pareja ${position} por definir`
     : `Jugador ${position} por definir`
 }
 

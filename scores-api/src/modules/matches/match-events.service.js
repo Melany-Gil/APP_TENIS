@@ -324,7 +324,7 @@ async function syncProjection(connection, match, state, fallbackStatus) {
 
 async function propagateWinner(connection, match, status, winner) {
   const position = winner === 'jugador1' ? 1 : winner === 'jugador2' ? 2 : null
-  const participantColumn = match.deporte === 'padel' ? 'equipo' : 'jugador'
+  const participantColumn = match.equipo1_id || match.equipo2_id ? 'equipo' : 'jugador'
   const participantId =
     status === 'finalizado' && position ? match[`${participantColumn}${position}_id`] : null
 

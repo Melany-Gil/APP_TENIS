@@ -272,18 +272,25 @@ test('updateMarcador permite guardar más de tres sets', async () => {
   assert.deepEqual(propagationCalls[1].params, [10, 7])
 })
 
-test('create asigna la categoría directamente al partido', async () => {
+test('create hereda deporte y categoría del torneo seleccionado', async () => {
   const calls = []
   const fakeDb = {
     async query(sql, params) {
       calls.push({ sql, params })
-      if (calls.length === 1) return [[{ deporte: 'tenis' }]]
-      if (calls.length === 2) return [{ insertId: 15 }]
-      if (calls.length === 3) {
+      if (/FROM torneos/.test(sql) && !/LEFT JOIN/.test(sql)) {
+        return [[{ id: 7, deporte: 'tenis', categoria_id: 3, modalidad: 'individual', estado: 'proximo' }]]
+      }
+      if (/FROM jugadores/.test(sql)) return [[{ id: 10 }, { id: 11 }]]
+      if (/INSERT INTO partidos/.test(sql)) return [{ insertId: 15 }]
+      if (/WHERE p\.id = \? LIMIT 1/.test(sql)) {
         return [
           [
             {
               id: 15,
+              torneo_id: 7,
+              torneo_nombre: 'Copa interna',
+              torneo_modalidad: 'individual',
+              torneo_sistema: 'eliminacion_directa',
               deporte: 'tenis',
               estado: 'programado',
               ganador: null,
@@ -308,8 +315,6 @@ test('create asigna la categoría directamente al partido', async () => {
 
   const result = await service.create(
     {
-      deporte: 'tenis',
-      categoria_id: '3',
       jugador1_id: '10',
       jugador2_id: '11',
       estado: 'programado',
@@ -322,17 +327,21 @@ test('create asigna la categoría directamente al partido', async () => {
     2
   )
 
-  assert.match(calls[1].sql, /deporte, categoria_id, jugador1_id, jugador2_id/)
+  const insert = calls.find((call) => /INSERT INTO partidos/.test(call.sql))
+  assert.match(insert.sql, /torneo_id, deporte, categoria_id, jugador1_id, jugador2_id/)
   assert.match(
-    calls[1].sql,
-    /fecha_inicio, hora_inicio, notas, origen_partido1_id, origen_partido2_id/
+    insert.sql,
+    /fecha_inicio, hora_inicio, fase, grupo, ronda, notas/
   )
-  assert.doesNotMatch(calls[1].sql, /torneo_id|ronda/)
-  assert.match(calls[1].sql, /cancha_id/)
-  assert.equal(calls[1].params[1], 3)
-  assert.equal(calls[1].params[7], '2026-08-01')
-  assert.equal(calls[1].params[8], '09:00')
-  assert.equal(calls[1].params[9], 'Cancha húmeda')
+  assert.match(insert.sql, /ronda/)
+  assert.match(insert.sql, /cancha_id/)
+  assert.equal(insert.params[0], 7)
+  assert.equal(insert.params[2], 3)
+  assert.equal(insert.params[8], '2026-08-01')
+  assert.equal(insert.params[9], '09:00')
+  assert.equal(insert.params[13], 'Cancha húmeda')
+  assert.equal(insert.params[12], 'Final')
+  assert.equal(result.torneo.nombre, 'Copa interna')
   assert.equal(result.categoria.nombre, '4ta')
 })
 
@@ -341,9 +350,12 @@ test('create permite registrar una hora sin fecha', async () => {
   const fakeDb = {
     async query(sql, params) {
       calls.push({ sql, params })
-      if (calls.length === 1) return [[{ deporte: 'tenis' }]]
-      if (calls.length === 2) return [{ insertId: 16 }]
-      if (calls.length === 3) {
+      if (/FROM torneos/.test(sql) && !/LEFT JOIN/.test(sql)) {
+        return [[{ id: 7, deporte: 'tenis', categoria_id: 3, modalidad: 'individual' }]]
+      }
+      if (/FROM jugadores/.test(sql)) return [[{ id: 10 }, { id: 11 }]]
+      if (/INSERT INTO partidos/.test(sql)) return [{ insertId: 16 }]
+      if (/WHERE p\.id = \? LIMIT 1/.test(sql)) {
         return [
           [
             {
@@ -374,16 +386,63 @@ test('create permite registrar una hora sin fecha', async () => {
       categoria_id: '3',
       jugador1_id: '10',
       jugador2_id: '11',
+      torneo_id: '7',
       fecha_inicio: '',
       hora_inicio: '10:30',
     },
     2
   )
 
-  assert.equal(calls[1].params[7], null)
-  assert.equal(calls[1].params[8], '10:30')
+  const insert = calls.find((call) => /INSERT INTO partidos/.test(call.sql))
+  assert.equal(insert.params[8], null)
+  assert.equal(insert.params[9], '10:30')
   assert.equal(result.fecha_inicio, null)
   assert.equal(result.hora_inicio, '10:30:00')
+})
+
+test('create usa parejas en un torneo de dobles de tenis', async () => {
+  const calls = []
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params })
+      if (/FROM torneos/.test(sql) && !/LEFT JOIN/.test(sql)) {
+        return [[{ id: 9, deporte: 'tenis', categoria_id: 3, modalidad: 'dobles' }]]
+      }
+      if (/SELECT id\s+FROM equipos_padel/.test(sql)) return [[{ id: 30 }, { id: 31 }]]
+      if (/INSERT INTO partidos/.test(sql)) return [{ insertId: 22 }]
+      if (/WHERE p\.id = \? LIMIT 1/.test(sql)) {
+        return [[{
+          id: 22,
+          torneo_id: 9,
+          torneo_nombre: 'Dobles Club Unión',
+          torneo_modalidad: 'dobles',
+          torneo_sistema: 'eliminacion_directa',
+          deporte: 'tenis',
+          estado: 'programado',
+          categoria_id: 3,
+          categoria_nombre: '4ta',
+          e1_id: 30,
+          e1_nombre: 'Ana / Laura',
+          e2_id: 31,
+          e2_nombre: 'Marta / Sofía',
+        }]]
+      }
+      return [[]]
+    },
+  }
+
+  const result = await loadService(fakeDb).create(
+    { torneo_id: '9', equipo1_id: '30', equipo2_id: '31', estado: 'programado' },
+    2
+  )
+
+  const insert = calls.find((call) => /INSERT INTO partidos/.test(call.sql))
+  assert.equal(insert.params[3], null)
+  assert.equal(insert.params[4], null)
+  assert.equal(insert.params[5], 30)
+  assert.equal(insert.params[6], 31)
+  assert.equal(result.modalidad, 'dobles')
+  assert.equal(result.equipo1.nombre, 'Ana / Laura')
 })
 
 test('create permite usar el ganador pendiente de otro partido como participante', async () => {
@@ -391,14 +450,15 @@ test('create permite usar el ganador pendiente de otro partido como participante
   const fakeDb = {
     async query(sql, params) {
       calls.push({ sql, params })
-      if (/SELECT deporte FROM categorias/.test(sql)) return [[{ deporte: 'tenis' }]]
-      if (/SELECT id, deporte, categoria_id, estado, ganador/.test(sql)) {
+      if (/FROM torneos/.test(sql) && !/LEFT JOIN/.test(sql)) {
+        return [[{ id: 7, deporte: 'tenis', categoria_id: 3, modalidad: 'individual' }]]
+      }
+      if (/SELECT id, torneo_id, estado, ganador/.test(sql)) {
         return [
           [
             {
               id: 20,
-              deporte: 'tenis',
-              categoria_id: 3,
+              torneo_id: 7,
               estado: 'programado',
               ganador: null,
               jugador1_id: 8,
@@ -407,12 +467,16 @@ test('create permite usar el ganador pendiente de otro partido como participante
           ],
         ]
       }
+      if (/FROM jugadores/.test(sql)) return [[{ id: 11 }]]
       if (/INSERT INTO partidos/.test(sql)) return [{ insertId: 21 }]
       if (/WHERE p\.id = \? LIMIT 1/.test(sql)) {
         return [
           [
             {
               id: 21,
+              torneo_id: 7,
+              torneo_nombre: 'Copa interna',
+              torneo_modalidad: 'individual',
               deporte: 'tenis',
               estado: 'programado',
               categoria_id: 3,
@@ -436,8 +500,7 @@ test('create permite usar el ganador pendiente de otro partido como participante
 
   const result = await loadService(fakeDb).create(
     {
-      deporte: 'tenis',
-      categoria_id: '3',
+      torneo_id: '7',
       origen_partido1_id: '20',
       jugador2_id: '11',
       estado: 'programado',
@@ -446,9 +509,9 @@ test('create permite usar el ganador pendiente de otro partido como participante
   )
 
   const insert = calls.find((call) => /INSERT INTO partidos/.test(call.sql))
-  assert.equal(insert.params[2], null)
-  assert.equal(insert.params[3], 11)
-  assert.equal(insert.params[10], 20)
+  assert.equal(insert.params[3], null)
+  assert.equal(insert.params[4], 11)
+  assert.equal(insert.params[14], 20)
   assert.equal(result.origen_partido1.id, 20)
   assert.equal(result.origen_partido1.participante1, 'Ana Rojas')
   assert.equal(result.origen_partido1.participante2, 'Marta León')

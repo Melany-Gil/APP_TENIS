@@ -24,7 +24,7 @@ import { cn } from '../utils/cn'
 const NAV = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/admin/jugadores', icon: Users, label: 'Jugadores' },
-  { to: '/admin/equipos', icon: Swords, label: 'Equipos' },
+  { to: '/admin/equipos', icon: Swords, label: 'Parejas' },
   { to: '/admin/torneos', icon: Trophy, label: 'Torneos' },
   { to: '/admin/partidos', icon: CalendarDays, label: 'Partidos' },
   { to: '/admin/anuncios', icon: Megaphone, label: 'Anuncios' },
