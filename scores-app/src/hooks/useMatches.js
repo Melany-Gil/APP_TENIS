@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { matchService } from '../services/matchService'
+import { useMatchRealtime } from './useMatchRealtime'
 
 export function useMatches(filters = {}) {
   const [matches, setMatches] = useState([])
@@ -31,13 +32,17 @@ export function useMatches(filters = {}) {
     fetch()
   }, [fetch])
 
+  useMatchRealtime(useCallback(() => {
+    if (document.visibilityState === 'visible') fetch({ silent: true })
+  }, [fetch]))
+
   useEffect(() => {
     if (filters.estado !== 'en_vivo') return undefined
 
     const refresh = () => {
       if (document.visibilityState === 'visible') fetch({ silent: true })
     }
-    const intervalId = window.setInterval(refresh, 5000)
+    const intervalId = window.setInterval(refresh, 30000)
     document.addEventListener('visibilitychange', refresh)
 
     return () => {
@@ -75,9 +80,15 @@ export function useMatch(id) {
     fetch()
   }, [fetch])
 
+  useMatchRealtime(useCallback((event) => {
+    if (event.matchId === null || Number(event.matchId) === Number(id)) {
+      fetch({ silent: true })
+    }
+  }, [fetch, id]))
+
   useEffect(() => {
     if (match?.estado !== 'en_vivo') return undefined
-    const intervalId = window.setInterval(() => fetch({ silent: true }), 5000)
+    const intervalId = window.setInterval(() => fetch({ silent: true }), 30000)
     return () => window.clearInterval(intervalId)
   }, [fetch, match?.estado])
 

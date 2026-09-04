@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Clock3, Radio, Trophy } from 'lucide-react'
+import { ArrowLeft, Clock3, Maximize2, Radio, Trophy } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { SPONSORS } from '../data/sponsors'
+import { useMatchRealtime } from '../hooks/useMatchRealtime'
 import { useMatchTimer } from '../hooks/useMatchTimer'
 import { matchService } from '../services/matchService'
 import { getParticipantName } from '../utils/matchParticipants'
 
-const REFRESH_MS = 10000
+const REFRESH_MS = 30000
 const SCREEN_SPONSOR = SPONSORS.find((sponsor) => sponsor.name === 'Induleche')
 
 export default function Pantalla() {
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
   const [clock, setClock] = useState(new Date())
+  const [focusedMatchId, setFocusedMatchId] = useState(null)
 
   const load = useCallback(() => {
     matchService.getAll({ estado: 'en_vivo', orden: 'asc' })
@@ -29,12 +32,28 @@ export default function Pantalla() {
     }
   }, [load])
 
+  useMatchRealtime(useCallback(() => load(), [load]))
+
+  useEffect(() => {
+    if (focusedMatchId && !matches.some((match) => Number(match.id) === Number(focusedMatchId))) {
+      setFocusedMatchId(null)
+    }
+  }, [focusedMatchId, matches])
+
   const sponsor = SCREEN_SPONSOR
+  const focusedMatch = matches.find((match) => Number(match.id) === Number(focusedMatchId))
 
   return (
     <main className='fixed inset-0 overflow-auto text-white' style={{ background: 'radial-gradient(circle at top left, #174b34 0, #0d251b 34%, #07110d 76%)' }}>
       <header className='sticky top-0 z-10 flex items-center justify-between gap-4 px-4 sm:px-7 py-3 backdrop-blur-xl' style={{ backgroundColor: 'rgba(7,17,13,.9)', borderBottom: '1px solid rgba(139,203,96,.2)' }}>
-        <div className='flex items-center gap-3 min-w-0'>
+        <div className='flex items-center gap-2 sm:gap-3 min-w-0'>
+          <Link
+            to='/'
+            className='w-10 h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 inline-flex items-center justify-center shrink-0 transition-colors'
+            aria-label='Regresar a la página principal'
+          >
+            <ArrowLeft className='w-5 h-5' />
+          </Link>
           <img src='/branding/subcomite-tenis-club-union.png' alt='Subcomité de Tenis Club Unión' className='w-12 h-12 object-contain shrink-0' />
           <div className='min-w-0'>
             <p className='font-black truncate'>Marcadores Club Unión</p>
@@ -54,17 +73,32 @@ export default function Pantalla() {
 
       <div className='grid lg:grid-cols-[minmax(0,1fr)_260px] min-h-[calc(100vh-73px)]'>
         <section className='p-4 sm:p-7'>
-          <div className='flex items-center gap-2 mb-5'>
-            <span className='relative flex w-3 h-3'><span className='absolute inset-0 rounded-full bg-orange-500 animate-ping' /><span className='relative w-3 h-3 rounded-full bg-orange-500' /></span>
-            <h1 className='font-black text-xl'>Partidos en vivo</h1>
-            <span className='rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold'>{matches.length}</span>
+          <div className='flex items-center justify-between gap-3 mb-5'>
+            <div className='flex items-center gap-2 min-w-0'>
+              <span className='relative flex w-3 h-3 shrink-0'><span className='absolute inset-0 rounded-full bg-orange-500 animate-ping' /><span className='relative w-3 h-3 rounded-full bg-orange-500' /></span>
+              <h1 className='font-black text-xl truncate'>{focusedMatch ? 'Partido destacado' : 'Partidos en vivo'}</h1>
+              {!focusedMatch && <span className='rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold'>{matches.length}</span>}
+            </div>
+            {focusedMatch && (
+              <button
+                type='button'
+                onClick={() => setFocusedMatchId(null)}
+                className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-2 text-xs sm:text-sm font-bold transition-colors shrink-0'
+              >
+                <ArrowLeft className='w-4 h-4' /> Todos
+              </button>
+            )}
           </div>
 
           {loading ? (
             <div className='grid md:grid-cols-2 gap-4'>{[1, 2].map((item) => <div key={item} className='h-56 rounded-3xl bg-white/5 animate-pulse' />)}</div>
+          ) : focusedMatch ? (
+            <ScreenMatch match={focusedMatch} featured onBack={() => setFocusedMatchId(null)} />
           ) : matches.length ? (
             <div className='grid md:grid-cols-2 gap-4'>
-              {matches.map((match) => <ScreenMatch key={match.id} match={match} />)}
+              {matches.map((match) => (
+                <ScreenMatch key={match.id} match={match} onFocus={() => setFocusedMatchId(match.id)} />
+              ))}
             </div>
           ) : (
             <div className='min-h-[55vh] rounded-3xl flex flex-col items-center justify-center text-center bg-white/5 border border-white/10'>
@@ -101,7 +135,7 @@ export default function Pantalla() {
   )
 }
 
-function ScreenMatch({ match }) {
+function ScreenMatch({ match, onFocus, onBack, featured = false }) {
   const marker = match.marcador_actual
   const { formatted, isPaused } = useMatchTimer(match.en_vivo, match.estado)
   const p1 = getParticipantName(match, 1) || 'Por definir'
@@ -110,32 +144,52 @@ function ScreenMatch({ match }) {
   const visibleSets = Math.max(3, sets.length)
 
   return (
-    <article className='rounded-3xl overflow-hidden border border-white/10 bg-black/20 shadow-2xl'>
+    <article className={`rounded-3xl overflow-hidden border border-white/10 bg-black/20 shadow-2xl ${featured ? 'min-h-[55vh] flex flex-col justify-center' : ''}`}>
       <div className='h-1' style={{ background: 'linear-gradient(90deg,#8bcb60,#c65d32)' }} />
-      <div className='p-4 sm:p-5'>
+      <div className={featured ? 'p-5 sm:p-8 lg:p-10' : 'p-4 sm:p-5'}>
         <div className='flex items-center justify-between gap-3 mb-4'>
           <div>
             <p className='text-xs uppercase tracking-wider font-bold text-lime-300'>{match.categoria?.nombre || 'Tenis'}</p>
             <p className='text-xs text-white/45 mt-1'>{match.cancha?.nombre || 'Cancha por confirmar'}</p>
           </div>
-          <span className='inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-mono font-bold'>
-            <Clock3 className='w-3 h-3' /> {formatted}{isPaused ? ' · PAUSA' : ''}
-          </span>
+          <div className='flex items-center gap-2'>
+            <span className='inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-mono font-bold'>
+              <Clock3 className='w-3 h-3' /> {formatted}{isPaused ? ' · PAUSA' : ''}
+            </span>
+            {onFocus && (
+              <button type='button' onClick={onFocus} className='h-9 rounded-full bg-white/10 hover:bg-white/15 inline-flex items-center justify-center gap-2 px-3 transition-colors' aria-label='Enfocar este partido'>
+                <Maximize2 className='w-4 h-4' />
+                <span className='hidden sm:inline text-xs font-bold'>Ver en grande</span>
+              </button>
+            )}
+          </div>
         </div>
-        <ScreenPlayer name={p1} side='jugador1' index={0} marker={marker} visibleSets={visibleSets} />
+        <ScreenPlayer name={p1} side='jugador1' index={0} marker={marker} visibleSets={visibleSets} featured={featured} />
         <div className='h-px bg-white/10 my-2' />
-        <ScreenPlayer name={p2} side='jugador2' index={1} marker={marker} visibleSets={visibleSets} />
+        <ScreenPlayer name={p2} side='jugador2' index={1} marker={marker} visibleSets={visibleSets} featured={featured} />
+        {featured && (
+          <div className='mt-7 pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-sm text-white/55'>
+            <div className='flex flex-wrap gap-x-5 gap-y-2'>
+              <span><strong className='text-white/80'>Formato:</strong> mejor de {match.formato?.mejor_de_sets || 3} sets</span>
+              <span><strong className='text-white/80'>Modalidad:</strong> {match.deporte === 'padel' ? 'Pádel' : 'Tenis'}</span>
+              {match.notas && <span><strong className='text-white/80'>Nota:</strong> {match.notas}</span>}
+            </div>
+            <button type='button' onClick={onBack} className='inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/15 px-4 py-2 font-bold text-white transition-colors'>
+              <ArrowLeft className='w-4 h-4' /> Regresar a partidos
+            </button>
+          </div>
+        )}
       </div>
     </article>
   )
 }
 
-function ScreenPlayer({ name, side, index, marker, visibleSets }) {
+function ScreenPlayer({ name, side, index, marker, visibleSets, featured }) {
   return (
-    <div className='grid items-center gap-2 py-2' style={{ gridTemplateColumns: `minmax(110px,1fr) repeat(${visibleSets},36px) 48px` }}>
+    <div className='grid items-center gap-2 py-2 overflow-x-auto' style={{ gridTemplateColumns: `minmax(${featured ? '180px' : '110px'},1fr) repeat(${visibleSets},${featured ? '52px' : '36px'}) ${featured ? '68px' : '48px'}` }}>
       <div className='flex items-center gap-2 min-w-0'>
         <span className='w-2.5 h-2.5 rounded-full shrink-0' style={{ backgroundColor: marker?.server === side ? '#c65d32' : 'transparent' }} />
-        <strong className='truncate text-sm sm:text-base'>{name}</strong>
+        <strong className={`truncate ${featured ? 'text-lg sm:text-2xl lg:text-3xl' : 'text-sm sm:text-base'}`}>{name}</strong>
         {marker?.winner === side && <Trophy className='w-4 h-4 text-amber-400 shrink-0' />}
       </div>
       {Array.from({ length: visibleSets }, (_, setIndex) => (
@@ -143,7 +197,7 @@ function ScreenPlayer({ name, side, index, marker, visibleSets }) {
           {marker?.sets?.[setIndex]?.games?.[index] ?? '/'}
         </strong>
       ))}
-      <strong className='text-center rounded-xl py-2 text-lg bg-lime-300/15 text-lime-200'>{marker?.displayPoints?.[index] ?? '0'}</strong>
+      <strong className={`text-center rounded-xl py-2 bg-lime-300/15 text-lime-200 ${featured ? 'text-2xl sm:text-3xl' : 'text-lg'}`}>{marker?.displayPoints?.[index] ?? '0'}</strong>
     </div>
   )
 }

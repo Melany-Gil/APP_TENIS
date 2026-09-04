@@ -43,6 +43,7 @@ test('las consultas necesarias para ver marcadores no exigen autenticación', ()
     [routes.jugadores, '/'],
     [routes.jugadores, '/:id'],
     [routes.partidos, '/'],
+    [routes.partidos, '/stream'],
     [routes.partidos, '/:id'],
     [routes.partidos, '/:id/estadisticas'],
     [routes.anuncios, '/'],

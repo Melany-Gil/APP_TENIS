@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button'
 import MatchStats from '../../components/match/MatchStats'
 import useUIStore from '../../store/useUIStore'
 import { useMatchTimer } from '../../hooks/useMatchTimer'
+import { useMatchRealtime } from '../../hooks/useMatchRealtime'
 import { cn } from '../../utils/cn'
 
 export default function JuezPartidos() {
@@ -18,14 +19,14 @@ export default function JuezPartidos() {
   const [showStats, setShowStats] = useState(false)
   const { addToast } = useUIStore()
 
-  const refreshMatches = async () => {
+  const refreshMatches = useCallback(async () => {
     try {
       const res = await matchService.getAssignments()
       setMatches(res.data || [])
     } catch {
       addToast({ type: 'error', title: 'No se pudieron cargar tus partidos' })
     }
-  }
+  }, [addToast])
 
   const loadState = async (match) => {
     setSelected(match)
@@ -54,7 +55,7 @@ export default function JuezPartidos() {
     } finally {
       setLoading(false)
     }
-  }, [selected])
+  }, [addToast, refreshMatches, selected])
 
   const handlePointClick = (ganador) => {
     if (quickMode) {
@@ -78,7 +79,14 @@ export default function JuezPartidos() {
 
   useEffect(() => {
     refreshMatches()
-  }, [])
+  }, [refreshMatches])
+
+  useMatchRealtime(useCallback((event) => {
+    refreshMatches()
+    if (selected && (event.matchId === null || Number(event.matchId) === Number(selected.id))) {
+      matchService.getLiveState(selected.id).then((response) => setState(response.data)).catch(() => {})
+    }
+  }, [refreshMatches, selected]))
 
   const p1 = selected && getParticipantName(selected, 1)
   const p2 = selected && getParticipantName(selected, 2)

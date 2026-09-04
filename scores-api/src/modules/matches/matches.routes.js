@@ -4,6 +4,7 @@ const { requireAuth, requireAdmin, requireOfficial } = require('../../middleware
 
 // GET  /api/partidos?estado=en_vivo&deporte=tenis&categoria_id=1
 router.get('/', controller.getAll)
+router.get('/stream', controller.stream)
 router.get('/gestion/mis-partidos', requireAuth, requireOfficial, controller.getManaged)
 // GET  /api/partidos/:id
 router.get('/:id/estadisticas', controller.getStats)

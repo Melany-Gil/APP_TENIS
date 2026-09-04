@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { BarChart3 } from 'lucide-react'
+import { useMatchRealtime } from '../../hooks/useMatchRealtime'
 import { matchService } from '../../services/matchService'
 
 const ROWS = [
@@ -19,17 +20,29 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
   const [selectedSet, setSelectedSet] = useState(null)
   const [loading, setLoading] = useState(!initialStats)
 
-  useEffect(() => {
+  const loadStats = useCallback(({ silent = false } = {}) => {
     if (!matchId) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     matchService.getStats(matchId, selectedSet)
       .then((response) => {
         setStats(response.data?.estadisticas || null)
         setTotalSets(Number(response.data?.total_sets || 0))
       })
       .catch(() => setStats(null))
-      .finally(() => setLoading(false))
+      .finally(() => {
+        if (!silent) setLoading(false)
+      })
   }, [matchId, selectedSet])
+
+  useEffect(() => {
+    loadStats()
+  }, [loadStats])
+
+  useMatchRealtime(useCallback((event) => {
+    if (event.matchId === null || Number(event.matchId) === Number(matchId)) {
+      loadStats({ silent: true })
+    }
+  }, [loadStats, matchId]))
 
   if (loading) return <div className='skeleton h-44 rounded-xl' />
   if (!stats || (!stats.jugador1?.puntos_ganados && !stats.jugador2?.puntos_ganados)) {
