@@ -13,7 +13,6 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { tournamentService } from '../../services/tournamentService'
-import { categoriaService } from '../../services/categoriaService'
 import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
@@ -34,6 +33,12 @@ const ESTADO_BADGE = {
 }
 const SISTEMAS = [
   {
+    value: 'por_definir',
+    label: 'Por definir',
+    description:
+      'Puedes crear y programar el torneo ahora, y elegir el sistema cuando esté confirmado.',
+  },
+  {
     value: 'eliminacion_directa',
     label: 'Eliminación directa',
     description: 'Quien pierde sale; ideal para un cuadro rápido y fácil de seguir.',
@@ -52,7 +57,6 @@ const SISTEMAS = [
 
 export default function GestionTorneos() {
   const [torneos, setTorneos] = useState([])
-  const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -65,20 +69,14 @@ export default function GestionTorneos() {
     formState: { errors, isSubmitting },
   } = useForm()
 
-  const selectedSport = watch('deporte') || 'tenis'
-  const selectedSystem = watch('sistema') || 'eliminacion_directa'
-  const availableCategories = categorias.filter(
-    (category) => category.deporte === selectedSport || category.deporte === 'ambos'
-  )
+  const selectedSystem = watch('sistema') || 'por_definir'
   const systemInfo = SISTEMAS.find((system) => system.value === selectedSystem)
 
   const fetchAll = () => {
     setLoading(true)
-    Promise.all([tournamentService.getAll(), categoriaService.getAll()])
-      .then(([tournaments, categories]) => {
-        setTorneos(tournaments.data || [])
-        setCategorias(categories.data || [])
-      })
+    tournamentService
+      .getAll()
+      .then((tournaments) => setTorneos(tournaments.data || []))
       .catch(() => addToast({ type: 'error', title: 'Error al cargar los torneos' }))
       .finally(() => setLoading(false))
   }
@@ -91,9 +89,9 @@ export default function GestionTorneos() {
     reset({
       nombre: '',
       deporte: 'tenis',
-      categoria_id: '',
+      categoria_id: null,
       modalidad: 'individual',
-      sistema: 'eliminacion_directa',
+      sistema: 'por_definir',
       estado: 'proximo',
       fecha_inicio: '',
       fecha_fin: '',
@@ -107,7 +105,7 @@ export default function GestionTorneos() {
     reset({
       nombre: torneo.nombre,
       deporte: torneo.deporte,
-      categoria_id: torneo.categoria?.id || '',
+      categoria_id: null,
       modalidad: torneo.modalidad,
       sistema: torneo.sistema,
       fecha_inicio: torneo.fecha_inicio?.split('T')[0] || '',
@@ -167,15 +165,18 @@ export default function GestionTorneos() {
     <div className='space-y-6 animate-fade-up'>
       <header className='flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4'>
         <div>
-          <p className='text-xs font-bold uppercase tracking-[0.16em]' style={{ color: 'var(--color-brand)' }}>
+          <p
+            className='text-xs font-bold uppercase tracking-[0.16em]'
+            style={{ color: 'var(--color-brand)' }}
+          >
             Organización deportiva
           </p>
           <h1 className='text-2xl font-black mt-1' style={{ color: 'var(--text-primary)' }}>
             Torneos
           </h1>
           <p className='text-sm mt-1 max-w-xl' style={{ color: 'var(--text-muted)' }}>
-            Crea la competencia una sola vez. Sus partidos usarán automáticamente el mismo deporte,
-            categoría y modalidad.
+            Crea una competencia para todas las categorías. La categoría se elige al programar cada
+            partido.
           </p>
         </div>
         <Button onClick={openCreate} leftIcon={<Plus className='w-4 h-4' />}>
@@ -185,7 +186,11 @@ export default function GestionTorneos() {
 
       <section className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
         <GuideStep number='1' title='Crea el torneo' text='Define solo sus datos esenciales.' />
-        <GuideStep number='2' title='Prepara participantes' text='Jugadores en individual; parejas en dobles.' />
+        <GuideStep
+          number='2'
+          title='Prepara participantes'
+          text='Jugadores en individual; parejas en dobles.'
+        />
         <GuideStep number='3' title='Programa partidos' text='Elige el torneo y arma sus cruces.' />
       </section>
 
@@ -200,7 +205,12 @@ export default function GestionTorneos() {
                 Los campos avanzados del marcador se configuran después, en cada partido.
               </p>
             </div>
-            <button type='button' onClick={closeForm} className='btn-ghost p-2' aria-label='Cerrar formulario'>
+            <button
+              type='button'
+              onClick={closeForm}
+              className='btn-ghost p-2'
+              aria-label='Cerrar formulario'
+            >
               <X className='w-4 h-4' />
             </button>
           </div>
@@ -216,20 +226,22 @@ export default function GestionTorneos() {
             </div>
 
             <Field label='Deporte *' error={errors.deporte?.message}>
-              <select className='form-input' {...register('deporte', { required: 'Selecciona el deporte' })}>
+              <select
+                className='form-input'
+                {...register('deporte', { required: 'Selecciona el deporte' })}
+              >
                 <option value='tenis'>Tenis</option>
                 <option value='padel'>Pádel</option>
               </select>
             </Field>
 
-            <Field label='Categoría *' error={errors.categoria_id?.message}>
-              <select className='form-input' {...register('categoria_id', { required: 'Selecciona una categoría' })}>
-                <option value=''>Seleccionar categoría</option>
-                {availableCategories.map((category) => (
-                  <option key={category.id} value={category.id}>{category.nombre}</option>
-                ))}
-              </select>
-            </Field>
+            <div
+              className='rounded-xl p-3 text-sm'
+              style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            >
+              <span className='font-semibold'>Categorías:</span> todas. Se asignan individualmente
+              al crear cada partido.
+            </div>
 
             <Field label='Modalidad *'>
               <select className='form-input' {...register('modalidad', { required: true })}>
@@ -241,7 +253,9 @@ export default function GestionTorneos() {
             <Field label='Sistema de competencia *'>
               <select className='form-input' {...register('sistema', { required: true })}>
                 {SISTEMAS.map((system) => (
-                  <option key={system.value} value={system.value}>{system.label}</option>
+                  <option key={system.value} value={system.value}>
+                    {system.label}
+                  </option>
                 ))}
               </select>
             </Field>
@@ -250,10 +264,17 @@ export default function GestionTorneos() {
               className='sm:col-span-2 rounded-xl p-3 flex gap-3'
               style={{ backgroundColor: 'var(--color-brand-dim)' }}
             >
-              <Network className='w-5 h-5 shrink-0 mt-0.5' style={{ color: 'var(--color-brand)' }} />
+              <Network
+                className='w-5 h-5 shrink-0 mt-0.5'
+                style={{ color: 'var(--color-brand)' }}
+              />
               <div>
-                <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>{systemInfo?.label}</p>
-                <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>{systemInfo?.description}</p>
+                <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
+                  {systemInfo?.label}
+                </p>
+                <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>
+                  {systemInfo?.description}
+                </p>
               </div>
             </div>
 
@@ -263,7 +284,9 @@ export default function GestionTorneos() {
             <Field label='Estado'>
               <select className='form-input' {...register('estado')}>
                 {ESTADOS.map((status) => (
-                  <option key={status.value} value={status.value}>{status.label}</option>
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
                 ))}
               </select>
             </Field>
@@ -272,7 +295,9 @@ export default function GestionTorneos() {
               <Button type='submit' loading={isSubmitting}>
                 {editing ? 'Guardar cambios' : 'Crear torneo'}
               </Button>
-              <Button type='button' variant='secondary' onClick={closeForm}>Cancelar</Button>
+              <Button type='button' variant='secondary' onClick={closeForm}>
+                Cancelar
+              </Button>
             </div>
           </form>
         </section>
@@ -280,15 +305,21 @@ export default function GestionTorneos() {
 
       <section className='space-y-3'>
         {loading ? (
-          Array.from({ length: 3 }, (_, index) => <div key={index} className='skeleton h-36 rounded-2xl' />)
+          Array.from({ length: 3 }, (_, index) => (
+            <div key={index} className='skeleton h-36 rounded-2xl' />
+          ))
         ) : torneos.length === 0 ? (
           <div className='card p-10 text-center'>
             <Trophy className='w-10 h-10 mx-auto mb-3' style={{ color: 'var(--text-muted)' }} />
-            <p className='font-semibold' style={{ color: 'var(--text-primary)' }}>Aún no hay torneos</p>
+            <p className='font-semibold' style={{ color: 'var(--text-primary)' }}>
+              Aún no hay torneos
+            </p>
             <p className='text-sm mt-1 mb-4' style={{ color: 'var(--text-muted)' }}>
               Crea el primero para comenzar a organizar sus partidos.
             </p>
-            <Button onClick={openCreate} leftIcon={<Plus className='w-4 h-4' />}>Crear torneo</Button>
+            <Button onClick={openCreate} leftIcon={<Plus className='w-4 h-4' />}>
+              Crear torneo
+            </Button>
           </div>
         ) : (
           torneos.map((tournament) => (
@@ -302,21 +333,27 @@ export default function GestionTorneos() {
                 </div>
                 <div className='flex-1 min-w-0'>
                   <div className='flex flex-wrap items-center gap-2'>
-                    <h2 className='font-bold text-base' style={{ color: 'var(--text-primary)' }}>{tournament.nombre}</h2>
+                    <h2 className='font-bold text-base' style={{ color: 'var(--text-primary)' }}>
+                      {tournament.nombre}
+                    </h2>
                     <span className={ESTADO_BADGE[tournament.estado] || 'badge'}>
                       {ESTADOS.find((status) => status.value === tournament.estado)?.label}
                     </span>
                   </div>
-                  <div className='flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs' style={{ color: 'var(--text-muted)' }}>
+                  <div
+                    className='flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs'
+                    style={{ color: 'var(--text-muted)' }}
+                  >
                     <span className='inline-flex items-center gap-1.5'>
                       <UsersRound className='w-3.5 h-3.5' />
-                      {tournament.modalidad === 'dobles' ? 'Dobles' : 'Individual'} · {tournament.deporte === 'padel' ? 'Pádel' : 'Tenis'}
+                      {tournament.modalidad === 'dobles' ? 'Dobles' : 'Individual'} ·{' '}
+                      {tournament.deporte === 'padel' ? 'Pádel' : 'Tenis'}
                     </span>
                     <span className='inline-flex items-center gap-1.5'>
                       <Network className='w-3.5 h-3.5' />
                       {SISTEMAS.find((system) => system.value === tournament.sistema)?.label}
                     </span>
-                    <span>{tournament.categoria?.nombre || 'Sin categoría'}</span>
+                    <span>{tournament.categoria?.nombre || 'Todas las categorías'}</span>
                     {(tournament.fecha_inicio || tournament.fecha_fin) && (
                       <span className='inline-flex items-center gap-1.5'>
                         <CalendarDays className='w-3.5 h-3.5' />
@@ -326,7 +363,10 @@ export default function GestionTorneos() {
                   </div>
                 </div>
                 <div className='flex items-center gap-2 shrink-0'>
-                  <span className='text-xs font-semibold px-3' style={{ color: 'var(--text-muted)' }}>
+                  <span
+                    className='text-xs font-semibold px-3'
+                    style={{ color: 'var(--text-muted)' }}
+                  >
                     {tournament.partidos_count} partido{tournament.partidos_count !== 1 ? 's' : ''}
                   </span>
                   <Link
@@ -335,7 +375,11 @@ export default function GestionTorneos() {
                   >
                     Partidos <ArrowRight className='w-3.5 h-3.5' />
                   </Link>
-                  <button onClick={() => openEdit(tournament)} className='btn-ghost p-2' aria-label='Editar torneo'>
+                  <button
+                    onClick={() => openEdit(tournament)}
+                    className='btn-ghost p-2'
+                    aria-label='Editar torneo'
+                  >
                     <Pencil className='w-4 h-4' />
                   </button>
                   <button
@@ -366,8 +410,12 @@ function GuideStep({ number, title, text }) {
         {number}
       </span>
       <div>
-        <p className='text-sm font-bold' style={{ color: 'var(--text-primary)' }}>{title}</p>
-        <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>{text}</p>
+        <p className='text-sm font-bold' style={{ color: 'var(--text-primary)' }}>
+          {title}
+        </p>
+        <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>
+          {text}
+        </p>
       </div>
     </div>
   )

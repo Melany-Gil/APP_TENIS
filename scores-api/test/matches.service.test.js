@@ -129,64 +129,77 @@ test('getMyMatches separa agenda e historial y calcula victoria o derrota', asyn
         return [[{ id: 8, nombre: 'Laura', apellido: 'Díaz', foto: '/uploads/players/laura.jpg' }]]
       }
       if (call === 2) {
-        return [[
-          {
-            id: 30,
-            deporte: 'tenis',
-            estado: 'finalizado',
-            ganador: 'jugador2',
-            fecha_inicio: '2026-08-20',
-            j1_id: 8,
-            j1_nombre: 'Laura',
-            j1_apellido: 'Díaz',
-            j1_foto: '/uploads/players/laura.jpg',
-            j2_id: 9,
-            j2_nombre: 'Ana',
-            j2_apellido: 'Rojas',
-          },
-          {
-            id: 31,
-            deporte: 'tenis',
-            estado: 'programado',
-            ganador: null,
-            fecha_inicio: '2026-09-10',
-            hora_inicio: '10:00:00',
-            j1_id: 9,
-            j1_nombre: 'Ana',
-            j1_apellido: 'Rojas',
-            j2_id: 8,
-            j2_nombre: 'Laura',
-            j2_apellido: 'Díaz',
-            j2_foto: '/uploads/players/laura.jpg',
-          },
-          {
-            id: 32,
-            deporte: 'tenis',
-            estado: 'en_vivo',
-            ganador: null,
-            fecha_inicio: '2026-09-04',
-            j1_id: 8,
-            j1_nombre: 'Laura',
-            j1_apellido: 'Díaz',
-            j2_id: 10,
-            j2_nombre: 'Sara',
-            j2_apellido: 'León',
-          },
-        ]]
+        return [
+          [
+            {
+              id: 30,
+              deporte: 'tenis',
+              estado: 'finalizado',
+              ganador: 'jugador2',
+              fecha_inicio: '2026-08-20',
+              j1_id: 8,
+              j1_nombre: 'Laura',
+              j1_apellido: 'Díaz',
+              j1_foto: '/uploads/players/laura.jpg',
+              j2_id: 9,
+              j2_nombre: 'Ana',
+              j2_apellido: 'Rojas',
+            },
+            {
+              id: 31,
+              deporte: 'tenis',
+              estado: 'programado',
+              ganador: null,
+              fecha_inicio: '2026-09-10',
+              hora_inicio: '10:00:00',
+              j1_id: 9,
+              j1_nombre: 'Ana',
+              j1_apellido: 'Rojas',
+              j2_id: 8,
+              j2_nombre: 'Laura',
+              j2_apellido: 'Díaz',
+              j2_foto: '/uploads/players/laura.jpg',
+            },
+            {
+              id: 32,
+              deporte: 'tenis',
+              estado: 'en_vivo',
+              ganador: null,
+              fecha_inicio: '2026-09-04',
+              j1_id: 8,
+              j1_nombre: 'Laura',
+              j1_apellido: 'Díaz',
+              j2_id: 10,
+              j2_nombre: 'Sara',
+              j2_apellido: 'León',
+            },
+          ],
+        ]
       }
-      return [[
-        { partido_id: 30, numero_set: 1, games_j1: 3, games_j2: 6, completado: 1 },
-        { partido_id: 30, numero_set: 2, games_j1: 4, games_j2: 6, completado: 1 },
-      ]]
+      return [
+        [
+          { partido_id: 30, numero_set: 1, games_j1: 3, games_j2: 6, completado: 1 },
+          { partido_id: 30, numero_set: 2, games_j1: 4, games_j2: 6, completado: 1 },
+        ],
+      ]
     },
   }
 
   const result = await loadService(fakeDb).getMyMatches(4)
 
   assert.equal(result.jugador.id, 8)
-  assert.deepEqual(result.en_vivo.map((match) => match.id), [32])
-  assert.deepEqual(result.proximos.map((match) => match.id), [31])
-  assert.deepEqual(result.historial.map((match) => match.id), [30])
+  assert.deepEqual(
+    result.en_vivo.map((match) => match.id),
+    [32]
+  )
+  assert.deepEqual(
+    result.proximos.map((match) => match.id),
+    [31]
+  )
+  assert.deepEqual(
+    result.historial.map((match) => match.id),
+    [30]
+  )
   assert.equal(result.historial[0].resultado, 'derrota')
   assert.equal(result.historial[0].jugador1.foto, '/uploads/players/laura.jpg')
 })
@@ -278,7 +291,17 @@ test('create hereda deporte y categoría del torneo seleccionado', async () => {
     async query(sql, params) {
       calls.push({ sql, params })
       if (/FROM torneos/.test(sql) && !/LEFT JOIN/.test(sql)) {
-        return [[{ id: 7, deporte: 'tenis', categoria_id: 3, modalidad: 'individual', estado: 'proximo' }]]
+        return [
+          [
+            {
+              id: 7,
+              deporte: 'tenis',
+              categoria_id: 3,
+              modalidad: 'individual',
+              estado: 'proximo',
+            },
+          ],
+        ]
       }
       if (/FROM jugadores/.test(sql)) return [[{ id: 10 }, { id: 11 }]]
       if (/INSERT INTO partidos/.test(sql)) return [{ insertId: 15 }]
@@ -329,10 +352,7 @@ test('create hereda deporte y categoría del torneo seleccionado', async () => {
 
   const insert = calls.find((call) => /INSERT INTO partidos/.test(call.sql))
   assert.match(insert.sql, /torneo_id, deporte, categoria_id, jugador1_id, jugador2_id/)
-  assert.match(
-    insert.sql,
-    /fecha_inicio, hora_inicio, fase, grupo, ronda, notas/
-  )
+  assert.match(insert.sql, /fecha_inicio, hora_inicio, fase, grupo, ronda, notas/)
   assert.match(insert.sql, /ronda/)
   assert.match(insert.sql, /cancha_id/)
   assert.equal(insert.params[0], 7)
@@ -343,6 +363,71 @@ test('create hereda deporte y categoría del torneo seleccionado', async () => {
   assert.equal(insert.params[12], 'Final')
   assert.equal(result.torneo.nombre, 'Copa interna')
   assert.equal(result.categoria.nombre, '4ta')
+})
+
+test('create exige y guarda la categoría del partido cuando el torneo incluye todas', async () => {
+  const calls = []
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params })
+      if (/FROM torneos/.test(sql) && !/LEFT JOIN/.test(sql)) {
+        return [
+          [
+            {
+              id: 12,
+              deporte: 'tenis',
+              categoria_id: null,
+              modalidad: 'individual',
+              sistema: 'por_definir',
+            },
+          ],
+        ]
+      }
+      if (/FROM categorias/.test(sql)) return [[{ id: 3 }]]
+      if (/FROM jugadores/.test(sql)) return [[{ id: 10 }, { id: 11 }]]
+      if (/INSERT INTO partidos/.test(sql)) return [{ insertId: 25 }]
+      if (/WHERE p\.id = \? LIMIT 1/.test(sql)) {
+        return [
+          [
+            {
+              id: 25,
+              torneo_id: 12,
+              torneo_nombre: 'Abierto Club Unión',
+              torneo_modalidad: 'individual',
+              torneo_sistema: 'por_definir',
+              deporte: 'tenis',
+              estado: 'programado',
+              categoria_id: 3,
+              categoria_nombre: '4ta',
+              j1_id: 10,
+              j1_nombre: 'Ana',
+              j1_apellido: 'Rojas',
+              j2_id: 11,
+              j2_nombre: 'Laura',
+              j2_apellido: 'Díaz',
+            },
+          ],
+        ]
+      }
+      return [[]]
+    },
+  }
+
+  const result = await loadService(fakeDb).create(
+    {
+      torneo_id: '12',
+      categoria_id: '3',
+      jugador1_id: '10',
+      jugador2_id: '11',
+    },
+    2
+  )
+
+  const insert = calls.find((call) => /INSERT INTO partidos/.test(call.sql))
+  assert.equal(insert.params[2], 3)
+  assert.equal(insert.params[10], null)
+  assert.equal(result.categoria.nombre, '4ta')
+  assert.ok(calls.some((call) => /FROM categorias/.test(call.sql)))
 })
 
 test('create permite registrar una hora sin fecha', async () => {
@@ -411,21 +496,25 @@ test('create usa parejas en un torneo de dobles de tenis', async () => {
       if (/SELECT id\s+FROM equipos_padel/.test(sql)) return [[{ id: 30 }, { id: 31 }]]
       if (/INSERT INTO partidos/.test(sql)) return [{ insertId: 22 }]
       if (/WHERE p\.id = \? LIMIT 1/.test(sql)) {
-        return [[{
-          id: 22,
-          torneo_id: 9,
-          torneo_nombre: 'Dobles Club Unión',
-          torneo_modalidad: 'dobles',
-          torneo_sistema: 'eliminacion_directa',
-          deporte: 'tenis',
-          estado: 'programado',
-          categoria_id: 3,
-          categoria_nombre: '4ta',
-          e1_id: 30,
-          e1_nombre: 'Ana / Laura',
-          e2_id: 31,
-          e2_nombre: 'Marta / Sofía',
-        }]]
+        return [
+          [
+            {
+              id: 22,
+              torneo_id: 9,
+              torneo_nombre: 'Dobles Club Unión',
+              torneo_modalidad: 'dobles',
+              torneo_sistema: 'eliminacion_directa',
+              deporte: 'tenis',
+              estado: 'programado',
+              categoria_id: 3,
+              categoria_nombre: '4ta',
+              e1_id: 30,
+              e1_nombre: 'Ana / Laura',
+              e2_id: 31,
+              e2_nombre: 'Marta / Sofía',
+            },
+          ],
+        ]
       }
       return [[]]
     },
@@ -453,12 +542,13 @@ test('create permite usar el ganador pendiente de otro partido como participante
       if (/FROM torneos/.test(sql) && !/LEFT JOIN/.test(sql)) {
         return [[{ id: 7, deporte: 'tenis', categoria_id: 3, modalidad: 'individual' }]]
       }
-      if (/SELECT id, torneo_id, estado, ganador/.test(sql)) {
+      if (/SELECT id, torneo_id, categoria_id, estado, ganador/.test(sql)) {
         return [
           [
             {
               id: 20,
               torneo_id: 7,
+              categoria_id: 3,
               estado: 'programado',
               ganador: null,
               jugador1_id: 8,

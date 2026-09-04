@@ -1,7 +1,7 @@
 const db = require('../../config/db')
 
 const MODALIDADES = ['individual', 'dobles']
-const SISTEMAS = ['eliminacion_directa', 'todos_contra_todos', 'grupos_eliminacion']
+const SISTEMAS = ['por_definir', 'eliminacion_directa', 'todos_contra_todos', 'grupos_eliminacion']
 const ESTADOS = ['proximo', 'en_curso', 'finalizado', 'cancelado']
 
 const SELECT = `
@@ -72,14 +72,14 @@ exports.update = async (id, body) => {
   const tournament = await validateTournament(body)
   const structureChanged =
     existing[0].deporte !== tournament.deporte ||
-    Number(existing[0].categoria_id) !== tournament.categoria_id ||
+    (existing[0].categoria_id ? Number(existing[0].categoria_id) : null) !==
+      tournament.categoria_id ||
     existing[0].modalidad !== tournament.modalidad
 
   if (structureChanged) {
-    const [[usage]] = await db.query(
-      'SELECT COUNT(*) AS total FROM partidos WHERE torneo_id = ?',
-      [id]
-    )
+    const [[usage]] = await db.query('SELECT COUNT(*) AS total FROM partidos WHERE torneo_id = ?', [
+      id,
+    ])
     if (Number(usage.total) > 0) {
       throw {
         status: 409,
@@ -113,7 +113,9 @@ exports.remove = async (id) => {
   const [existing] = await db.query('SELECT id FROM torneos WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Torneo no encontrado' }
 
-  const [[usage]] = await db.query('SELECT COUNT(*) AS total FROM partidos WHERE torneo_id = ?', [id])
+  const [[usage]] = await db.query('SELECT COUNT(*) AS total FROM partidos WHERE torneo_id = ?', [
+    id,
+  ])
   if (Number(usage.total) > 0) {
     throw {
       status: 409,
@@ -136,10 +138,10 @@ async function validateTournament({
   estado,
 }) {
   const normalizedName = String(nombre || '').trim()
-  const categoryId = Number(categoria_id)
+  const categoryId = categoria_id ? Number(categoria_id) : null
   const normalizedStatus = estado || 'proximo'
   const normalizedModality = modalidad || 'individual'
-  const normalizedSystem = sistema || 'eliminacion_directa'
+  const normalizedSystem = sistema || 'por_definir'
   const normalizedStart = normalizeOptionalDate(fecha_inicio, 'inicial')
   const normalizedEnd = normalizeOptionalDate(fecha_fin, 'final')
 
@@ -147,8 +149,8 @@ async function validateTournament({
   if (!['tenis', 'padel'].includes(deporte)) {
     throw { status: 400, message: 'Selecciona un deporte válido' }
   }
-  if (!Number.isInteger(categoryId) || categoryId < 1) {
-    throw { status: 400, message: 'Selecciona la categoría del torneo' }
+  if (categoryId !== null && (!Number.isInteger(categoryId) || categoryId < 1)) {
+    throw { status: 400, message: 'La categoría seleccionada no es válida' }
   }
   if (!MODALIDADES.includes(normalizedModality)) {
     throw { status: 400, message: 'Selecciona una modalidad válida' }
@@ -163,12 +165,14 @@ async function validateTournament({
     throw { status: 400, message: 'La fecha final no puede ser anterior a la inicial' }
   }
 
-  const [categories] = await db.query('SELECT deporte FROM categorias WHERE id = ? LIMIT 1', [
-    categoryId,
-  ])
-  if (!categories.length) throw { status: 400, message: 'La categoría seleccionada no existe' }
-  if (![deporte, 'ambos'].includes(categories[0].deporte)) {
-    throw { status: 400, message: 'La categoría no corresponde al deporte del torneo' }
+  if (categoryId !== null) {
+    const [categories] = await db.query('SELECT deporte FROM categorias WHERE id = ? LIMIT 1', [
+      categoryId,
+    ])
+    if (!categories.length) throw { status: 400, message: 'La categoría seleccionada no existe' }
+    if (![deporte, 'ambos'].includes(categories[0].deporte)) {
+      throw { status: 400, message: 'La categoría no corresponde al deporte del torneo' }
+    }
   }
 
   return {
@@ -198,10 +202,8 @@ function formatTournament(row) {
     nombre: row.nombre,
     deporte: row.deporte,
     modalidad: row.modalidad || (row.deporte === 'padel' ? 'dobles' : 'individual'),
-    sistema: row.sistema || 'eliminacion_directa',
-    categoria: row.categoria_id
-      ? { id: row.categoria_id, nombre: row.categoria_nombre }
-      : null,
+    sistema: row.sistema || 'por_definir',
+    categoria: row.categoria_id ? { id: row.categoria_id, nombre: row.categoria_nombre } : null,
     fecha_inicio: row.fecha_inicio || null,
     fecha_fin: row.fecha_fin || null,
     estado: row.estado,

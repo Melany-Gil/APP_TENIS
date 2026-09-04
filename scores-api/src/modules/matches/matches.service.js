@@ -211,7 +211,12 @@ exports.getMyMatches = async (userId) => {
 
   if (!rows.length) {
     return {
-      jugador: { id: player.id, nombre: player.nombre, apellido: player.apellido, foto: player.foto || null },
+      jugador: {
+        id: player.id,
+        nombre: player.nombre,
+        apellido: player.apellido,
+        foto: player.foto || null,
+      },
       en_vivo: [],
       proximos: [],
       historial: [],
@@ -239,13 +244,14 @@ exports.getMyMatches = async (userId) => {
     return {
       ...match,
       mi_lado: mySide,
-      resultado: match.estado === 'finalizado'
-        ? match.ganador === mySide
-          ? 'victoria'
-          : match.ganador
-            ? 'derrota'
-            : 'sin_resultado'
-        : null,
+      resultado:
+        match.estado === 'finalizado'
+          ? match.ganador === mySide
+            ? 'victoria'
+            : match.ganador
+              ? 'derrota'
+              : 'sin_resultado'
+          : null,
     }
   })
 
@@ -254,7 +260,12 @@ exports.getMyMatches = async (userId) => {
     .sort(compareScheduleAscending)
 
   return {
-    jugador: { id: player.id, nombre: player.nombre, apellido: player.apellido, foto: player.foto || null },
+    jugador: {
+      id: player.id,
+      nombre: player.nombre,
+      apellido: player.apellido,
+      foto: player.foto || null,
+    },
     en_vivo: matches.filter((match) => match.estado === 'en_vivo'),
     proximos: upcoming,
     historial: matches.filter((match) => match.estado === 'finalizado'),
@@ -332,10 +343,9 @@ exports.create = async (body, actor) => {
 
 exports.update = async (id, body, actor) => {
   const requester = normalizeActor(actor)
-  const [existing] = await db.query(
-    'SELECT id, juez_id, created_by FROM partidos WHERE id = ?',
-    [id]
-  )
+  const [existing] = await db.query('SELECT id, juez_id, created_by FROM partidos WHERE id = ?', [
+    id,
+  ])
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
   assertCanManage(existing[0], requester)
 
@@ -543,13 +553,24 @@ async function validateBasicMatch(body, currentMatchId = null) {
 
   const tournament = tournaments[0]
   const deporte = tournament.deporte
-  const categoriaId = Number(tournament.categoria_id)
+  const categoriaId = tournament.categoria_id
+    ? Number(tournament.categoria_id)
+    : positiveId(body.categoria_id)
   const modalidad = tournament.modalidad || (deporte === 'padel' ? 'dobles' : 'individual')
   const fase = normalizePhase(tournament.sistema, body.fase)
   const grupo = fase === 'grupos' ? normalizeOptionalLabel(body.grupo, 20) : null
   const ronda = normalizeOptionalLabel(body.ronda, 50)
   if (!Number.isInteger(categoriaId) || categoriaId < 1) {
-    throw { status: 409, message: 'El torneo debe tener una categoría antes de crear partidos' }
+    throw { status: 400, message: 'Selecciona la categoría del partido' }
+  }
+  if (!tournament.categoria_id) {
+    const [categories] = await db.query(
+      "SELECT id FROM categorias WHERE id = ? AND deporte IN (?, 'ambos') LIMIT 1",
+      [categoriaId, deporte]
+    )
+    if (!categories.length) {
+      throw { status: 400, message: 'La categoría no corresponde al deporte del torneo' }
+    }
   }
 
   const jugador1Id = positiveId(body.jugador1_id)
@@ -578,10 +599,10 @@ async function validateBasicMatch(body, currentMatchId = null) {
   }
 
   const source1 = source1Id
-    ? await resolveMatchSource(source1Id, torneoId, modalidad, currentMatchId)
+    ? await resolveMatchSource(source1Id, torneoId, modalidad, categoriaId, currentMatchId)
     : null
   const source2 = source2Id
-    ? await resolveMatchSource(source2Id, torneoId, modalidad, currentMatchId)
+    ? await resolveMatchSource(source2Id, torneoId, modalidad, categoriaId, currentMatchId)
     : null
 
   const resolvedPlayer1 =
@@ -599,7 +620,10 @@ async function validateBasicMatch(body, currentMatchId = null) {
   ) {
     throw { status: 400, message: 'Selecciona un jugador o un partido de origen para cada lado' }
   }
-  if (modalidad === 'dobles' && ((!resolvedTeam1 && !source1Id) || (!resolvedTeam2 && !source2Id))) {
+  if (
+    modalidad === 'dobles' &&
+    ((!resolvedTeam1 && !source1Id) || (!resolvedTeam2 && !source2Id))
+  ) {
     throw { status: 400, message: 'Selecciona una pareja o un partido de origen para cada lado' }
   }
   if (resolvedPlayer1 && resolvedPlayer2 && resolvedPlayer1 === resolvedPlayer2) {
@@ -734,7 +758,11 @@ function normalizeScoringConfig(body) {
   if (!Number.isInteger(tieBreakPoints) || tieBreakPoints < 5 || tieBreakPoints > 99) {
     throw { status: 400, message: 'Los puntos del tiebreak no son válidos' }
   }
-  if (!Number.isInteger(matchTieBreakPoints) || matchTieBreakPoints < 5 || matchTieBreakPoints > 99) {
+  if (
+    !Number.isInteger(matchTieBreakPoints) ||
+    matchTieBreakPoints < 5 ||
+    matchTieBreakPoints > 99
+  ) {
     throw { status: 400, message: 'Los puntos del match tiebreak no son válidos' }
   }
 
@@ -784,13 +812,13 @@ async function validateJudge(judgeId) {
   if (!rows.length) throw { status: 400, message: 'El juez seleccionado no está disponible' }
 }
 
-async function resolveMatchSource(sourceId, torneoId, modalidad, currentMatchId) {
+async function resolveMatchSource(sourceId, torneoId, modalidad, categoriaId, currentMatchId) {
   if (currentMatchId && sourceId >= currentMatchId) {
     throw { status: 400, message: 'El partido de origen debe ser anterior al partido actual' }
   }
 
   const [rows] = await db.query(
-    `SELECT id, torneo_id, estado, ganador,
+    `SELECT id, torneo_id, categoria_id, estado, ganador,
             jugador1_id, jugador2_id, equipo1_id, equipo2_id
      FROM partidos
      WHERE id = ?
@@ -806,6 +834,12 @@ async function resolveMatchSource(sourceId, torneoId, modalidad, currentMatchId)
     throw {
       status: 400,
       message: 'El partido de origen debe pertenecer al mismo torneo',
+    }
+  }
+  if (Number(source.categoria_id) !== categoriaId) {
+    throw {
+      status: 400,
+      message: 'El partido de origen debe pertenecer a la misma categoría',
     }
   }
 

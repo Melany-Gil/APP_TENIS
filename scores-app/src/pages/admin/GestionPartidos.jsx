@@ -8,6 +8,7 @@ import { teamService } from '../../services/teamService'
 import { userService } from '../../services/userService'
 import { sedeService } from '../../services/sedeService'
 import { tournamentService } from '../../services/tournamentService'
+import { categoriaService } from '../../services/categoriaService'
 import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
@@ -38,6 +39,7 @@ export default function GestionPartidos() {
   const [jueces, setJueces] = useState([])
   const [canchas, setCanchas] = useState([])
   const [torneos, setTorneos] = useState([])
+  const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showMarcador, setShowMarcador] = useState(null)
@@ -52,6 +54,7 @@ export default function GestionPartidos() {
     register,
     handleSubmit,
     reset,
+    setValue,
     watch,
     formState: { errors, isSubmitting },
   } = useForm({ shouldUnregister: true })
@@ -68,7 +71,9 @@ export default function GestionPartidos() {
     (tournament) => String(tournament.id) === selectedTournamentId
   )
   const selectedDeporte = selectedTournament?.deporte || 'tenis'
-  const selectedCategoryId = String(selectedTournament?.categoria?.id || '')
+  const selectedCategoryId = String(
+    selectedTournament?.categoria?.id || watch('categoria_id') || ''
+  )
   const selectedModality = selectedTournament?.modalidad || 'individual'
   const selectedPhase = watch('fase') || 'grupos'
   const participant1Mode = watch('participante1_tipo') || 'fijo'
@@ -76,7 +81,11 @@ export default function GestionPartidos() {
   const sourceMatches = partidos.filter(
     (partido) =>
       String(partido.torneo?.id || '') === selectedTournamentId &&
+      String(partido.categoria?.id || '') === selectedCategoryId &&
       (!editing || partido.id < editing.id)
+  )
+  const categoriasDisponibles = categorias.filter(
+    (categoria) => categoria.deporte === selectedDeporte || categoria.deporte === 'ambos'
   )
   const jugadoresDisponibles = jugadores.filter(
     (jugador) => jugador.deporte === selectedDeporte || jugador.deporte === 'ambos'
@@ -97,17 +106,24 @@ export default function GestionPartidos() {
       userService.getAll(),
       sedeService.getAll(),
       tournamentService.getAll(),
+      categoriaService.getAll(),
     ])
-      .then(async ([p, j, e, u, locations, tournaments]) => {
+      .then(async ([p, j, e, u, locations, tournaments, categories]) => {
         setPartidos(p.data || [])
         setJugadores(j.data || [])
         setEquipos(e.data || [])
         setJueces((u.data || []).filter((usuario) => ['juez', 'admin'].includes(usuario.rol)))
-        setTorneos((tournaments.data || []).filter((tournament) => tournament.estado !== 'cancelado'))
+        setTorneos(
+          (tournaments.data || []).filter((tournament) => tournament.estado !== 'cancelado')
+        )
+        setCategorias(categories.data || [])
         const courtResponses = await Promise.all(
           (locations.data || []).map(async (location) => {
             const response = await sedeService.getCanchasBySede(location.id)
-            return (response.data || []).map((court) => ({ ...court, sede_nombre: location.nombre }))
+            return (response.data || []).map((court) => ({
+              ...court,
+              sede_nombre: location.nombre,
+            }))
           })
         )
         setCanchas(courtResponses.flat())
@@ -129,6 +145,7 @@ export default function GestionPartidos() {
   const openCreate = () => {
     reset({
       torneo_id: searchParams.get('torneo') || '',
+      categoria_id: '',
       estado: 'programado',
       participante1_tipo: 'fijo',
       participante2_tipo: 'fijo',
@@ -155,6 +172,7 @@ export default function GestionPartidos() {
     setEditing(partido)
     reset({
       torneo_id: partido.torneo?.id || '',
+      categoria_id: partido.categoria?.id || '',
       estado: partido.estado,
       fecha_inicio: partido.fecha_inicio ? partido.fecha_inicio.slice(0, 10) : '',
       hora_inicio: partido.hora_inicio ? partido.hora_inicio.slice(0, 5) : '',
@@ -203,6 +221,7 @@ export default function GestionPartidos() {
     try {
       const payload = {
         torneo_id: data.torneo_id,
+        categoria_id: data.categoria_id,
         estado: data.estado,
         fecha_inicio: data.fecha_inicio,
         hora_inicio: data.hora_inicio,
@@ -348,12 +367,17 @@ export default function GestionPartidos() {
               <label className='form-label'>Torneo *</label>
               <select
                 className='form-input'
-                {...register('torneo_id', { required: 'Selecciona el torneo del partido' })}
+                {...register('torneo_id', {
+                  required: 'Selecciona el torneo del partido',
+                  onChange: () => setValue('categoria_id', ''),
+                })}
               >
                 <option value=''>Seleccionar torneo</option>
                 {torneos.map((tournament) => (
                   <option key={tournament.id} value={tournament.id}>
-                    {tournament.nombre} · {tournament.modalidad === 'dobles' ? 'Dobles' : 'Individual'} · {tournament.categoria?.nombre}
+                    {tournament.nombre} ·{' '}
+                    {tournament.modalidad === 'dobles' ? 'Dobles' : 'Individual'} ·{' '}
+                    {tournament.categoria?.nombre || 'Todas las categorías'}
                   </option>
                 ))}
               </select>
@@ -381,11 +405,31 @@ export default function GestionPartidos() {
                 className='rounded-xl p-3 text-sm flex flex-wrap items-center gap-x-3 gap-y-1'
                 style={{ backgroundColor: 'var(--color-brand-dim)', color: 'var(--text-primary)' }}
               >
-                <span className='font-semibold'>{selectedDeporte === 'padel' ? 'Pádel' : 'Tenis'}</span>
+                <span className='font-semibold'>
+                  {selectedDeporte === 'padel' ? 'Pádel' : 'Tenis'}
+                </span>
                 <span>·</span>
-                <span>{selectedTournament.categoria?.nombre}</span>
+                <span>{selectedTournament.categoria?.nombre || 'Todas las categorías'}</span>
                 <span>·</span>
                 <span>{selectedModality === 'dobles' ? 'Parejas' : 'Individual'}</span>
+              </div>
+            )}
+
+            {selectedTournament && !selectedTournament.categoria && (
+              <div className='form-group'>
+                <label className='form-label'>Categoría del partido *</label>
+                <select
+                  className='form-input'
+                  {...register('categoria_id', { required: 'Selecciona la categoría del partido' })}
+                >
+                  <option value=''>Seleccionar categoría</option>
+                  {categoriasDisponibles.map((categoria) => (
+                    <option key={categoria.id} value={categoria.id}>
+                      {categoria.nombre}
+                    </option>
+                  ))}
+                </select>
+                {errors.categoria_id && <p className='form-error'>{errors.categoria_id.message}</p>}
               </div>
             )}
 
@@ -400,14 +444,20 @@ export default function GestionPartidos() {
             )}
 
             {selectedTournament?.sistema === 'grupos_eliminacion' && selectedPhase === 'grupos' && (
-              <Input label='Grupo' placeholder='Ej.: Grupo A' maxLength={20} {...register('grupo')} />
+              <Input
+                label='Grupo'
+                placeholder='Ej.: Grupo A'
+                maxLength={20}
+                {...register('grupo')}
+              />
             )}
 
             {selectedTournament && selectedTournament.sistema !== 'todos_contra_todos' && (
               <Input
                 label='Ronda (opcional)'
                 placeholder={
-                  selectedTournament.sistema === 'eliminacion_directa' || selectedPhase === 'eliminacion'
+                  selectedTournament.sistema === 'eliminacion_directa' ||
+                  selectedPhase === 'eliminacion'
                     ? 'Ej.: Cuartos de final'
                     : 'Ej.: Fecha 1'
                 }
@@ -438,7 +488,9 @@ export default function GestionPartidos() {
                 {canchas
                   .filter((court) => court.deporte === selectedDeporte || court.deporte === 'ambos')
                   .map((court) => (
-                    <option key={court.id} value={court.id}>{court.nombre} · {court.sede_nombre}</option>
+                    <option key={court.id} value={court.id}>
+                      {court.nombre} · {court.sede_nombre}
+                    </option>
                   ))}
               </select>
             </div>
@@ -467,11 +519,23 @@ export default function GestionPartidos() {
                 </label>
                 <label className='form-group'>
                   <span className='form-label'>Juegos por set</span>
-                  <input type='number' min='1' max='12' className='form-input' {...register('juegos_por_set')} />
+                  <input
+                    type='number'
+                    min='1'
+                    max='12'
+                    className='form-input'
+                    {...register('juegos_por_set')}
+                  />
                 </label>
                 <label className='form-group'>
                   <span className='form-label'>Diferencia de juegos</span>
-                  <input type='number' min='1' max='6' className='form-input' {...register('diferencia_juegos')} />
+                  <input
+                    type='number'
+                    min='1'
+                    max='6'
+                    className='form-input'
+                    {...register('diferencia_juegos')}
+                  />
                 </label>
                 <label className='form-group'>
                   <span className='form-label'>Games</span>
@@ -489,16 +553,36 @@ export default function GestionPartidos() {
                 </label>
                 <label className='form-group'>
                   <span className='form-label'>Tiebreak en</span>
-                  <input type='number' min='0' max='12' className='form-input' {...register('tiebreak_en')} />
-                  <span className='text-[11px]' style={{ color: 'var(--text-muted)' }}>Usa 0 para jugar sin tiebreak.</span>
+                  <input
+                    type='number'
+                    min='0'
+                    max='12'
+                    className='form-input'
+                    {...register('tiebreak_en')}
+                  />
+                  <span className='text-[11px]' style={{ color: 'var(--text-muted)' }}>
+                    Usa 0 para jugar sin tiebreak.
+                  </span>
                 </label>
                 <label className='form-group'>
                   <span className='form-label'>Tiebreak a</span>
-                  <input type='number' min='5' max='99' className='form-input' {...register('tiebreak_puntos')} />
+                  <input
+                    type='number'
+                    min='5'
+                    max='99'
+                    className='form-input'
+                    {...register('tiebreak_puntos')}
+                  />
                 </label>
                 <label className='form-group'>
                   <span className='form-label'>Match tiebreak a</span>
-                  <input type='number' min='5' max='99' className='form-input' {...register('match_tiebreak_puntos')} />
+                  <input
+                    type='number'
+                    min='5'
+                    max='99'
+                    className='form-input'
+                    {...register('match_tiebreak_puntos')}
+                  />
                 </label>
                 <label className='form-group'>
                   <span className='form-label'>Primer servidor</span>
@@ -789,12 +873,18 @@ export default function GestionPartidos() {
                         .join(' ')}`}
                   </p>
                   {p.juez && (
-                    <p className='text-[11px] mt-1 flex items-center gap-1' style={{ color: 'var(--text-muted)' }}>
+                    <p
+                      className='text-[11px] mt-1 flex items-center gap-1'
+                      style={{ color: 'var(--text-muted)' }}
+                    >
                       <Gavel className='w-3 h-3' /> Juez: {p.juez.nombre} {p.juez.apellido}
                     </p>
                   )}
                   {p.cancha && (
-                    <p className='text-[11px] mt-1 flex items-center gap-1' style={{ color: 'var(--text-muted)' }}>
+                    <p
+                      className='text-[11px] mt-1 flex items-center gap-1'
+                      style={{ color: 'var(--text-muted)' }}
+                    >
                       <MapPin className='w-3 h-3' /> {p.cancha.nombre}
                     </p>
                   )}

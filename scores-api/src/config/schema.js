@@ -173,7 +173,9 @@ exports.ensureSchema = async () => {
        LIMIT 1`
     )
     if (duplicates.length) {
-      throw new Error('Hay cuentas vinculadas a más de un jugador; corrige los duplicados antes de continuar')
+      throw new Error(
+        'Hay cuentas vinculadas a más de un jugador; corrige los duplicados antes de continuar'
+      )
     }
     await db.query('ALTER TABLE jugadores ADD UNIQUE KEY uq_jugadores_user_id (user_id)')
   }
@@ -189,6 +191,10 @@ exports.ensureSchema = async () => {
   if (!(await columnExists('torneos', 'categoria_id'))) {
     await db.query('ALTER TABLE torneos ADD COLUMN categoria_id INT NULL AFTER deporte')
   }
+  const tournamentCategoryColumn = await getColumn('torneos', 'categoria_id')
+  if (tournamentCategoryColumn?.isNullable === 'NO') {
+    await db.query('ALTER TABLE torneos MODIFY categoria_id INT NULL')
+  }
   if (!(await columnExists('torneos', 'modalidad'))) {
     await db.query(
       "ALTER TABLE torneos ADD COLUMN modalidad ENUM('individual','dobles') NOT NULL DEFAULT 'individual' AFTER categoria_id"
@@ -197,7 +203,13 @@ exports.ensureSchema = async () => {
   }
   if (!(await columnExists('torneos', 'sistema'))) {
     await db.query(
-      "ALTER TABLE torneos ADD COLUMN sistema ENUM('eliminacion_directa','todos_contra_todos','grupos_eliminacion') NOT NULL DEFAULT 'eliminacion_directa' AFTER modalidad"
+      "ALTER TABLE torneos ADD COLUMN sistema ENUM('por_definir','eliminacion_directa','todos_contra_todos','grupos_eliminacion') NOT NULL DEFAULT 'por_definir' AFTER modalidad"
+    )
+  }
+  const tournamentSystemType = await getColumnType('torneos', 'sistema')
+  if (tournamentSystemType && !tournamentSystemType.includes("'por_definir'")) {
+    await db.query(
+      "ALTER TABLE torneos MODIFY sistema ENUM('por_definir','eliminacion_directa','todos_contra_todos','grupos_eliminacion') NOT NULL DEFAULT 'por_definir'"
     )
   }
   if (!(await columnIndexExists('torneos', 'categoria_id'))) {
@@ -458,7 +470,7 @@ exports.ensureSchema = async () => {
   if (cleanup) {
     console.log(
       `🧹  Limpieza única completada: ${cleanup.partidosEliminados} partidos eliminados; ` +
-      `${cleanup.jugadoresConservados} jugadores y ${cleanup.usuariosConservados} usuarios conservados`
+        `${cleanup.jugadoresConservados} jugadores y ${cleanup.usuariosConservados} usuarios conservados`
     )
   }
 
