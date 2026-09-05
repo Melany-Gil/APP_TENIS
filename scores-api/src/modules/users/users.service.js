@@ -1,16 +1,36 @@
 const db = require('../../config/db')
 const bcrypt = require('bcryptjs')
 
-const SAFE_FIELDS =
-  'u.id, u.numero_documento, u.usuario, u.nombre, u.apellido, u.email, u.telefono, u.avatar, u.rol, u.activo, u.created_at'
+const BASE_FIELDS =
+  'u.id, u.numero_documento, u.nombre, u.apellido, u.email, u.telefono, u.avatar, u.rol, u.activo, u.created_at'
 
 const normalizeUsuario = (value) => {
   const text = String(value ?? '').trim()
   return text ? text.slice(0, 50) : null
 }
 
-const USER_WITH_PLAYER = `
-  SELECT ${SAFE_FIELDS},
+// Tolerancia mientras la columna `users.usuario` termina de migrarse tras un
+// despliegue: se detecta una vez y, si aún no existe, se opera sin ella.
+let usuarioColumnReady = false
+const hasUsuarioColumn = async () => {
+  if (usuarioColumnReady) return true
+  try {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) AS total
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'users'
+         AND COLUMN_NAME = 'usuario'`
+    )
+    usuarioColumnReady = Number(rows[0].total) > 0
+  } catch {
+    usuarioColumnReady = false
+  }
+  return usuarioColumnReady
+}
+
+const userWithPlayer = (withUsuario) => `
+  SELECT ${withUsuario ? `${BASE_FIELDS}, u.usuario` : BASE_FIELDS},
          j.id AS jugador_id,
          j.nombre AS jugador_nombre,
          j.apellido AS jugador_apellido,
@@ -20,12 +40,16 @@ const USER_WITH_PLAYER = `
 `
 
 exports.getAll = async () => {
-  const [rows] = await db.query(`${USER_WITH_PLAYER} WHERE u.activo = TRUE ORDER BY u.created_at DESC`)
+  const [rows] = await db.query(
+    `${userWithPlayer(await hasUsuarioColumn())} WHERE u.activo = TRUE ORDER BY u.created_at DESC`
+  )
   return rows.map(formatUser)
 }
 
 exports.getById = async (id) => {
-  const [rows] = await db.query(`${USER_WITH_PLAYER} WHERE u.id = ? LIMIT 1`, [id])
+  const [rows] = await db.query(`${userWithPlayer(await hasUsuarioColumn())} WHERE u.id = ? LIMIT 1`, [
+    id,
+  ])
   if (!rows.length) throw { status: 404, message: 'Usuario no encontrado' }
   return formatUser(rows[0])
 }
@@ -44,7 +68,8 @@ exports.create = async ({
     throw { status: 400, message: 'Rol inválido' }
   }
 
-  const alias = normalizeUsuario(usuario)
+  const aliasSupported = await hasUsuarioColumn()
+  const alias = aliasSupported ? normalizeUsuario(usuario) : null
 
   const [existing] = await db.query(
     'SELECT id FROM users WHERE numero_documento = ? OR email = ? LIMIT 1',
@@ -61,26 +86,38 @@ exports.create = async ({
   }
 
   const hashedPassword = await bcrypt.hash(password, 12)
+  const columns = ['numero_documento', 'nombre', 'apellido', 'email', 'password', 'telefono', 'rol']
+  const values = [
+    numero_documento.trim(),
+    nombre.trim(),
+    apellido.trim(),
+    email.trim().toLowerCase(),
+    hashedPassword,
+    telefono?.trim() || null,
+    rol,
+  ]
+  if (aliasSupported) {
+    columns.splice(1, 0, 'usuario')
+    values.splice(1, 0, alias)
+  }
+
   const [result] = await db.query(
-    `INSERT INTO users
-       (numero_documento, usuario, nombre, apellido, email, password, telefono, rol, activo)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
-    [
-      numero_documento.trim(),
-      alias,
-      nombre.trim(),
-      apellido.trim(),
-      email.trim().toLowerCase(),
-      hashedPassword,
-      telefono?.trim() || null,
-      rol,
-    ]
+    `INSERT INTO users (${columns.join(', ')}, activo)
+     VALUES (${columns.map(() => '?').join(', ')}, TRUE)`,
+    values
   )
 
   return exports.getById(result.insertId)
 }
 
 exports.updateUsuario = async (id, usuario) => {
+  if (!(await hasUsuarioColumn())) {
+    throw {
+      status: 503,
+      message: 'La función de usuario de acceso aún no está disponible. Reinténtalo en unos minutos.',
+    }
+  }
+
   const [existing] = await db.query('SELECT id FROM users WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Usuario no encontrado' }
 

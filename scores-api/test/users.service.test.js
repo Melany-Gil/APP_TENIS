@@ -79,6 +79,7 @@ test('crear usuario guarda el alias y valida que no esté repetido', async () =>
   const fakeDb = {
     async query(sql, params) {
       calls.push({ sql, params })
+      if (/information_schema\.COLUMNS/.test(sql)) return [[{ total: 1 }]]
       if (/numero_documento = \? OR email = \?/.test(sql)) return [[]]
       if (/SELECT id FROM users WHERE usuario = \? LIMIT 1/.test(sql)) return [[]]
       if (/INSERT INTO users/.test(sql)) return [{ insertId: 11 }]
@@ -114,6 +115,7 @@ test('crear usuario guarda el alias y valida que no esté repetido', async () =>
 test('crear usuario rechaza un alias ya usado por otra cuenta', async () => {
   const fakeDb = {
     async query(sql) {
+      if (/information_schema\.COLUMNS/.test(sql)) return [[{ total: 1 }]]
       if (/numero_documento = \? OR email = \?/.test(sql)) return [[]]
       if (/SELECT id FROM users WHERE usuario = \? LIMIT 1/.test(sql)) return [[{ id: 3 }]]
       return [[]]
@@ -134,11 +136,38 @@ test('crear usuario rechaza un alias ya usado por otra cuenta', async () => {
   )
 })
 
+test('crear usuario funciona aunque la columna usuario aún no exista', async () => {
+  const calls = []
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params })
+      if (/information_schema\.COLUMNS/.test(sql)) return [[{ total: 0 }]]
+      if (/numero_documento = \? OR email = \?/.test(sql)) return [[]]
+      if (/INSERT INTO users/.test(sql)) return [{ insertId: 12 }]
+      return [[{ id: 12, numero_documento: '5', nombre: 'A', apellido: 'B', email: 'a@b.com', rol: 'miembro', activo: 1 }]]
+    },
+  }
+
+  await loadService(fakeDb).create({
+    numero_documento: '55554444',
+    usuario: 'ignorado',
+    nombre: 'Ana',
+    apellido: 'Ruiz',
+    email: 'ana@example.com',
+    password: 'Secret123',
+  })
+
+  const insert = calls.find((call) => /INSERT INTO users/.test(call.sql))
+  assert.doesNotMatch(insert.sql, /usuario/)
+  assert.equal(calls.some((call) => /SELECT id FROM users WHERE usuario = \?/.test(call.sql)), false)
+})
+
 test('updateUsuario permite fijar y retirar el alias', async () => {
   const calls = []
   const fakeDb = {
     async query(sql, params) {
       calls.push({ sql, params })
+      if (/information_schema\.COLUMNS/.test(sql)) return [[{ total: 1 }]]
       if (/SELECT id FROM users WHERE id = \?/.test(sql)) return [[{ id: 7 }]]
       if (/SELECT id FROM users WHERE usuario = \? AND id != \?/.test(sql)) return [[]]
       if (/UPDATE users SET usuario/.test(sql)) return [{ affectedRows: 1 }]
