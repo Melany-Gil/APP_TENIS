@@ -31,6 +31,13 @@ router.post(
   requireAdmin,
   [
     body('numero_documento').trim().isLength({ min: 5, max: 20 }),
+    body('usuario')
+      .optional({ values: 'falsy' })
+      .trim()
+      .isLength({ min: 3, max: 50 })
+      .withMessage('El usuario debe tener entre 3 y 50 caracteres')
+      .matches(/^[a-zA-Z0-9._-]+$/)
+      .withMessage('El usuario solo admite letras, números, punto, guion y guion bajo'),
     body('nombre').trim().isLength({ min: 2, max: 100 }),
     body('apellido').trim().isLength({ min: 2, max: 100 }),
     body('email').normalizeEmail().isEmail(),
@@ -43,5 +50,21 @@ router.post(
 )
 router.get('/:id', requireAuth, requireAdmin, controller.getById)
 router.put('/:id/rol', requireAuth, requireAdmin, controller.updateRole)
+router.put(
+  '/:id/usuario',
+  requireAuth,
+  requireAdmin,
+  [
+    body('usuario')
+      .optional({ values: 'falsy' })
+      .trim()
+      .isLength({ min: 3, max: 50 })
+      .withMessage('El usuario debe tener entre 3 y 50 caracteres')
+      .matches(/^[a-zA-Z0-9._-]+$/)
+      .withMessage('El usuario solo admite letras, números, punto, guion y guion bajo'),
+  ],
+  validate,
+  controller.updateUsuario
+)
 
 module.exports = router

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { CreditCard, Eye, EyeOff, Lock } from 'lucide-react'
+import { Eye, EyeOff, Lock, UserRound } from 'lucide-react'
 import useAuthStore from '../../store/useAuthStore'
 import useUIStore from '../../store/useUIStore'
 import { authService } from '../../services/authService'
@@ -34,8 +34,8 @@ export default function Login() {
         requestedRedirect || (user.rol === 'juez' ? '/juez' : user.rol === 'admin' ? '/admin' : '/')
       navigate(redirectTo, { replace: true })
     } catch (error) {
-      setError('numero_documento', {
-        message: error.message || 'Documento o contraseña incorrectos',
+      setError('identificador', {
+        message: error.message || 'Documento, usuario o contraseña incorrectos',
       })
     }
   }
@@ -71,28 +71,26 @@ export default function Login() {
 
       <form onSubmit={handleSubmit(onSubmit)} className='flex flex-col gap-5'>
         <div className='form-group'>
-          <label className='form-label'>Número de documento</label>
+          <label className='form-label'>Documento o usuario</label>
           <div className='relative'>
-            <CreditCard
+            <UserRound
               className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none'
               style={{ color: 'var(--text-muted)' }}
             />
             <input
-              inputMode='numeric'
               autoComplete='username'
-              placeholder='1090512345'
-              className={`form-input pl-10 ${errors.numero_documento ? 'error' : ''}`}
-              {...register('numero_documento', {
-                required: 'El número de documento es requerido',
-                minLength: { value: 5, message: 'Documento inválido' },
-                maxLength: { value: 20, message: 'Documento inválido' },
-                pattern: { value: /^\d+$/, message: 'Usa únicamente números' },
+              placeholder='Documento o usuario'
+              className={`form-input pl-10 ${errors.identificador ? 'error' : ''}`}
+              {...register('identificador', {
+                required: 'Ingresa tu documento o usuario',
+                setValueAs: (value) => (typeof value === 'string' ? value.trim() : value),
               })}
             />
           </div>
-          {errors.numero_documento && (
-            <p className='form-error'>{errors.numero_documento.message}</p>
-          )}
+          {errors.identificador && <p className='form-error'>{errors.identificador.message}</p>}
+          <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
+            Los jueces también pueden entrar con el usuario asignado por el club.
+          </p>
         </div>
 
         <Input

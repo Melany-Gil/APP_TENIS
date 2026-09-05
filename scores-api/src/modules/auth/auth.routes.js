@@ -5,12 +5,11 @@ const { requireAuth } = require('../../middlewares/auth.middleware')
 const validate = require('../../middlewares/validate.middleware')
 
 // POST /api/auth/login
+// El identificador (documento o, para jueces, su usuario) se valida en el
+// servicio para poder aceptar tanto `identificador` como `numero_documento`.
 router.post(
   '/login',
-  [
-    body('numero_documento').notEmpty().withMessage('El número de documento es requerido'),
-    body('password').notEmpty().withMessage('La contraseña es requerida'),
-  ],
+  [body('password').notEmpty().withMessage('La contraseña es requerida')],
   validate,
   controller.login
 )

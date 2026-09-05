@@ -46,6 +46,15 @@ exports.updateRole = async (req, res) => {
   }
 }
 
+// PUT /api/users/:id/usuario — solo admin
+exports.updateUsuario = async (req, res) => {
+  try {
+    return success(res, await service.updateUsuario(req.params.id, req.body.usuario))
+  } catch (err) {
+    return error(res, err.message || 'Error al actualizar el usuario', err.status || 500)
+  }
+}
+
 // PUT /api/users/me — usuario autenticado
 exports.updateMe = async (req, res) => {
   try {

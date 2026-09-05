@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Gavel, Plus, Search, Shield, User, X } from 'lucide-react'
+import { Check, Gavel, Pencil, Plus, Search, Shield, User, X } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { userService } from '../../services/userService'
 import useAuthStore from '../../store/useAuthStore'
@@ -14,6 +14,9 @@ export default function GestionUsuarios() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [editingUsuarioId, setEditingUsuarioId] = useState(null)
+  const [usuarioDraft, setUsuarioDraft] = useState('')
+  const [savingUsuario, setSavingUsuario] = useState(false)
   const { user: me } = useAuthStore()
   const { addToast } = useUIStore()
   const {
@@ -38,13 +41,32 @@ export default function GestionUsuarios() {
 
   const createUser = async (data) => {
     try {
-      await userService.create(data)
+      await userService.create({ ...data, usuario: data.usuario?.trim() || undefined })
       addToast({ type: 'success', title: 'Usuario creado correctamente' })
       reset({ rol: 'miembro' })
       setShowCreate(false)
       fetchAll()
     } catch (err) {
       addToast({ type: 'error', title: 'No se pudo crear', message: err.message })
+    }
+  }
+
+  const startEditUsuario = (usuario) => {
+    setEditingUsuarioId(usuario.id)
+    setUsuarioDraft(usuario.usuario || '')
+  }
+
+  const saveUsuario = async (usuario) => {
+    setSavingUsuario(true)
+    try {
+      await userService.updateUsuario(usuario.id, usuarioDraft.trim())
+      addToast({ type: 'success', title: 'Usuario de acceso actualizado' })
+      setEditingUsuarioId(null)
+      fetchAll()
+    } catch (err) {
+      addToast({ type: 'error', title: 'No se pudo guardar', message: err.message })
+    } finally {
+      setSavingUsuario(false)
     }
   }
 
@@ -76,7 +98,7 @@ export default function GestionUsuarios() {
   }
 
   const filtered = usuarios.filter((u) =>
-    `${u.nombre} ${u.apellido} ${u.email} ${u.numero_documento}`
+    `${u.nombre} ${u.apellido} ${u.email} ${u.numero_documento} ${u.usuario || ''}`
       .toLowerCase()
       .includes(search.toLowerCase())
   )
@@ -152,6 +174,26 @@ export default function GestionUsuarios() {
                 className={`form-input ${errors.email ? 'error' : ''}`}
                 {...register('email', { required: true })}
               />
+            </label>
+            <label className='form-group'>
+              <span className='form-label'>Usuario (opcional, para jueces)</span>
+              <input
+                autoComplete='off'
+                placeholder='ej. juan.perez'
+                className={`form-input ${errors.usuario ? 'error' : ''}`}
+                {...register('usuario', {
+                  minLength: { value: 3, message: 'Mínimo 3 caracteres' },
+                  maxLength: { value: 50, message: 'Máximo 50 caracteres' },
+                  pattern: {
+                    value: /^[a-zA-Z0-9._-]+$/,
+                    message: 'Solo letras, números, punto, guion y guion bajo',
+                  },
+                })}
+              />
+              {errors.usuario && <span className='form-error'>{errors.usuario.message}</span>}
+              <span className='text-[11px]' style={{ color: 'var(--text-muted)' }}>
+                Si lo defines, el juez podrá iniciar sesión con este usuario o con su documento.
+              </span>
             </label>
             <label className='form-group'>
               <span className='form-label'>Contraseña temporal</span>
@@ -297,6 +339,51 @@ export default function GestionUsuarios() {
                 <p className='text-xs truncate' style={{ color: 'var(--text-muted)' }}>
                   CC: {u.numero_documento} · {u.email}
                 </p>
+                {u.rol === 'juez' &&
+                  (editingUsuarioId === u.id ? (
+                    <div className='flex items-center gap-1 mt-0.5'>
+                      <input
+                        value={usuarioDraft}
+                        onChange={(e) => setUsuarioDraft(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && saveUsuario(u)}
+                        placeholder='usuario de acceso'
+                        autoFocus
+                        className='form-input py-1 text-xs'
+                      />
+                      <button
+                        type='button'
+                        onClick={() => saveUsuario(u)}
+                        disabled={savingUsuario}
+                        className='p-1'
+                        aria-label='Guardar usuario'
+                      >
+                        <Check className='w-3.5 h-3.5' style={{ color: 'var(--color-brand)' }} />
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() => setEditingUsuarioId(null)}
+                        className='p-1'
+                        aria-label='Cancelar'
+                      >
+                        <X className='w-3.5 h-3.5' style={{ color: 'var(--text-muted)' }} />
+                      </button>
+                    </div>
+                  ) : (
+                    <p
+                      className='text-[11px] flex items-center gap-1 mt-0.5'
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Usuario: {u.usuario || <span className='italic'>sin definir</span>}
+                      <button
+                        type='button'
+                        onClick={() => startEditUsuario(u)}
+                        className='p-0.5 opacity-60 hover:opacity-100'
+                        aria-label='Editar usuario de acceso'
+                      >
+                        <Pencil className='w-3 h-3' />
+                      </button>
+                    </p>
+                  ))}
                 <p className='text-[10px]' style={{ color: 'var(--text-muted)' }}>
                   Registrado {formatDate(u.created_at)}
                 </p>

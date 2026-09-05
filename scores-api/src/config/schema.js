@@ -150,6 +150,23 @@ exports.ensureSchema = async () => {
   if (!(await columnExists('users', 'avatar'))) {
     await db.query('ALTER TABLE users ADD COLUMN avatar VARCHAR(255) NULL AFTER telefono')
   }
+  if (!(await columnExists('users', 'usuario'))) {
+    await db.query('ALTER TABLE users ADD COLUMN usuario VARCHAR(50) NULL AFTER numero_documento')
+  }
+  if (!(await uniqueColumnIndexExists('users', 'usuario'))) {
+    const [duplicates] = await db.query(
+      `SELECT usuario
+       FROM users
+       WHERE usuario IS NOT NULL
+       GROUP BY usuario
+       HAVING COUNT(*) > 1
+       LIMIT 1`
+    )
+    if (duplicates.length) {
+      throw new Error('Hay usuarios con el mismo alias; corrige los duplicados antes de continuar')
+    }
+    await db.query('ALTER TABLE users ADD UNIQUE KEY uq_users_usuario (usuario)')
+  }
   if (!(await columnExists('jugadores', 'user_id'))) {
     await db.query('ALTER TABLE jugadores ADD COLUMN user_id INT NULL AFTER id')
   }

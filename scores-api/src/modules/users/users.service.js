@@ -2,7 +2,12 @@ const db = require('../../config/db')
 const bcrypt = require('bcryptjs')
 
 const SAFE_FIELDS =
-  'u.id, u.numero_documento, u.nombre, u.apellido, u.email, u.telefono, u.avatar, u.rol, u.activo, u.created_at'
+  'u.id, u.numero_documento, u.usuario, u.nombre, u.apellido, u.email, u.telefono, u.avatar, u.rol, u.activo, u.created_at'
+
+const normalizeUsuario = (value) => {
+  const text = String(value ?? '').trim()
+  return text ? text.slice(0, 50) : null
+}
 
 const USER_WITH_PLAYER = `
   SELECT ${SAFE_FIELDS},
@@ -27,6 +32,7 @@ exports.getById = async (id) => {
 
 exports.create = async ({
   numero_documento,
+  usuario,
   nombre,
   apellido,
   email,
@@ -38,6 +44,8 @@ exports.create = async ({
     throw { status: 400, message: 'Rol inválido' }
   }
 
+  const alias = normalizeUsuario(usuario)
+
   const [existing] = await db.query(
     'SELECT id FROM users WHERE numero_documento = ? OR email = ? LIMIT 1',
     [numero_documento, email.toLowerCase()]
@@ -45,14 +53,21 @@ exports.create = async ({
   if (existing.length) {
     throw { status: 409, message: 'El documento o correo ya está registrado' }
   }
+  if (alias) {
+    const [dupAlias] = await db.query('SELECT id FROM users WHERE usuario = ? LIMIT 1', [alias])
+    if (dupAlias.length) {
+      throw { status: 409, message: 'Ese usuario ya está en uso por otra cuenta' }
+    }
+  }
 
   const hashedPassword = await bcrypt.hash(password, 12)
   const [result] = await db.query(
     `INSERT INTO users
-       (numero_documento, nombre, apellido, email, password, telefono, rol, activo)
-     VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
+       (numero_documento, usuario, nombre, apellido, email, password, telefono, rol, activo)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
     [
       numero_documento.trim(),
+      alias,
       nombre.trim(),
       apellido.trim(),
       email.trim().toLowerCase(),
@@ -63,6 +78,25 @@ exports.create = async ({
   )
 
   return exports.getById(result.insertId)
+}
+
+exports.updateUsuario = async (id, usuario) => {
+  const [existing] = await db.query('SELECT id FROM users WHERE id = ?', [id])
+  if (!existing.length) throw { status: 404, message: 'Usuario no encontrado' }
+
+  const alias = normalizeUsuario(usuario)
+  if (alias) {
+    const [dup] = await db.query('SELECT id FROM users WHERE usuario = ? AND id != ? LIMIT 1', [
+      alias,
+      id,
+    ])
+    if (dup.length) {
+      throw { status: 409, message: 'Ese usuario ya está en uso por otra cuenta' }
+    }
+  }
+
+  await db.query('UPDATE users SET usuario = ?, updated_at = NOW() WHERE id = ?', [alias, id])
+  return exports.getById(id)
 }
 
 exports.updateRole = async (id, rol, requesterId) => {
@@ -128,6 +162,7 @@ function formatUser(row) {
   return {
     id: row.id,
     numero_documento: row.numero_documento,
+    usuario: row.usuario || null,
     nombre: row.nombre,
     apellido: row.apellido,
     email: row.email,

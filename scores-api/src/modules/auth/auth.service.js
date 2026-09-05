@@ -16,6 +16,7 @@ const publicUser = (user) => ({
   apellido: user.apellido,
   email: user.email,
   numero_documento: user.numero_documento,
+  usuario: user.usuario || null,
   rol: user.rol || 'miembro',
   telefono: user.telefono || null,
   avatar: user.avatar || null,
@@ -46,14 +47,26 @@ const mailFromAddress = () => {
   return (addressBetweenBrackets?.[1] || configured.split(/[;,]/)[0]).trim()
 }
 
-exports.login = async ({ numero_documento, password }) => {
+exports.login = async ({ identificador, numero_documento, password }) => {
+  // Acepta el número de documento (cualquier usuario) o el alias "usuario"
+  // (solo cuentas con rol juez). Se conserva `numero_documento` por
+  // compatibilidad con clientes antiguos.
+  const credential = String(identificador ?? numero_documento ?? '').trim()
+  if (!credential) {
+    throw { status: 400, message: 'Ingresa tu documento o usuario' }
+  }
+
   const [rows] = await db.query(
-    'SELECT * FROM users WHERE numero_documento = ? AND activo = TRUE LIMIT 1',
-    [numero_documento]
+    `SELECT * FROM users
+     WHERE activo = TRUE
+       AND (numero_documento = ? OR (usuario = ? AND rol = 'juez'))
+     ORDER BY (numero_documento = ?) DESC
+     LIMIT 1`,
+    [credential, credential, credential]
   )
 
   if (!rows.length || !(await bcrypt.compare(password, rows[0].password))) {
-    throw { status: 401, message: 'Documento o contraseña incorrectos' }
+    throw { status: 401, message: 'Documento, usuario o contraseña incorrectos' }
   }
 
   return { token: signToken(rows[0]), user: publicUser(rows[0]) }
