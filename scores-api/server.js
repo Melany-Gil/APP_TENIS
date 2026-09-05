@@ -135,19 +135,42 @@ app.use((error, _req, res, _next) => {
 })
 
 const port = process.env.PORT || 3001
+
+// ensureSchema() debe ejecutarse una sola vez por proceso, sin importar cómo se
+// arranque la app: `node server.js` (Render) llama a app.start(); Passenger
+// (Hostinger) carga el módulo con require() y sirve `module.exports` sin llamar
+// a app.start(), por lo que la migración de esquema se dispara aquí igualmente.
+let schemaPromise = null
+app.ensureSchemaOnce = () => {
+  if (!schemaPromise) {
+    schemaPromise = ensureSchema().catch((error) => {
+      console.error('❌  No fue posible actualizar el esquema:', error.message)
+      throw error
+    })
+  }
+  return schemaPromise
+}
+
 app.start = () => {
-  return ensureSchema()
+  return app
+    .ensureSchemaOnce()
     .then(() => {
       app.listen(port, '0.0.0.0', () => {
         console.log(`Tenis Club Unión API disponible en el puerto ${port}`)
       })
     })
-    .catch((error) => {
-      console.error('❌  No fue posible actualizar el esquema:', error.message)
+    .catch(() => {
       process.exitCode = 1
     })
 }
 
-if (require.main === module) app.start()
+if (require.main === module) {
+  app.start()
+} else {
+  // Arranque gestionado (Passenger u otro loader): migra el esquema en segundo
+  // plano. Los primeros milisegundos tras un despliegue pueden servir peticiones
+  // mientras corre el ALTER; se resuelve solo en cuanto termina.
+  app.ensureSchemaOnce().catch(() => {})
+}
 
 module.exports = app

@@ -86,3 +86,24 @@ test('login sin coincidencias responde 401', async () => {
     (error) => error.status === 401
   )
 })
+
+test('si falta la columna usuario, degrada a login solo por documento', async () => {
+  const calls = []
+  const service = loadService({
+    async query(sql, params) {
+      calls.push(sql)
+      if (/usuario = \?/.test(sql)) {
+        const err = new Error("Unknown column 'usuario' in 'where clause'")
+        err.code = 'ER_BAD_FIELD_ERROR'
+        throw err
+      }
+      assert.equal(params[0], '1090512345')
+      return [[judgeRow]]
+    },
+  })
+
+  const result = await service.login({ identificador: '1090512345', password: 'Secret123' })
+  assert.equal(result.user.id, 7)
+  assert.ok(calls.some((sql) => /usuario = \?/.test(sql)))
+  assert.ok(calls.some((sql) => /numero_documento = \? AND activo = TRUE LIMIT 1/.test(sql)))
+})

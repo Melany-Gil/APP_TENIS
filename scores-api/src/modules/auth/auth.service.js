@@ -56,14 +56,25 @@ exports.login = async ({ identificador, numero_documento, password }) => {
     throw { status: 400, message: 'Ingresa tu documento o usuario' }
   }
 
-  const [rows] = await db.query(
-    `SELECT * FROM users
-     WHERE activo = TRUE
-       AND (numero_documento = ? OR (usuario = ? AND rol = 'juez'))
-     ORDER BY (numero_documento = ?) DESC
-     LIMIT 1`,
-    [credential, credential, credential]
-  )
+  let rows
+  try {
+    ;[rows] = await db.query(
+      `SELECT * FROM users
+       WHERE activo = TRUE
+         AND (numero_documento = ? OR (usuario = ? AND rol = 'juez'))
+       ORDER BY (numero_documento = ?) DESC
+       LIMIT 1`,
+      [credential, credential, credential]
+    )
+  } catch (error) {
+    // Si la columna `usuario` aún no existe (migración pendiente tras un
+    // despliegue), se degrada a login solo por documento para no bloquear el acceso.
+    if (error.code !== 'ER_BAD_FIELD_ERROR') throw error
+    ;[rows] = await db.query(
+      'SELECT * FROM users WHERE numero_documento = ? AND activo = TRUE LIMIT 1',
+      [credential]
+    )
+  }
 
   if (!rows.length || !(await bcrypt.compare(password, rows[0].password))) {
     throw { status: 401, message: 'Documento, usuario o contraseña incorrectos' }
