@@ -1,0 +1,12 @@
+{
+  "name": "tenis-hosting",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "postinstall": "node scripts/build-hostinger.cjs",
+    "build": "node scripts/build-hostinger.cjs",
+    "start": "node server.js",
+    "test": "npm --prefix scores-api test"
+  }
+}

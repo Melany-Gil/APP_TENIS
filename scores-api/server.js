@@ -135,8 +135,8 @@ app.use((error, _req, res, _next) => {
 })
 
 const port = process.env.PORT || 3001
-if (require.main === module) {
-  ensureSchema()
+app.start = () => {
+  return ensureSchema()
     .then(() => {
       app.listen(port, '0.0.0.0', () => {
         console.log(`Tenis Club Unión API disponible en el puerto ${port}`)
@@ -147,5 +147,7 @@ if (require.main === module) {
       process.exitCode = 1
     })
 }
+
+if (require.main === module) app.start()
 
 module.exports = app
