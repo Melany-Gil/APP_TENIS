@@ -223,6 +223,13 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
         <ScreenPlayer name={p1} photo={match.jugador1?.foto} side='jugador1' index={0} marker={marker} visibleSets={visibleSets} featured={featured} />
         <div className='h-px bg-white/10 my-2' />
         <ScreenPlayer name={p2} photo={match.jugador2?.foto} side='jugador2' index={1} marker={marker} visibleSets={visibleSets} featured={featured} />
+        {marker?.breakpoint && !isFinished && (
+          <div className='mt-2 text-center'>
+            <span className='inline-block rounded-full px-3 py-1 text-xs font-bold' style={{ backgroundColor: 'rgba(239,68,68,0.2)', color: '#fca5a5' }}>
+              {marker.breakpoint.count === 2 ? '2 BREAK POINTS' : 'BREAK POINT'}
+            </span>
+          </div>
+        )}
         {featured && (
           <>
             <section

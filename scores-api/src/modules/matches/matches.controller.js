@@ -50,6 +50,15 @@ exports.update = async (req, res) => {
   }
 }
 
+// PUT /api/partidos/:id/participantes — renombrar o reasignar participantes
+exports.updateParticipants = async (req, res) => {
+  try {
+    return changed(res, await service.updateParticipants(req.params.id, req.body, req.user), req.params.id)
+  } catch (err) {
+    return error(res, err.message, err.status || 500)
+  }
+}
+
 // PUT /api/partidos/:id/marcador — actualizar sets en tiempo real
 exports.updateMarcador = async (req, res) => {
   try {

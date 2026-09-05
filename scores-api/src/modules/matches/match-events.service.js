@@ -2,6 +2,7 @@ const db = require('../../config/db')
 const matchesService = require('./matches.service')
 const {
   applyEvent,
+  computeBreakpoint,
   createInitialState,
   projectSets,
   serializeState,
@@ -43,9 +44,12 @@ exports.getControl = async (id, user) => {
     [id]
   )
 
+  const breakpoint = computeBreakpoint(state, matchRow)
+
   return {
     partido: match,
-    marcador: serializeState(state),
+    marcador: { ...serializeState(state), breakpoint },
+    breakpoint,
     estadisticas: buildStats(pointEvents),
     eventos_recientes: lastEvents.map(formatEvent),
     en_vivo: formatLiveState(liveRows[0]),

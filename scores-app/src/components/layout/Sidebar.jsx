@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, Radio, Trophy, Star, User, Settings, LogOut, ShieldCheck, LogIn } from 'lucide-react'
+import { Home, Radio, Trophy, Star, User, Settings, LogOut, ShieldCheck, LogIn, Handshake, Gavel } from 'lucide-react'
 import { useEffect } from 'react'
 import useUIStore from '../../store/useUIStore'
 import useAuthStore from '../../store/useAuthStore'
@@ -7,7 +7,7 @@ import { authService } from '../../services/authService'
 import { cn } from '../../utils/cn'
 import Avatar from '../ui/Avatar'
 
-const NAV = [
+const NAV_FULL = [
   { to: '/', icon: Home, label: 'Inicio', exact: true },
   { to: '/live', icon: Radio, label: 'En Vivo', dot: true },
   { to: '/tennis', icon: Trophy, label: 'Tenis' },
@@ -17,11 +17,20 @@ const NAV = [
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ]
 
+const NAV_JUEZ = [
+  { to: '/sponsors', icon: Handshake, label: 'Patrocinadores' },
+  { to: '/juez', icon: Gavel, label: 'Juez' },
+  { divider: true },
+  { to: '/profile', icon: User, label: 'Mi Perfil' },
+]
+
 export default function Sidebar() {
   const { sidebarCollapsed, setSidebarCollapsed } = useUIStore()
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const isAdmin = user?.rol === 'admin'
+  const isJuez = user?.rol === 'juez'
+  const NAV = isJuez ? NAV_JUEZ : NAV_FULL
 
   // Solo se ejecuta una vez al montar (ya no se remonta al navegar
   // gracias al Suspense local en cada layout) — inicia cerrado.

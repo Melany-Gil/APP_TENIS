@@ -246,6 +246,32 @@ function projectSets(state) {
   }))
 }
 
+function computeBreakpoint(state, match = {}) {
+  if (state.mode !== 'game') return null
+  const config = normalizeConfig(match)
+  const serverIndex = sideIndex(state.server)
+  const returnerIndex = serverIndex === 0 ? 1 : 0
+  const serverPoints = state.points[serverIndex]
+  const returnerPoints = state.points[returnerIndex]
+
+  const returnerAfter = returnerPoints + 1
+  let willWin
+  if (config.gameMode === 'sin_ventaja') {
+    willWin = returnerAfter >= 4
+  } else {
+    willWin = returnerAfter >= 4 && returnerAfter - serverPoints >= 2
+  }
+  if (!willWin) return null
+
+  const diff = returnerPoints - serverPoints
+  const isDoubleBreak = diff >= 2
+  return {
+    server: state.server,
+    type: isDoubleBreak ? 'double_break_point' : 'break_point',
+    count: isDoubleBreak ? 2 : 1,
+  }
+}
+
 function serializeState(state) {
   return {
     ...state,
@@ -256,6 +282,7 @@ function serializeState(state) {
 module.exports = {
   POINT_REASONS,
   applyEvent,
+  computeBreakpoint,
   createInitialState,
   normalizeConfig,
   otherSide,

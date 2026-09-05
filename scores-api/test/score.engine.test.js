@@ -3,6 +3,7 @@ const assert = require('node:assert/strict')
 
 const {
   applyEvent,
+  computeBreakpoint,
   createInitialState,
   pointDisplay,
   projectSets,
@@ -322,4 +323,62 @@ test('set decisivo sin match_tiebreak usa tiebreak normal a 7', () => {
   assert.equal(state.winner, 'jugador1')
   assert.equal(projectSets(state)[2].games_j1, 7)
   assert.equal(projectSets(state)[2].games_j2, 6)
+})
+
+// ── Break point ──────────────────────────────────────────────────────
+
+test('computeBreakpoint retorna null cuando no hay breakpoint', () => {
+  const state = createInitialState()
+  state.points = [0, 0]
+  assert.equal(computeBreakpoint(state), null)
+})
+
+test('computeBreakpoint detecta breakpoint simple (30-40)', () => {
+  const state = createInitialState()
+  state.server = 'jugador1'
+  state.points = [2, 3]
+  const bp = computeBreakpoint(state)
+  assert.equal(bp.type, 'break_point')
+  assert.equal(bp.count, 1)
+  assert.equal(bp.server, 'jugador1')
+})
+
+test('computeBreakpoint detecta doble breakpoint (15-40)', () => {
+  const state = createInitialState()
+  state.server = 'jugador1'
+  state.points = [1, 3]
+  const bp = computeBreakpoint(state)
+  assert.equal(bp.type, 'double_break_point')
+  assert.equal(bp.count, 2)
+})
+
+test('computeBreakpoint no detecta breakpoint en 30-30', () => {
+  const state = createInitialState()
+  state.server = 'jugador1'
+  state.points = [2, 2]
+  assert.equal(computeBreakpoint(state), null)
+})
+
+test('computeBreakpoint no detecta breakpoint en 40-30', () => {
+  const state = createInitialState()
+  state.server = 'jugador1'
+  state.points = [3, 2]
+  assert.equal(computeBreakpoint(state), null)
+})
+
+test('computeBreakpoint no aplica en tiebreak', () => {
+  const state = createInitialState()
+  state.mode = 'tiebreak'
+  state.server = 'jugador1'
+  state.points = [5, 8]
+  assert.equal(computeBreakpoint(state), null)
+})
+
+test('computeBreakpoint funciona con sin_ventaja', () => {
+  const state = createInitialState()
+  state.server = 'jugador1'
+  state.points = [2, 3]
+  const bp = computeBreakpoint(state, { modo_game: 'sin_ventaja' })
+  assert.equal(bp.type, 'break_point')
+  assert.equal(bp.count, 1)
 })

@@ -171,9 +171,24 @@ export default function Header() {
 }
 
 function NavigationLinks({ isAdmin, isOfficial }) {
-  const items = isOfficial
-    ? [...NAV_ITEMS, { to: '/juez', icon: Gavel, label: 'Juez' }, ...(isAdmin ? [{ to: '/admin', icon: ShieldCheck, label: 'Administración' }] : [])]
-    : NAV_ITEMS
+  const { user } = useAuthStore()
+  const isJuez = user?.rol === 'juez'
+
+  let items
+  if (isJuez) {
+    items = [
+      ...NAV_ITEMS.filter((item) => ['/sponsors', '/profile'].includes(item.to)),
+      { to: '/juez', icon: Gavel, label: 'Juez' },
+    ]
+  } else if (isOfficial) {
+    items = [
+      ...NAV_ITEMS,
+      { to: '/juez', icon: Gavel, label: 'Juez' },
+      ...(isAdmin ? [{ to: '/admin', icon: ShieldCheck, label: 'Administración' }] : []),
+    ]
+  } else {
+    items = NAV_ITEMS
+  }
 
   return items.map((item) => (
     <NavLink

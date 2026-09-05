@@ -548,6 +548,44 @@ export default function GestionPartidos() {
                   </p>
                 </div>
               </div>
+
+              <div className='flex gap-2'>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setValue('set_decisivo', 'match_tiebreak')
+                    setValue('tiebreak_en', '6')
+                    setValue('tiebreak_puntos', '7')
+                    setValue('match_tiebreak_puntos', '10')
+                  }}
+                  className='flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all'
+                  style={{
+                    backgroundColor: watch('set_decisivo') === 'match_tiebreak' ? 'var(--color-brand-dim)' : 'var(--bg-primary)',
+                    color: watch('set_decisivo') === 'match_tiebreak' ? 'var(--color-brand)' : 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
+                  }}
+                >
+                  Normal (3er set = Supertiebreak)
+                </button>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setValue('set_decisivo', 'set_completo')
+                    setValue('tiebreak_en', '6')
+                    setValue('tiebreak_puntos', '7')
+                    setValue('match_tiebreak_puntos', '10')
+                  }}
+                  className='flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all'
+                  style={{
+                    backgroundColor: watch('set_decisivo') === 'set_completo' ? 'var(--color-brand-dim)' : 'var(--bg-primary)',
+                    color: watch('set_decisivo') === 'set_completo' ? 'var(--color-brand)' : 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
+                  }}
+                >
+                  Super Game (3er set completo)
+                </button>
+              </div>
+
               <div className='grid grid-cols-2 sm:grid-cols-3 gap-3'>
                 <label className='form-group'>
                   <span className='form-label'>Mejor de</span>

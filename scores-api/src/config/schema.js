@@ -466,6 +466,20 @@ exports.ensureSchema = async () => {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
 
+  if (!(await columnExists('partidos', 'nombre_override'))) {
+    await db.query('ALTER TABLE partidos ADD COLUMN nombre_override VARCHAR(100) NULL AFTER notas')
+  }
+  if (!(await columnExists('partidos', 'nombre_override_j1'))) {
+    await db.query(
+      'ALTER TABLE partidos ADD COLUMN nombre_override_j1 VARCHAR(100) NULL AFTER nombre_override'
+    )
+  }
+  if (!(await columnExists('partidos', 'nombre_override_j2'))) {
+    await db.query(
+      'ALTER TABLE partidos ADD COLUMN nombre_override_j2 VARCHAR(100) NULL AFTER nombre_override_j1'
+    )
+  }
+
   const cleanup = await runOneTimeMatchCleanup()
   if (cleanup) {
     console.log(

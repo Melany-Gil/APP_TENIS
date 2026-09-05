@@ -1,5 +1,6 @@
 const db = require('../../config/db')
 const { rethrowDeleteConflict } = require('../../utils/deleteConflict')
+const { computeBreakpoint } = require('./score.engine')
 
 const MAX_SETS = 127
 
@@ -16,6 +17,9 @@ const MATCH_SELECT = `
     p.grupo,
     p.ronda,
     p.notas,
+    p.nombre_override,
+    p.nombre_override_j1,
+    p.nombre_override_j2,
     p.origen_partido1_id,
     p.origen_partido2_id,
     p.juez_id,
@@ -539,6 +543,62 @@ exports.remove = async (id) => {
   return { message: 'Partido eliminado correctamente' }
 }
 
+exports.updateParticipants = async (id, data, user) => {
+  const [existing] = await db.query('SELECT id, juez_id FROM partidos WHERE id = ?', [id])
+  if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
+
+  const match = existing[0]
+  if (user.rol !== 'admin' && Number(match.juez_id) !== Number(user.id)) {
+    throw { status: 403, message: 'No tienes permiso para modificar este partido' }
+  }
+
+  const updates = []
+  const params = []
+
+  const cleanName = (value) => {
+    const text = String(value ?? '').trim()
+    return text ? text.slice(0, 100) : null
+  }
+
+  if (data.nombre_override !== undefined) {
+    updates.push('nombre_override = ?')
+    params.push(cleanName(data.nombre_override))
+  }
+  if (data.nombre_override_j1 !== undefined) {
+    updates.push('nombre_override_j1 = ?')
+    params.push(cleanName(data.nombre_override_j1))
+  }
+  if (data.nombre_override_j2 !== undefined) {
+    updates.push('nombre_override_j2 = ?')
+    params.push(cleanName(data.nombre_override_j2))
+  }
+  if (data.jugador1_id !== undefined) {
+    updates.push('jugador1_id = ?')
+    params.push(positiveId(data.jugador1_id))
+  }
+  if (data.jugador2_id !== undefined) {
+    updates.push('jugador2_id = ?')
+    params.push(positiveId(data.jugador2_id))
+  }
+  if (data.equipo1_id !== undefined) {
+    updates.push('equipo1_id = ?')
+    params.push(positiveId(data.equipo1_id))
+  }
+  if (data.equipo2_id !== undefined) {
+    updates.push('equipo2_id = ?')
+    params.push(positiveId(data.equipo2_id))
+  }
+
+  if (updates.length === 0) {
+    throw { status: 400, message: 'No hay cambios para guardar' }
+  }
+
+  params.push(id)
+  await db.query(`UPDATE partidos SET ${updates.join(', ')} WHERE id = ?`, params)
+
+  return exports.getById(id)
+}
+
 async function validateBasicMatch(body, currentMatchId = null) {
   const torneoId = positiveId(body.torneo_id)
   if (body.torneo_id !== undefined && body.torneo_id !== null && body.torneo_id !== '' && !torneoId) {
@@ -920,6 +980,20 @@ async function propagateWinner(connection, match, estado, ganador) {
 }
 
 function formatSummary(row) {
+  const snapshot = parseScoreSnapshot(row.marcador_actual)
+  const matchConfig = {
+    mejor_de_sets: Number(row.mejor_de_sets || 3),
+    juegos_por_set: Number(row.juegos_por_set || 6),
+    diferencia_juegos: Number(row.diferencia_juegos || 2),
+    modo_game: row.modo_game || 'ventaja',
+    set_decisivo: row.set_decisivo || 'set_completo',
+    tiebreak_en: Number(row.tiebreak_en ?? 6),
+    tiebreak_puntos: Number(row.tiebreak_puntos || 7),
+    match_tiebreak_puntos: Number(row.match_tiebreak_puntos || 10),
+    servidor_inicial: row.servidor_inicial || 'jugador1',
+  }
+  const isLiveMatch = row.estado !== 'finalizado' && row.estado !== 'cancelado'
+  const breakpoint = snapshot && isLiveMatch ? computeBreakpoint(snapshot, matchConfig) : null
   const match = {
     id: row.id,
     deporte: row.deporte,
@@ -940,7 +1014,10 @@ function formatSummary(row) {
     grupo: row.grupo || null,
     ronda: row.ronda || null,
     notas: row.notas || null,
-    marcador_actual: parseScoreSnapshot(row.marcador_actual),
+    nombre_override: row.nombre_override || null,
+    nombre_override_j1: row.nombre_override_j1 || null,
+    nombre_override_j2: row.nombre_override_j2 || null,
+    marcador_actual: snapshot ? { ...snapshot, breakpoint } : null,
     cancha: row.cancha_id
       ? {
           id: row.cancha_id,
@@ -960,17 +1037,7 @@ function formatSummary(row) {
     juez: row.juez_id
       ? { id: row.juez_id, nombre: row.juez_nombre, apellido: row.juez_apellido }
       : null,
-    formato: {
-      mejor_de_sets: Number(row.mejor_de_sets || 3),
-      juegos_por_set: Number(row.juegos_por_set || 6),
-      diferencia_juegos: Number(row.diferencia_juegos || 2),
-      modo_game: row.modo_game || 'ventaja',
-      set_decisivo: row.set_decisivo || 'set_completo',
-      tiebreak_en: Number(row.tiebreak_en ?? 6),
-      tiebreak_puntos: Number(row.tiebreak_puntos || 7),
-      match_tiebreak_puntos: Number(row.match_tiebreak_puntos || 10),
-      servidor_inicial: row.servidor_inicial || 'jugador1',
-    },
+    formato: matchConfig,
     origen_partido1: formatMatchSource(row, 1),
     origen_partido2: formatMatchSource(row, 2),
     categoria: row.categoria_id

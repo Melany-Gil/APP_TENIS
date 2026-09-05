@@ -20,6 +20,8 @@ router.post('/:id/deshacer', requireAuth, requireOfficial, controller.undoEvent)
 router.post('/', requireAuth, requireOfficial, controller.create)
 // PUT  /api/partidos/:id
 router.put('/:id', requireAuth, requireOfficial, controller.update)
+// PUT  /api/partidos/:id/participantes  — renombrar o reasignar participantes
+router.put('/:id/participantes', requireAuth, requireOfficial, controller.updateParticipants)
 // PUT  /api/partidos/:id/marcador  — actualizar sets en vivo
 router.put('/:id/marcador', requireAuth, requireOfficial, controller.updateMarcador)
 // DELETE /api/partidos/:id

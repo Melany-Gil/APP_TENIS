@@ -34,6 +34,7 @@ const toJudgeState = (control) => {
       deuce: displayPoints[0] === '40' && displayPoints[1] === '40',
       terminado: Boolean(winner),
       ganador: winner,
+      breakpoint: control.breakpoint || null,
     },
     en_vivo: {
       ...live,
@@ -61,6 +62,7 @@ export const matchService = {
   getFinished: () => api.get('/partidos', { params: { estado: 'finalizado' } }),
   create: (data) => api.post('/partidos', data),
   update: (id, data) => api.put(`/partidos/${id}`, data),
+  updateParticipants: (id, data) => api.put(`/partidos/${id}/participantes`, data),
   updateMarcador: (id, data) => api.put(`/partidos/${id}/marcador`, data),
   getManaged: () => api.get('/partidos/gestion/mis-partidos'),
   getControl: (id) => api.get(`/partidos/${id}/control`),

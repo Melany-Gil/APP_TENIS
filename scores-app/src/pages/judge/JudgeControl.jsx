@@ -4,8 +4,8 @@ import {
   ArrowLeft,
   BarChart3,
   Check,
-  CircleDot,
   Clock3,
+  Pencil,
   Pause,
   Play,
   RotateCcw,
@@ -23,15 +23,17 @@ import { matchService } from '../../services/matchService'
 import useUIStore from '../../store/useUIStore'
 import { getParticipantName } from '../../utils/matchParticipants'
 
-const REASONS = [
-  { value: 'ace', label: 'Ace', detail: 'Saque válido que el receptor no toca', icon: Sparkles },
-  { value: 'tiro_ganador', label: 'Tiro ganador', detail: 'Golpe directo que no puede devolverse', icon: Trophy },
-  { value: 'error_forzado', label: 'Error forzado', detail: 'La presión del rival provoca el error', icon: Check },
-  { value: 'error_no_forzado', label: 'Error no forzado', detail: 'El rival falla sin presión suficiente', icon: X },
-  { value: 'doble_falta', label: 'Doble falta', detail: 'Falló también el segundo servicio', icon: AlertTriangle },
-  { value: 'penalizacion', label: 'Penalización', detail: 'Punto otorgado por decisión del juez', icon: CircleDot },
-  { value: 'infraccion', label: 'Infracción', detail: 'Toque, invasión u otra infracción', icon: AlertTriangle },
-]
+const REASONS = {
+  positive: [
+    { value: 'ace', label: 'Ace', detail: 'Saque directo', icon: Sparkles },
+    { value: 'tiro_ganador', label: 'Winner', detail: 'Tiro ganador', icon: Trophy },
+  ],
+  negative: [
+    { value: 'error_no_forzado', label: 'Error no forzado', detail: 'Error del rival', icon: X },
+    { value: 'falta', label: 'Falta', detail: 'Primera falta', icon: AlertTriangle },
+    { value: 'doble_falta', label: 'Doble falta', detail: 'Segunda falta', icon: AlertTriangle },
+  ],
+}
 
 export default function JudgeControl() {
   const { id } = useParams()
@@ -88,10 +90,19 @@ export default function JudgeControl() {
   const isStarted = Boolean(liveState?.iniciado_at) || partido.estado === 'en_vivo' || isFinished
   const isPaused = Boolean(liveState?.pausado_at)
   const receiver = marcador.server === 'jugador1' ? 'jugador2' : 'jugador1'
+  const isFirstServe = marcador.serviceAttempt === 1
   const { formatted: elapsed } = matchTimer
 
   const registerPoint = (winner, reason = 'punto_sin_detalle') =>
     run(() => matchService.addEvent(id, { tipo: 'punto', ganador: winner, motivo: reason }))
+
+  const handleReasonClick = (reason) => {
+    if (reason === 'falta' && isFirstServe) {
+      run(() => matchService.addEvent(id, { tipo: 'primera_falta' }))
+      return
+    }
+    registerPoint(selectedWinner, reason)
+  }
 
   const chooseWinner = (winner) => {
     if (quickMode) registerPoint(winner)
@@ -100,7 +111,8 @@ export default function JudgeControl() {
 
   const reasonDisabled = (reason) => {
     if (reason === 'ace') return selectedWinner !== marcador.server
-    if (reason === 'doble_falta') return marcador.serviceAttempt !== 2 || selectedWinner !== receiver
+    if (reason === 'doble_falta') return isFirstServe || selectedWinner !== receiver
+    if (reason === 'falta') return !isFirstServe
     return false
   }
 
@@ -143,16 +155,18 @@ export default function JudgeControl() {
           </div>
         </div>
 
-        <Scoreboard marcador={marcador} names={names} />
+        <Scoreboard marcador={marcador} names={names} matchId={id} onSaved={load} />
 
         {!isFinished && (
           <div className='px-4 pb-4 flex flex-wrap items-center gap-2'>
             <span className='text-xs font-semibold rounded-full px-3 py-1.5' style={{ backgroundColor: 'var(--color-brand-dim)', color: 'var(--color-brand)' }}>
               Servicio: {names[marcador.server]}
             </span>
-            <span className='text-xs rounded-full px-3 py-1.5' style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
-              {marcador.serviceAttempt === 2 ? 'Segundo servicio' : 'Primer servicio'}
-            </span>
+            {marcador.breakpoint && (
+              <span className='text-xs font-bold rounded-full px-3 py-1.5' style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
+                {marcador.breakpoint.count === 2 ? '2 BP' : 'BP'}
+              </span>
+            )}
           </div>
         )}
       </section>
@@ -200,9 +214,6 @@ export default function JudgeControl() {
               </div>
 
               <div className='grid grid-cols-2 gap-3'>
-                <button type='button' disabled={busy || marcador.serviceAttempt === 2} onClick={() => run(() => matchService.addEvent(id, { tipo: 'primera_falta' }))} className='btn-secondary min-h-14 justify-center disabled:opacity-40'>
-                  <AlertTriangle className='w-4 h-4' /> Primera falta
-                </button>
                 <button type='button' disabled={busy} onClick={() => run(() => matchService.addEvent(id, { tipo: 'let' }))} className='btn-secondary min-h-14 justify-center disabled:opacity-40'>
                   <RotateCcw className='w-4 h-4' /> Let / repetir
                 </button>
@@ -214,24 +225,43 @@ export default function JudgeControl() {
             <div className='rounded-2xl p-4 animate-fade-up' style={{ border: '2px solid var(--color-brand)', backgroundColor: 'var(--bg-card)' }}>
               <div className='flex justify-between gap-3 mb-3'>
                 <div>
-                  <p className='text-xs uppercase font-bold' style={{ color: 'var(--color-brand)' }}>Justificar el punto</p>
+                  <p className='text-xs uppercase font-bold' style={{ color: 'var(--color-brand)' }}>¿Cómo terminó el punto?</p>
                   <h3 className='font-extrabold mt-1' style={{ color: 'var(--text-primary)' }}>{names[selectedWinner]}</h3>
                 </div>
                 <button type='button' className='btn-ghost p-2' onClick={() => setSelectedWinner(null)}><X className='w-4 h-4' /></button>
               </div>
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
-                {REASONS.map((reason) => {
-                  const disabled = reasonDisabled(reason.value)
-                  return (
-                    <button key={reason.value} type='button' disabled={busy || disabled} onClick={() => registerPoint(selectedWinner, reason.value)} className='text-left rounded-xl p-3 flex gap-3 transition-colors disabled:opacity-35 disabled:cursor-not-allowed' style={{ backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)' }}>
-                      <reason.icon className='w-5 h-5 shrink-0 mt-0.5' style={{ color: 'var(--color-brand)' }} />
-                      <span>
-                        <strong className='block text-sm' style={{ color: 'var(--text-primary)' }}>{reason.label}</strong>
-                        <span className='block text-[11px] mt-0.5' style={{ color: 'var(--text-muted)' }}>{reason.detail}</span>
-                      </span>
-                    </button>
-                  )
-                })}
+
+              <div className='grid grid-cols-2 gap-3'>
+                <div className='space-y-2'>
+                  <p className='text-[10px] font-bold uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>Negativo</p>
+                  {REASONS.negative.map((reason) => {
+                    const disabled = reasonDisabled(reason.value)
+                    return (
+                      <button key={reason.value} type='button' disabled={busy || disabled} onClick={() => handleReasonClick(reason.value)} className='w-full text-left rounded-xl p-3 flex gap-3 transition-colors disabled:opacity-35 disabled:cursor-not-allowed' style={{ backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)' }}>
+                        <reason.icon className='w-5 h-5 shrink-0 mt-0.5' style={{ color: '#ef4444' }} />
+                        <span>
+                          <strong className='block text-sm' style={{ color: 'var(--text-primary)' }}>{reason.label}</strong>
+                          <span className='block text-[11px] mt-0.5' style={{ color: 'var(--text-muted)' }}>{reason.detail}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className='space-y-2'>
+                  <p className='text-[10px] font-bold uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>Positivo</p>
+                  {REASONS.positive.map((reason) => {
+                    const disabled = reasonDisabled(reason.value)
+                    return (
+                      <button key={reason.value} type='button' disabled={busy || disabled} onClick={() => handleReasonClick(reason.value)} className='w-full text-left rounded-xl p-3 flex gap-3 transition-colors disabled:opacity-35 disabled:cursor-not-allowed' style={{ backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)' }}>
+                        <reason.icon className='w-5 h-5 shrink-0 mt-0.5' style={{ color: 'var(--color-brand)' }} />
+                        <span>
+                          <strong className='block text-sm' style={{ color: 'var(--text-primary)' }}>{reason.label}</strong>
+                          <span className='block text-[11px] mt-0.5' style={{ color: 'var(--text-muted)' }}>{reason.detail}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -256,8 +286,26 @@ export default function JudgeControl() {
   )
 }
 
-function Scoreboard({ marcador, names }) {
+function Scoreboard({ marcador, names, matchId, onSaved }) {
   const visibleSets = Math.max(marcador.sets?.length || 1, 3)
+  const [editing, setEditing] = useState(null)
+  const [editValue, setEditValue] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!editing) return
+    setSaving(true)
+    try {
+      const sideKey = editing === 'jugador1' ? 'nombre_override_j1' : 'nombre_override_j2'
+      await matchService.updateParticipants(matchId, { [sideKey]: editValue || null })
+      setEditing(null)
+      onSaved?.()
+    } catch {
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className='p-3 sm:p-5 overflow-x-auto'>
       <div className='min-w-[470px]'>
@@ -270,7 +318,26 @@ function Scoreboard({ marcador, names }) {
           <div key={side} className='grid gap-2 items-center py-3' style={{ gridTemplateColumns: `minmax(190px,1fr) repeat(${visibleSets},48px) 68px`, borderTop: '1px solid var(--border-color)' }}>
             <div className='flex items-center gap-2 min-w-0'>
               <span className='w-2.5 h-2.5 rounded-full shrink-0' style={{ backgroundColor: marcador.server === side && !marcador.winner ? 'var(--club-clay)' : 'transparent' }} />
-              <strong className='truncate' style={{ color: 'var(--text-primary)' }}>{names[side]}</strong>
+              {editing === side ? (
+                <div className='flex items-center gap-1 flex-1 min-w-0'>
+                  <input
+                    type='text'
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                    className='text-sm font-bold bg-transparent border-b-2 flex-1 min-w-0 outline-none'
+                    style={{ borderColor: 'var(--color-brand)', color: 'var(--text-primary)' }}
+                    autoFocus
+                  />
+                  <button onClick={handleSave} disabled={saving} className='p-1'><Check className='w-3.5 h-3.5' style={{ color: 'var(--color-brand)' }} /></button>
+                  <button onClick={() => setEditing(null)} className='p-1'><X className='w-3.5 h-3.5' style={{ color: 'var(--text-muted)' }} /></button>
+                </div>
+              ) : (
+                <>
+                  <strong className='truncate' style={{ color: 'var(--text-primary)' }}>{names[side]}</strong>
+                  <button onClick={() => { setEditing(side); setEditValue('') }} className='p-1 opacity-50 hover:opacity-100'><Pencil className='w-3 h-3' style={{ color: 'var(--text-muted)' }} /></button>
+                </>
+              )}
               {marcador.winner === side && <Trophy className='w-4 h-4 shrink-0' style={{ color: 'var(--club-clay)' }} />}
             </div>
             {Array.from({ length: visibleSets }, (_, index) => (
@@ -306,7 +373,12 @@ function RecentEvents({ events, names }) {
 }
 
 const shortName = (name) => String(name || '').split(' ')[0]
-const reasonLabel = (value) => value === 'punto_sin_detalle' ? 'Punto sin detalle' : REASONS.find((reason) => reason.value === value)?.label || value
+const reasonLabel = (value) => {
+  if (value === 'punto_sin_detalle') return 'Punto sin detalle'
+  if (value === 'tiro_ganador') return 'Winner'
+  const all = [...REASONS.positive, ...REASONS.negative]
+  return all.find((r) => r.value === value)?.label || value
+}
 const eventText = (event, names) => {
   if (event.tipo === 'primera_falta') return `Primera falta · ${names[event.servidor]}`
   if (event.tipo === 'let') return 'Let / repetir punto'

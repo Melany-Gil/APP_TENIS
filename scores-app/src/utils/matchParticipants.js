@@ -1,6 +1,10 @@
 export function getParticipantName(match, position) {
   if (!match) return `Participante ${position}`
 
+  const perPlayerOverride = match[`nombre_override_j${position}`]
+  if (perPlayerOverride) return perPlayerOverride
+  if (match.nombre_override) return match.nombre_override
+
   const participant =
     match.modalidad === 'dobles' || match.torneo?.modalidad === 'dobles'
       ? match[`equipo${position}`]?.nombre

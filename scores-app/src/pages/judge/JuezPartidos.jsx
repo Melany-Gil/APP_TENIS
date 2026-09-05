@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Play, Pause, Undo2, Flag, RefreshCw, MapPin, Timer, Circle, BarChart3, Zap, ClipboardList } from 'lucide-react'
+import { Play, Pause, Undo2, Flag, RefreshCw, MapPin, Timer, Circle, BarChart3, Zap, ClipboardList, Pencil, Check, X } from 'lucide-react'
 import { matchService } from '../../services/matchService'
 import { getParticipantName } from '../../utils/matchParticipants'
 import Button from '../../components/ui/Button'
@@ -18,6 +18,9 @@ export default function JuezPartidos() {
   const [quickMode, setQuickMode] = useState(true)
   const [pendingPoint, setPendingPoint] = useState(null) // { ganador: 'jugador1'|'jugador2' }
   const [showStats, setShowStats] = useState(false)
+  const [editingName, setEditingName] = useState(null) // 'jugador1' | 'jugador2'
+  const [editNameValue, setEditNameValue] = useState('')
+  const [savingName, setSavingName] = useState(false)
   const { addToast } = useUIStore()
 
   const refreshMatches = useCallback(async () => {
@@ -48,7 +51,8 @@ export default function JuezPartidos() {
     if (!selected) return
     setLoading(true)
     try {
-      const res = await operation()
+      await operation()
+      const res = await matchService.getLiveState(selected.id)
       setState(res.data)
       await refreshMatches()
     } catch (err) {
@@ -76,6 +80,40 @@ export default function JuezPartidos() {
       }, score?.numero_servicio)
     )
     setPendingPoint(null)
+  }
+
+  const handleReasonSelect = (reason) => {
+    if (!pendingPoint) return
+    if (reason === 'falta' && score?.numero_servicio === 1) {
+      action(() => matchService.addEvent(selected.id, { tipo: 'primera_falta' }))
+      setPendingPoint(null)
+      return
+    }
+    const motivoMap = { winner: 'tiro_ganador', ace: 'ace', error_no_forzado: 'error_no_forzado', doble_falta: 'doble_falta' }
+    action(() =>
+      matchService.addEvent(selected.id, {
+        tipo: 'punto',
+        ganador: pendingPoint.ganador,
+        motivo: motivoMap[reason] || 'punto_sin_detalle',
+      })
+    )
+    setPendingPoint(null)
+  }
+
+  const handleSaveName = async () => {
+    if (!editingName || !selected) return
+    setSavingName(true)
+    try {
+      const sideKey = editingName === 'jugador1' ? 'nombre_override_j1' : 'nombre_override_j2'
+      await matchService.updateParticipants(selected.id, { [sideKey]: editNameValue || null })
+      const res = await matchService.getLiveState(selected.id)
+      setState(res.data)
+      setEditingName(null)
+      await refreshMatches()
+    } catch {
+    } finally {
+      setSavingName(false)
+    }
   }
 
   useEffect(() => {
@@ -217,16 +255,27 @@ export default function JuezPartidos() {
                 </div>
                 <PlayerRow name={p1} photo={p1Photo} score={score} playerKey='j1' pointKey='punto_j1'
                   isWinner={score.ganador === 'jugador1'} isServing={liveData?.saca === 'jugador1'}
-                  isFinished={isFinished} totalSetsToShow={Math.max(score.sets.length + (isFinished ? 0 : 1), 3)} />
+                  isFinished={isFinished} totalSetsToShow={Math.max(score.sets.length + (isFinished ? 0 : 1), 3)}
+                  side='jugador1' editingName={editingName} editNameValue={editNameValue}
+                  setEditNameValue={setEditNameValue} setEditingName={setEditingName}
+                  onSaveName={handleSaveName} savingName={savingName} />
                 <div className='h-px' style={{ backgroundColor: 'var(--border-color)' }} />
                 <PlayerRow name={p2} photo={p2Photo} score={score} playerKey='j2' pointKey='punto_j2'
                   isWinner={score.ganador === 'jugador2'} isServing={liveData?.saca === 'jugador2'}
-                  isFinished={isFinished} totalSetsToShow={Math.max(score.sets.length + (isFinished ? 0 : 1), 3)} />
+                  isFinished={isFinished} totalSetsToShow={Math.max(score.sets.length + (isFinished ? 0 : 1), 3)}
+                  side='jugador2' editingName={editingName} editNameValue={editNameValue}
+                  setEditNameValue={setEditNameValue} setEditingName={setEditingName}
+                  onSaveName={handleSaveName} savingName={savingName} />
               </div>
 
               {/* Status badges */}
               <div className='flex justify-center gap-4 mt-3 text-xs' style={{ color: 'var(--text-muted)' }}>
                 {score.deuce && <span className='font-semibold' style={{ color: 'var(--club-clay)' }}>DEUCE</span>}
+                {score.breakpoint && (
+                  <span className='font-bold' style={{ color: '#ef4444' }}>
+                    {score.breakpoint.count === 2 ? '2 BREAK POINTS' : 'BREAK POINT'}
+                  </span>
+                )}
                 {score.currentSet.tiebreak && !isFinished && <span className='font-semibold' style={{ color: 'var(--club-clay)' }}>TIE-BREAK</span>}
                 {isFinished && score.ganador && (
                   <span className='font-semibold' style={{ color: 'var(--color-live)' }}>
@@ -307,8 +356,9 @@ export default function JuezPartidos() {
                   ganador={pendingPoint.ganador}
                   p1={p1}
                   p2={p2}
+                  isFirstServe={score?.numero_servicio === 1}
                   isServing={liveData?.saca === pendingPoint.ganador}
-                  onConfirm={confirmPoint}
+                  onSelectReason={handleReasonSelect}
                   onCancel={() => setPendingPoint(null)}
                   loading={loading}
                 />
@@ -432,30 +482,28 @@ export default function JuezPartidos() {
 }
 
 /* ── Point Detail Panel ── */
-function PointDetailPanel({ ganador, p1, p2, isServing, onConfirm, onCancel, loading }) {
-  const [tipoSaque, setTipoSaque] = useState(null)
-  const [resultado, setResultado] = useState(null)
+function PointDetailPanel({ ganador, p1, p2, isFirstServe, isServing, onSelectReason, onCancel, loading }) {
   const playerName = ganador === 'jugador1' ? p1 : p2
 
-  const serveOptions = isServing
-    ? [
-        { value: 'primer_saque', label: '1er saque', icon: '1️⃣' },
-        { value: 'segundo_saque', label: '2do saque', icon: '2️⃣' },
-      ]
-    : []
+  const negativeReasons = [
+    { value: 'error_no_forzado', label: 'Error no forzado', desc: 'Error del rival', icon: '❌' },
+    ...(isFirstServe
+      ? [{ value: 'falta', label: 'Falta', desc: 'Primera falta', icon: '⚠️' }]
+      : [{ value: 'doble_falta', label: 'Doble falta', desc: 'Segunda falta', icon: '🚫' }]
+    ),
+  ]
 
-  const resultOptions = isServing
-    ? [
-        { value: 'ace', label: 'Ace', icon: '🔥', desc: 'Saque directo' },
-        { value: 'winner', label: 'Winner', icon: '💥', desc: 'Tiro ganador' },
-        { value: null, label: 'Normal', icon: '✓', desc: 'Punto regular' },
-      ]
-    : [
-        { value: 'winner', label: 'Winner', icon: '💥', desc: 'Tiro ganador' },
-        { value: 'error_no_forzado', label: 'Error rival', icon: '❌', desc: 'Error no forzado del rival' },
-        { value: 'doble_falta', label: 'Doble falta', icon: '🚫', desc: 'Doble falta del sacador' },
-        { value: null, label: 'Normal', icon: '✓', desc: 'Punto regular' },
-      ]
+  const positiveReasons = [
+    { value: 'ace', label: 'Ace', desc: 'Saque directo', icon: '🔥' },
+    { value: 'winner', label: 'Winner', desc: 'Tiro ganador', icon: '💥' },
+  ]
+
+  const isDisabled = (reason) => {
+    if (reason === 'ace') return !isServing
+    if (reason === 'doble_falta') return isFirstServe || isServing
+    if (reason === 'falta') return !isFirstServe
+    return false
+  }
 
   return (
     <div
@@ -464,51 +512,45 @@ function PointDetailPanel({ ganador, p1, p2, isServing, onConfirm, onCancel, loa
     >
       <div className='flex justify-between items-center'>
         <h3 className='font-semibold text-sm'>
-          Punto para <span style={{ color: 'var(--color-live)' }}>{playerName}</span>
+          ¿Cómo terminó el punto para{' '}
+          <span style={{ color: 'var(--color-live)' }}>{playerName}</span>?
         </h3>
         <button onClick={onCancel} className='text-xs' style={{ color: 'var(--text-muted)' }}>Cancelar</button>
       </div>
 
-      {/* Tipo de saque */}
-      {serveOptions.length > 0 && (
-        <div>
-          <p className='text-xs font-medium mb-2' style={{ color: 'var(--text-muted)' }}>Tipo de saque</p>
-          <div className='flex gap-2'>
-            {serveOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setTipoSaque(tipoSaque === opt.value ? null : opt.value)}
-                className={cn(
-                  'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all text-center',
-                  tipoSaque === opt.value ? 'ring-2 ring-[var(--color-live)]' : ''
-                )}
-                style={{
-                  backgroundColor: tipoSaque === opt.value ? 'var(--color-live-bg, rgba(34,197,94,0.1))' : 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {opt.icon} {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Resultado */}
-      <div>
-        <p className='text-xs font-medium mb-2' style={{ color: 'var(--text-muted)' }}>¿Cómo terminó el punto?</p>
-        <div className='grid grid-cols-2 gap-2'>
-          {resultOptions.map((opt) => (
+      <div className='grid grid-cols-2 gap-3'>
+        <div className='space-y-2'>
+          <p className='text-[10px] font-bold uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>Negativo</p>
+          {negativeReasons.map((opt) => (
             <button
-              key={opt.value || 'normal'}
-              onClick={() => setResultado(resultado === opt.value ? undefined : opt.value)}
-              className={cn(
-                'px-3 py-2 rounded-lg text-left transition-all',
-                resultado === opt.value ? 'ring-2 ring-[var(--color-live)]' : ''
-              )}
+              key={opt.value}
+              disabled={loading || isDisabled(opt.value)}
+              onClick={() => onSelectReason(opt.value)}
+              className='w-full text-left px-3 py-2.5 rounded-lg transition-all disabled:opacity-35 disabled:cursor-not-allowed'
               style={{
-                backgroundColor: resultado === opt.value ? 'var(--color-live-bg, rgba(34,197,94,0.1))' : 'var(--bg-primary)',
+                backgroundColor: 'var(--bg-primary)',
+                border: '1px solid var(--border-color)',
+              }}
+            >
+              <span className='text-sm font-medium' style={{ color: 'var(--text-primary)' }}>
+                {opt.icon} {opt.label}
+              </span>
+              <span className='block text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>
+                {opt.desc}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className='space-y-2'>
+          <p className='text-[10px] font-bold uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>Positivo</p>
+          {positiveReasons.map((opt) => (
+            <button
+              key={opt.value}
+              disabled={loading || isDisabled(opt.value)}
+              onClick={() => onSelectReason(opt.value)}
+              className='w-full text-left px-3 py-2.5 rounded-lg transition-all disabled:opacity-35 disabled:cursor-not-allowed'
+              style={{
+                backgroundColor: 'var(--bg-primary)',
                 border: '1px solid var(--border-color)',
               }}
             >
@@ -522,32 +564,15 @@ function PointDetailPanel({ ganador, p1, p2, isServing, onConfirm, onCancel, loa
           ))}
         </div>
       </div>
-
-      {/* Actions */}
-      <div className='flex gap-2'>
-        <Button
-          className='flex-1'
-          disabled={loading}
-          onClick={() => onConfirm({ tipo_saque: tipoSaque, resultado })}
-        >
-          Registrar punto
-        </Button>
-        <Button
-          variant='secondary'
-          disabled={loading}
-          onClick={() => onConfirm({})}
-        >
-          Sin detalle
-        </Button>
-      </div>
     </div>
   )
 }
 
 /* ── Player Row ── */
-function PlayerRow({ name, photo, score, playerKey, pointKey, isWinner, isServing, isFinished, totalSetsToShow }) {
+function PlayerRow({ name, photo, score, playerKey, pointKey, isWinner, isServing, isFinished, totalSetsToShow, side, editingName, editNameValue, setEditNameValue, setEditingName, onSaveName, savingName }) {
   const gamesKey = `games_${playerKey}`
   const point = score?.[pointKey] ?? '0'
+  const isEditing = editingName === side
 
   return (
     <div
@@ -562,10 +587,29 @@ function PlayerRow({ name, photo, score, playerKey, pointKey, isWinner, isServin
           <Circle className='w-2.5 h-2.5 fill-[var(--color-live)] text-[var(--color-live)] shrink-0' />
         )}
         <Avatar src={photo} name={name} size='xs' />
-        <span className={cn('truncate text-sm', isWinner ? 'font-bold' : 'font-medium')}
-          style={{ color: isWinner ? 'var(--color-live)' : 'var(--text-primary)' }}>
-          {name || '—'}
-        </span>
+        {isEditing ? (
+          <div className='flex items-center gap-1 flex-1 min-w-0'>
+            <input
+              type='text'
+              value={editNameValue}
+              onChange={(e) => setEditNameValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onSaveName()}
+              className='text-sm font-bold bg-transparent border-b-2 flex-1 min-w-0 outline-none'
+              style={{ borderColor: 'var(--color-brand)', color: 'var(--text-primary)' }}
+              autoFocus
+            />
+            <button onClick={onSaveName} disabled={savingName} className='p-1'><Check className='w-3.5 h-3.5' style={{ color: 'var(--color-brand)' }} /></button>
+            <button onClick={() => setEditingName(null)} className='p-1'><X className='w-3.5 h-3.5' style={{ color: 'var(--text-muted)' }} /></button>
+          </div>
+        ) : (
+          <>
+            <span className={cn('truncate text-sm', isWinner ? 'font-bold' : 'font-medium')}
+              style={{ color: isWinner ? 'var(--color-live)' : 'var(--text-primary)' }}>
+              {name || '—'}
+            </span>
+            <button onClick={() => { setEditingName(side); setEditNameValue('') }} className='p-1 opacity-50 hover:opacity-100'><Pencil className='w-3 h-3' style={{ color: 'var(--text-muted)' }} /></button>
+          </>
+        )}
         {isWinner && <span className='text-xs'>🏆</span>}
       </div>
 

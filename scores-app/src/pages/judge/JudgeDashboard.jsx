@@ -332,6 +332,34 @@ export default function JudgeDashboard() {
                 Formato del partido
               </h3>
             </div>
+
+            <div className='flex gap-2'>
+              <button
+                type='button'
+                onClick={() => setForm((current) => ({ ...current, set_decisivo: 'match_tiebreak', tiebreak_en: '6', tiebreak_puntos: '7', match_tiebreak_puntos: '10' }))}
+                className='flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all'
+                style={{
+                  backgroundColor: form.set_decisivo === 'match_tiebreak' ? 'var(--color-brand-dim)' : 'var(--bg-primary)',
+                  color: form.set_decisivo === 'match_tiebreak' ? 'var(--color-brand)' : 'var(--text-muted)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                Normal (3er set = Supertiebreak)
+              </button>
+              <button
+                type='button'
+                onClick={() => setForm((current) => ({ ...current, set_decisivo: 'set_completo', tiebreak_en: '6', tiebreak_puntos: '7', match_tiebreak_puntos: '10' }))}
+                className='flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all'
+                style={{
+                  backgroundColor: form.set_decisivo === 'set_completo' ? 'var(--color-brand-dim)' : 'var(--bg-primary)',
+                  color: form.set_decisivo === 'set_completo' ? 'var(--color-brand)' : 'var(--text-muted)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                Super Game (3er set completo)
+              </button>
+            </div>
+
             <div className='grid grid-cols-2 sm:grid-cols-3 gap-3'>
               <Field label='Mejor de'>
                 <select
