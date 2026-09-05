@@ -2,8 +2,8 @@ const db = require('../../config/db')
 const { getPlayerStats } = require('../../utils/playerStats')
 const { describeDependencies, rethrowDeleteConflict } = require('../../utils/deleteConflict')
 
-// Las categorías pertenecen a los partidos, no al perfil del jugador.
-// Por eso las estadísticas se calculan desde los resultados finalizados.
+// La categoría del perfil es opcional. Las estadísticas siguen usando
+// la categoría histórica de cada partido finalizado.
 exports.getAll = async ({ deporte, categoria_id, activo, includeAccount = false }) => {
   let query = `
     SELECT
@@ -11,11 +11,14 @@ exports.getAll = async ({ deporte, categoria_id, activo, includeAccount = false 
       j.nombre,
       j.apellido,
       j.deporte,
+      j.categoria_id,
       j.activo,
       j.foto,
-      j.user_id
+      j.user_id,
+      c.nombre AS categoria_nombre
       ${includeAccount ? ', u.nombre AS usuario_nombre, u.apellido AS usuario_apellido, u.email AS usuario_email' : ''}
     FROM jugadores j
+      LEFT JOIN categorias c ON c.id = j.categoria_id
     ${includeAccount ? 'LEFT JOIN users u ON u.id = j.user_id' : ''}
     WHERE 1 = 1
   `
@@ -45,9 +48,11 @@ exports.getAll = async ({ deporte, categoria_id, activo, includeAccount = false 
 
 exports.getById = async (id) => {
   const [rows] = await db.query(
-    `SELECT id, nombre, apellido, deporte, activo, foto
-     FROM jugadores
-     WHERE id = ?
+    `SELECT j.id, j.nombre, j.apellido, j.deporte, j.categoria_id, j.activo, j.foto,
+            c.nombre AS categoria_nombre
+     FROM jugadores j
+       LEFT JOIN categorias c ON c.id = j.categoria_id
+     WHERE j.id = ?
      LIMIT 1`,
     [id]
   )
@@ -66,13 +71,14 @@ exports.getById = async (id) => {
 }
 
 exports.create = async (body) => {
-  const { nombre, apellido, deporte } = body
+  const { nombre, apellido, deporte, categoria_id } = body
+  const catId = await validateCategory(categoria_id, deporte)
 
   const [result] = await db.query(
     `INSERT INTO jugadores
-       (nombre, apellido, country_id, deporte)
-     VALUES (?, ?, 1, ?)`,
-    [nombre.trim(), apellido.trim(), deporte]
+       (nombre, apellido, country_id, deporte, categoria_id)
+     VALUES (?, ?, 1, ?, ?)`,
+    [nombre.trim(), apellido.trim(), deporte, catId]
   )
 
   return exports.getById(result.insertId)
@@ -84,12 +90,13 @@ exports.update = async (id, body) => {
     throw { status: 404, message: 'Jugador no encontrado' }
   }
 
-  const { nombre, apellido, deporte } = body
+  const { nombre, apellido, deporte, categoria_id } = body
+  const catId = await validateCategory(categoria_id, deporte)
   await db.query(
     `UPDATE jugadores
-     SET nombre = ?, apellido = ?, deporte = ?
+     SET nombre = ?, apellido = ?, deporte = ?, categoria_id = ?
      WHERE id = ?`,
-    [nombre.trim(), apellido.trim(), deporte, id]
+    [nombre.trim(), apellido.trim(), deporte, catId, id]
   )
 
   return exports.getById(id)
@@ -178,6 +185,7 @@ function formatListItem(row, stats, includeAccount = false) {
     nombre: row.nombre,
     apellido: row.apellido,
     deporte: row.deporte,
+    categoria: row.categoria_id ? { id: row.categoria_id, nombre: row.categoria_nombre } : null,
     activo: !!row.activo,
     foto: row.foto || null,
     stats: stats || null,
@@ -198,4 +206,15 @@ function formatListItem(row, stats, includeAccount = false) {
 function positiveId(value) {
   const parsed = Number(value)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+async function validateCategory(value, sport) {
+  if (value === null || value === undefined || value === '') return null
+  const id = positiveId(value)
+  if (!id) throw { status: 400, message: 'Selecciona una categoría válida' }
+  const [rows] = await db.query('SELECT deporte FROM categorias WHERE id = ? LIMIT 1', [id])
+  if (!rows.length || (sport !== 'ambos' && ![sport, 'ambos'].includes(rows[0].deporte))) {
+    throw { status: 400, message: 'La categoría no corresponde al deporte del jugador' }
+  }
+  return id
 }

@@ -16,6 +16,56 @@ const loadService = (fakeDb) => {
   return require(servicePath)
 }
 
+for (const modality of ['individual', 'dobles']) {
+  test(`permite crear y editar un partido libre ${modality}`, async () => {
+    const calls = []
+    const fakeDb = {
+      async query(sql, params) {
+        calls.push({ sql, params })
+        if (/SELECT id, juez_id, created_by FROM partidos/.test(sql)) return [[{ id: 77 }]]
+        if (/FROM categorias/.test(sql)) return [[{ id: 3 }]]
+        if (/FROM jugadores/.test(sql) || /SELECT id\s+FROM equipos_padel/.test(sql)) {
+          return [[{ id: 10 }, { id: 11 }]]
+        }
+        if (/INSERT INTO partidos/.test(sql)) return [{ insertId: 77 }]
+        if (/WHERE p\.id = \? LIMIT 1/.test(sql)) {
+          return [[{
+            id: 77, torneo_id: null, deporte: 'tenis', categoria_id: 3,
+            estado: 'programado',
+            ...(modality === 'dobles' ? { e1_id: 10, e2_id: 11 } : { j1_id: 10, j2_id: 11 }),
+          }]]
+        }
+        return [[]]
+      },
+    }
+    const service = loadService(fakeDb)
+    const body = {
+      torneo_id: null, deporte: 'tenis', modalidad: modality, categoria_id: 3,
+      ...(modality === 'dobles' ? { equipo1_id: 10, equipo2_id: 11 } : { jugador1_id: 10, jugador2_id: 11 }),
+    }
+    const created = await service.create(body, { id: 1, rol: 'admin' })
+    const updated = await service.update(77, body, { id: 1, rol: 'admin' })
+    assert.equal(created.torneo, null)
+    assert.equal(updated.modalidad, modality)
+    const insert = calls.find((call) => /INSERT INTO partidos/.test(call.sql))
+    assert.equal(insert.params[0], null)
+    assert.deepEqual(insert.params.slice(3, 7), modality === 'dobles' ? [null, null, 10, 11] : [10, 11, null, null])
+    assert.equal(calls.some((call) => /FROM torneos\s+WHERE/.test(call.sql)), false)
+  })
+}
+
+test('un torneo inválido no se convierte silenciosamente en partido libre', async () => {
+  const service = loadService({ async query() { throw new Error('No debe consultar') } })
+  await assert.rejects(service.create({ torneo_id: 'incorrecto' }, 1),
+    (error) => error.status === 400 && /torneo válido/.test(error.message))
+})
+
+test('partido libre rechaza categorías de otro deporte antes de guardar', async () => {
+  const service = loadService({ async query() { return [[]] } })
+  await assert.rejects(service.create({ deporte: 'tenis', categoria_id: 3 }, 1),
+    (error) => error.status === 400 && /categoría no corresponde/.test(error.message))
+})
+
 test('getAll devuelve sets, categoría y aplica los filtros del historial', async () => {
   const calls = []
   const fakeDb = {

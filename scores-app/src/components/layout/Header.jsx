@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router-dom'
 import {
   Bell,
   CheckCheck,
+  Gavel,
   Handshake,
   Home,
   LogIn,
@@ -35,6 +36,7 @@ export default function Header() {
   const [showNotifs, setShowNotifs] = useState(false)
   const notifRef = useRef(null)
   const isAdmin = user?.rol === 'admin'
+  const isOfficial = user?.rol === 'admin' || user?.rol === 'juez'
 
   useEffect(() => {
     if (!showNotifs) return undefined
@@ -81,7 +83,7 @@ export default function Header() {
           className='top-navigation-links top-navigation-links-desktop'
           aria-label='Navegación principal'
         >
-          <NavigationLinks isAdmin={isAdmin} />
+        <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} />
         </nav>
 
         <div className='top-navigation-actions'>
@@ -162,15 +164,15 @@ export default function Header() {
         className='top-navigation-links top-navigation-links-mobile'
         aria-label='Navegación principal móvil'
       >
-        <NavigationLinks isAdmin={isAdmin} />
+            <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} />
       </nav>
     </header>
   )
 }
 
-function NavigationLinks({ isAdmin }) {
-  const items = isAdmin
-    ? [...NAV_ITEMS, { to: '/admin', icon: ShieldCheck, label: 'Administración' }]
+function NavigationLinks({ isAdmin, isOfficial }) {
+  const items = isOfficial
+    ? [...NAV_ITEMS, { to: '/juez', icon: Gavel, label: 'Juez' }, ...(isAdmin ? [{ to: '/admin', icon: ShieldCheck, label: 'Administración' }] : [])]
     : NAV_ITEMS
 
   return items.map((item) => (

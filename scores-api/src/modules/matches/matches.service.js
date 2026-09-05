@@ -541,44 +541,73 @@ exports.remove = async (id) => {
 
 async function validateBasicMatch(body, currentMatchId = null) {
   const torneoId = positiveId(body.torneo_id)
+  if (body.torneo_id !== undefined && body.torneo_id !== null && body.torneo_id !== '' && !torneoId) {
+    throw { status: 400, message: 'Selecciona un torneo válido o Partido libre' }
+  }
   const fechaInicio = normalizeOptionalDate(body.fecha_inicio)
   const horaInicio = normalizeOptionalTime(body.hora_inicio)
   const estado = body.estado || 'programado'
 
-  if (!torneoId) throw { status: 400, message: 'Selecciona el torneo del partido' }
   if (!['programado', 'en_vivo', 'finalizado', 'cancelado'].includes(estado)) {
     throw { status: 400, message: 'Selecciona un estado válido' }
   }
 
-  const [tournaments] = await db.query(
-    `SELECT id, deporte, categoria_id, modalidad, sistema, estado
-     FROM torneos
-     WHERE id = ?
-     LIMIT 1`,
-    [torneoId]
-  )
-  if (!tournaments.length) throw { status: 400, message: 'El torneo seleccionado no existe' }
+  let deporte, categoriaId, modalidad, fase, grupo, ronda
 
-  const tournament = tournaments[0]
-  const deporte = tournament.deporte
-  const categoriaId = tournament.categoria_id
-    ? Number(tournament.categoria_id)
-    : positiveId(body.categoria_id)
-  const modalidad = tournament.modalidad || (deporte === 'padel' ? 'dobles' : 'individual')
-  const fase = normalizePhase(tournament.sistema, body.fase)
-  const grupo = fase === 'grupos' ? normalizeOptionalLabel(body.grupo, 20) : null
-  const ronda = normalizeOptionalLabel(body.ronda, 50)
-  if (!Number.isInteger(categoriaId) || categoriaId < 1) {
-    throw { status: 400, message: 'Selecciona la categoría del partido' }
-  }
-  if (!tournament.categoria_id) {
+  if (torneoId) {
+    const [tournaments] = await db.query(
+      `SELECT id, deporte, categoria_id, modalidad, sistema, estado
+       FROM torneos
+       WHERE id = ?
+       LIMIT 1`,
+      [torneoId]
+    )
+    if (!tournaments.length) throw { status: 400, message: 'El torneo seleccionado no existe' }
+
+    const tournament = tournaments[0]
+    deporte = tournament.deporte
+    categoriaId = tournament.categoria_id
+      ? Number(tournament.categoria_id)
+      : positiveId(body.categoria_id)
+    modalidad = tournament.modalidad || (deporte === 'padel' ? 'dobles' : 'individual')
+    fase = normalizePhase(tournament.sistema, body.fase)
+    grupo = fase === 'grupos' ? normalizeOptionalLabel(body.grupo, 20) : null
+    ronda = normalizeOptionalLabel(body.ronda, 50)
+    if (!Number.isInteger(categoriaId) || categoriaId < 1) {
+      throw { status: 400, message: 'Selecciona la categoría del partido' }
+    }
+    if (!tournament.categoria_id) {
+      const [categories] = await db.query(
+        "SELECT id FROM categorias WHERE id = ? AND deporte IN (?, 'ambos') LIMIT 1",
+        [categoriaId, deporte]
+      )
+      if (!categories.length) {
+        throw { status: 400, message: 'La categoría no corresponde al deporte del torneo' }
+      }
+    }
+  } else {
+    deporte = body.deporte || 'tenis'
+    if (!['tenis', 'padel'].includes(deporte)) {
+      throw { status: 400, message: 'Selecciona un deporte válido' }
+    }
+    categoriaId = positiveId(body.categoria_id)
+    if (!Number.isInteger(categoriaId) || categoriaId < 1) {
+      throw { status: 400, message: 'Selecciona la categoría del partido' }
+    }
     const [categories] = await db.query(
       "SELECT id FROM categorias WHERE id = ? AND deporte IN (?, 'ambos') LIMIT 1",
       [categoriaId, deporte]
     )
     if (!categories.length) {
-      throw { status: 400, message: 'La categoría no corresponde al deporte del torneo' }
+      throw { status: 400, message: 'La categoría no corresponde al deporte seleccionado' }
     }
+    modalidad = body.modalidad || (deporte === 'padel' ? 'dobles' : 'individual')
+    if (!['individual', 'dobles'].includes(modalidad)) {
+      throw { status: 400, message: 'Selecciona una modalidad válida' }
+    }
+    fase = null
+    grupo = null
+    ronda = normalizeOptionalLabel(body.ronda, 50)
   }
 
   const jugador1Id = positiveId(body.jugador1_id)
@@ -587,6 +616,9 @@ async function validateBasicMatch(body, currentMatchId = null) {
   const equipo2Id = positiveId(body.equipo2_id)
   const source1Id = positiveId(body.origen_partido1_id)
   const source2Id = positiveId(body.origen_partido2_id)
+  if (!torneoId && (source1Id || source2Id)) {
+    throw { status: 400, message: 'Para usar ganadores de otros partidos, selecciona un torneo. En partidos libres selecciona los participantes directamente.' }
+  }
   const canchaId = positiveId(body.cancha_id)
 
   if (canchaId) {

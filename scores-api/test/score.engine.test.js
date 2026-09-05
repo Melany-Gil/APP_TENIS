@@ -54,10 +54,18 @@ test('permite configurar un match tiebreak como set decisivo', () => {
   }
   let state = createInitialState(config)
 
-  for (let game = 0; game < 6; game += 1) {
+  // Set 1: J1 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
     for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
   }
-  for (let game = 0; game < 6; game += 1) {
+  // Set 2: J2 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
     for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
   }
 
@@ -108,4 +116,210 @@ test('permite corregir manualmente el servidor sin sumar puntos', () => {
   const corrected = applyEvent(state, { tipo: 'cambio_servidor', ganador: 'jugador2' })
   assert.equal(corrected.server, 'jugador2')
   assert.deepEqual(corrected.points, [0, 0])
+})
+
+// ── Tiebreak (empate a 6-6, primer en 7 con 2 de diferencia) ──────────
+
+function reachSixSix(config = {}) {
+  let state = createInitialState(config)
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  return state
+}
+
+test('entra en modo tiebreak cuando el set llega a 6-6', () => {
+  const state = reachSixSix()
+  assert.equal(state.mode, 'tiebreak')
+  assert.deepEqual(state.points, [0, 0])
+})
+
+test('tiebreak no termina en 7-6 (falta diferencia de 2)', () => {
+  let state = reachSixSix()
+  for (let i = 0; i < 6; i += 1) state = point(state, 'jugador1', 'tiro_ganador')
+  for (let i = 0; i < 6; i += 1) state = point(state, 'jugador2', 'tiro_ganador')
+  assert.equal(state.mode, 'tiebreak')
+  assert.deepEqual(state.points, [6, 6])
+  state = point(state, 'jugador1', 'tiro_ganador')
+  assert.equal(state.mode, 'tiebreak')
+  assert.deepEqual(state.points, [7, 6])
+  assert.equal(state.winner, null)
+})
+
+test('tiebreak termina en 7-5 (7 puntos con 2 de diferencia)', () => {
+  let state = reachSixSix()
+  for (let i = 0; i < 5; i += 1) state = point(state, 'jugador1', 'tiro_ganador')
+  for (let i = 0; i < 5; i += 1) state = point(state, 'jugador2', 'tiro_ganador')
+  assert.deepEqual(state.points, [5, 5])
+  state = point(state, 'jugador1', 'tiro_ganador')
+  state = point(state, 'jugador1', 'tiro_ganador')
+  assert.equal(state.mode, 'game')
+  const sets = projectSets(state)
+  assert.equal(sets[0].completado, true)
+  assert.equal(sets[0].games_j1, 7)
+  assert.equal(sets[0].games_j2, 6)
+})
+
+test('tiebreak termina en 8-6', () => {
+  let state = reachSixSix()
+  for (let i = 0; i < 6; i += 1) state = point(state, 'jugador1', 'tiro_ganador')
+  for (let i = 0; i < 6; i += 1) state = point(state, 'jugador2', 'tiro_ganador')
+  state = point(state, 'jugador1', 'tiro_ganador')
+  state = point(state, 'jugador1', 'tiro_ganador')
+  assert.equal(state.mode, 'game')
+  const sets = projectSets(state)
+  assert.equal(sets[0].games_j1, 7)
+  assert.equal(sets[0].games_j2, 6)
+})
+
+test('tiebreak muestra puntos en display', () => {
+  let state = reachSixSix()
+  state = point(state, 'jugador1', 'tiro_ganador')
+  state = point(state, 'jugador2', 'tiro_ganador')
+  state = point(state, 'jugador1', 'tiro_ganador')
+  assert.deepEqual(pointDisplay(state), ['2', '1'])
+})
+
+// ── Match tiebreak / supertiebreak (set decisivo, primer en 10 con 2 de diferencia) ──
+
+test('match tiebreak no termina en 10-9 (falta diferencia de 2)', () => {
+  const config = { mejor_de_sets: 3, set_decisivo: 'match_tiebreak', match_tiebreak_puntos: 10 }
+  let state = createInitialState(config)
+  // Set 1: J1 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  // Set 2: J2 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  assert.equal(state.mode, 'match_tiebreak')
+  for (let i = 0; i < 9; i += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  for (let i = 0; i < 9; i += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  assert.deepEqual(state.points, [9, 9])
+  state = point(state, 'jugador1', 'tiro_ganador', config)
+  assert.deepEqual(state.points, [10, 9])
+  assert.equal(state.winner, null)
+  assert.equal(state.mode, 'match_tiebreak')
+})
+
+test('match tiebreak termina en 10-8 (10 puntos con 2 de diferencia)', () => {
+  const config = { mejor_de_sets: 3, set_decisivo: 'match_tiebreak', match_tiebreak_puntos: 10 }
+  let state = createInitialState(config)
+  // Set 1: J1 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  // Set 2: J2 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  for (let i = 0; i < 8; i += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  for (let i = 0; i < 8; i += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  state = point(state, 'jugador1', 'tiro_ganador', config)
+  state = point(state, 'jugador1', 'tiro_ganador', config)
+  assert.equal(state.winner, 'jugador1')
+  assert.equal(projectSets(state)[2].games_j1, 10)
+  assert.equal(projectSets(state)[2].games_j2, 8)
+})
+
+test('match tiebreak se extiende hasta 12-10 después de empatar 10-10', () => {
+  const config = { mejor_de_sets: 3, set_decisivo: 'match_tiebreak', match_tiebreak_puntos: 10 }
+  let state = createInitialState(config)
+  // Set 1: J1 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  // Set 2: J2 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  for (let i = 0; i < 9; i += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  for (let i = 0; i < 9; i += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  assert.deepEqual(state.points, [9, 9])
+  state = point(state, 'jugador1', 'tiro_ganador', config)
+  state = point(state, 'jugador2', 'tiro_ganador', config)
+  assert.deepEqual(state.points, [10, 10])
+  state = point(state, 'jugador1', 'tiro_ganador', config)
+  state = point(state, 'jugador1', 'tiro_ganador', config)
+  assert.equal(state.winner, 'jugador1')
+  assert.equal(projectSets(state)[2].games_j1, 12)
+  assert.equal(projectSets(state)[2].games_j2, 10)
+})
+
+test('match tiebreak muestra puntos en display', () => {
+  const config = { mejor_de_sets: 3, set_decisivo: 'match_tiebreak', match_tiebreak_puntos: 10 }
+  let state = createInitialState(config)
+  // Set 1: J1 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  // Set 2: J2 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  state = point(state, 'jugador1', 'tiro_ganador', config)
+  state = point(state, 'jugador2', 'tiro_ganador', config)
+  state = point(state, 'jugador1', 'tiro_ganador', config)
+  assert.deepEqual(pointDisplay(state), ['2', '1'])
+})
+
+test('set decisivo sin match_tiebreak usa tiebreak normal a 7', () => {
+  const config = { mejor_de_sets: 3, set_decisivo: 'set_completo' }
+  let state = createInitialState(config)
+  // Set 1: J1 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  // Set 2: J2 wins 6-4
+  for (let g = 0; g < 4; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  }
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  assert.equal(state.mode, 'game')
+  assert.equal(state.currentSet, 3)
+  // Reach 6-6 in set 3
+  for (let g = 0; g < 6; g += 1) {
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+    for (let p = 0; p < 4; p += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  }
+  assert.equal(state.mode, 'tiebreak')
+  // Score tiebreak to 7-5
+  for (let i = 0; i < 5; i += 1) state = point(state, 'jugador1', 'tiro_ganador', config)
+  for (let i = 0; i < 5; i += 1) state = point(state, 'jugador2', 'tiro_ganador', config)
+  state = point(state, 'jugador1', 'tiro_ganador', config)
+  state = point(state, 'jugador1', 'tiro_ganador', config)
+  assert.equal(state.winner, 'jugador1')
+  assert.equal(projectSets(state)[2].games_j1, 7)
+  assert.equal(projectSets(state)[2].games_j2, 6)
 })

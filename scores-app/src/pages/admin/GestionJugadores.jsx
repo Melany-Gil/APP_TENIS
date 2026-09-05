@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { Camera, Link2, Plus, Pencil, Trash2, Search, X } from 'lucide-react'
 import { playerService } from '../../services/playerService'
 import { userService } from '../../services/userService'
+import { categoriaService } from '../../services/categoriaService'
 import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
@@ -18,6 +19,7 @@ export default function GestionJugadores() {
   const [editing, setEditing] = useState(null)
   const [search, setSearch] = useState('')
   const [usuarios, setUsuarios] = useState([])
+  const [categorias, setCategorias] = useState([])
   const [mediaBusy, setMediaBusy] = useState(false)
   const { addToast } = useUIStore()
 
@@ -25,19 +27,23 @@ export default function GestionJugadores() {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm()
 
   const fetchAll = async (editingId = null) => {
     setLoading(true)
     try {
-      const [playersResponse, usersResponse] = await Promise.all([
+      const [playersResponse, usersResponse, catsResponse] = await Promise.all([
         playerService.getAdminAll(),
         userService.getAll(),
+        categoriaService.getAll(),
       ])
       const nextPlayers = playersResponse.data || []
       setJugadores(nextPlayers)
       setUsuarios(usersResponse.data || [])
+      setCategorias(catsResponse.data || [])
       if (editingId) {
         setEditing(nextPlayers.find((player) => Number(player.id) === Number(editingId)) || null)
       }
@@ -53,7 +59,7 @@ export default function GestionJugadores() {
   }, [])
 
   const openCreate = () => {
-    reset({ deporte: 'tenis' })
+    reset({ deporte: 'tenis', categoria_id: '' })
     setEditing(null)
     setShowForm(true)
   }
@@ -64,6 +70,7 @@ export default function GestionJugadores() {
       nombre: jugador.nombre,
       apellido: jugador.apellido,
       deporte: jugador.deporte,
+      categoria_id: jugador.categoria?.id || '',
     })
     setShowForm(true)
   }
@@ -74,6 +81,7 @@ export default function GestionJugadores() {
         nombre: data.nombre,
         apellido: data.apellido,
         deporte: data.deporte,
+        categoria_id: data.categoria_id || null,
       }
       if (editing) {
         await playerService.update(editing.id, payload)
@@ -205,13 +213,26 @@ export default function GestionJugadores() {
             />
             <div className='form-group'>
               <label className='form-label'>Deporte *</label>
-              <select className='form-input' {...register('deporte', { required: 'Requerido' })}>
+              <select className='form-input' {...register('deporte', { required: 'Requerido', onChange: () => setValue('categoria_id', '') })}>
                 <option value=''>Seleccionar</option>
                 {DEPORTES.map((d) => (
                   <option key={d} value={d}>
                     {d}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div className='form-group'>
+              <label className='form-label'>Categoría</label>
+              <select className='form-input' {...register('categoria_id')}>
+                <option value=''>Sin categoría</option>
+                {categorias
+                  .filter((c) => watch('deporte') === 'ambos' || c.deporte === watch('deporte') || c.deporte === 'ambos')
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -319,6 +340,11 @@ export default function GestionJugadores() {
                   >
                     {j.deporte}
                   </span>
+                  {j.categoria && (
+                    <span className='badge-brand text-[10px]'>
+                      {j.categoria.nombre}
+                    </span>
+                  )}
                   {j.usuario && (
                     <span className='text-[10px]' style={{ color: 'var(--text-muted)' }}>
                       Cuenta: {j.usuario.email}

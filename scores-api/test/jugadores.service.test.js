@@ -51,6 +51,30 @@ const loadService = (fakeDb) => {
   return require(servicePath)
 }
 
+test('rechaza una categoría incompatible sin guardar el jugador', async () => {
+  const service = loadService({ async query(sql) {
+    assert.match(sql, /SELECT deporte FROM categorias/)
+    return [[{ deporte: 'padel' }]]
+  } })
+  await assert.rejects(service.create({ nombre: 'Ana', apellido: 'Pérez', deporte: 'tenis', categoria_id: 4 }),
+    (error) => error.status === 400 && /categoría no corresponde/.test(error.message))
+})
+
+test('editar jugador permite cambiar y retirar la categoría', async () => {
+  const writes = []
+  const service = loadService({ async query(sql, params) {
+    if (/SELECT id FROM jugadores/.test(sql)) return [[{ id: 8 }]]
+    if (/SELECT deporte FROM categorias/.test(sql)) return [[{ deporte: 'tenis' }]]
+    if (/UPDATE jugadores/.test(sql)) { writes.push(params); return [{}] }
+    if (/WHERE j.id = \?/.test(sql)) return [[playerRow]]
+    return [[]]
+  } })
+  const body = { nombre: 'Laura', apellido: 'Díaz', deporte: 'tenis' }
+  await service.update(8, { ...body, categoria_id: 3 })
+  await service.update(8, { ...body, categoria_id: null })
+  assert.deepEqual(writes.map((params) => params[3]), [3, null])
+})
+
 test('el detalle público contiene solo datos básicos y estadísticas por categoría', async () => {
   let call = 0
   const fakeDb = {
@@ -93,13 +117,14 @@ test('getAll filtra estadísticas por la categoría de los partidos', async () =
   assert.match(calls[1].sql, /p\.categoria_id = \?/)
 })
 
-test('crear jugador guarda únicamente nombre, apellido y deporte', async () => {
+test('crear jugador guarda datos básicos y categoría opcional validada', async () => {
   const calls = []
   const fakeDb = {
     async query(sql, params) {
       calls.push({ sql, params })
-      if (calls.length === 1) return [{ insertId: 9 }]
-      if (calls.length === 2) return [[{ ...playerRow, id: 9 }]]
+      if (calls.length === 1) return [[{ deporte: 'tenis' }]]
+      if (calls.length === 2) return [{ insertId: 9 }]
+      if (calls.length === 3) return [[{ ...playerRow, id: 9, categoria_id: 3, categoria_nombre: '4ta' }]]
       return [[]]
     },
   }
@@ -112,9 +137,9 @@ test('crear jugador guarda únicamente nombre, apellido y deporte', async () => 
     categoria_id: 3,
   })
 
-  assert.match(calls[0].sql, /\(nombre, apellido, country_id, deporte\)/)
-  assert.doesNotMatch(calls[0].sql, /telefono|categoria_id|apodo|fecha_nac/)
-  assert.deepEqual(calls[0].params, ['Laura', 'Díaz', 'tenis'])
+  assert.match(calls[1].sql, /\(nombre, apellido, country_id, deporte, categoria_id\)/)
+  assert.doesNotMatch(calls[1].sql, /telefono|apodo|fecha_nac/)
+  assert.deepEqual(calls[1].params, ['Laura', 'Díaz', 'tenis', 3])
   assert.equal(
     calls.some((call) => /INSERT INTO jugador_stats/.test(call.sql)),
     false

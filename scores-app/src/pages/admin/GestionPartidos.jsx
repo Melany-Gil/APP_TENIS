@@ -70,17 +70,17 @@ export default function GestionPartidos() {
   const selectedTournament = torneos.find(
     (tournament) => String(tournament.id) === selectedTournamentId
   )
-  const selectedDeporte = selectedTournament?.deporte || 'tenis'
+  const selectedDeporte = selectedTournament?.deporte || watch('deporte') || 'tenis'
   const selectedCategoryId = String(
     selectedTournament?.categoria?.id || watch('categoria_id') || ''
   )
-  const selectedModality = selectedTournament?.modalidad || 'individual'
+  const selectedModality = selectedTournament?.modalidad || watch('modalidad') || 'individual'
   const selectedPhase = watch('fase') || 'grupos'
   const participant1Mode = watch('participante1_tipo') || 'fijo'
   const participant2Mode = watch('participante2_tipo') || 'fijo'
   const sourceMatches = partidos.filter(
     (partido) =>
-      String(partido.torneo?.id || '') === selectedTournamentId &&
+      selectedTournamentId && String(partido.torneo?.id || '') === selectedTournamentId &&
       String(partido.categoria?.id || '') === selectedCategoryId &&
       (!editing || partido.id < editing.id)
   )
@@ -145,6 +145,8 @@ export default function GestionPartidos() {
   const openCreate = () => {
     reset({
       torneo_id: searchParams.get('torneo') || '',
+      deporte: 'tenis',
+      modalidad: 'individual',
       categoria_id: '',
       estado: 'programado',
       participante1_tipo: 'fijo',
@@ -172,6 +174,8 @@ export default function GestionPartidos() {
     setEditing(partido)
     reset({
       torneo_id: partido.torneo?.id || '',
+      deporte: partido.deporte || 'tenis',
+      modalidad: partido.modalidad || (partido.equipo1?.id || partido.equipo2?.id ? 'dobles' : 'individual'),
       categoria_id: partido.categoria?.id || '',
       estado: partido.estado,
       fecha_inicio: partido.fecha_inicio ? partido.fecha_inicio.slice(0, 10) : '',
@@ -220,7 +224,9 @@ export default function GestionPartidos() {
   const onSubmit = async (data) => {
     try {
       const payload = {
-        torneo_id: data.torneo_id,
+        torneo_id: data.torneo_id || null,
+        deporte: data.deporte || 'tenis',
+        modalidad: data.modalidad || 'individual',
         categoria_id: data.categoria_id,
         estado: data.estado,
         fecha_inicio: data.fecha_inicio,
@@ -364,15 +370,20 @@ export default function GestionPartidos() {
 
           <form onSubmit={handleSubmit(onSubmit)} className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             <div className='form-group sm:col-span-2'>
-              <label className='form-label'>Torneo *</label>
+              <label className='form-label'>Torneo (opcional)</label>
               <select
                 className='form-input'
                 {...register('torneo_id', {
-                  required: 'Selecciona el torneo del partido',
-                  onChange: () => setValue('categoria_id', ''),
+                  onChange: () => {
+                    setValue('categoria_id', '')
+                    setValue('deporte', 'tenis')
+                    setValue('modalidad', 'individual')
+                    setValue('participante1_tipo', 'fijo')
+                    setValue('participante2_tipo', 'fijo')
+                  },
                 })}
               >
-                <option value=''>Seleccionar torneo</option>
+                <option value=''>Partido libre (sin torneo)</option>
                 {torneos.map((tournament) => (
                   <option key={tournament.id} value={tournament.id}>
                     {tournament.nombre} ·{' '}
@@ -382,11 +393,6 @@ export default function GestionPartidos() {
                 ))}
               </select>
               {errors.torneo_id && <p className='form-error'>{errors.torneo_id.message}</p>}
-              {torneos.length === 0 && (
-                <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
-                  Primero crea un torneo desde el módulo Torneos.
-                </p>
-              )}
             </div>
 
             <div className='form-group'>
@@ -399,6 +405,40 @@ export default function GestionPartidos() {
                 ))}
               </select>
             </div>
+
+            {!selectedTournament && (
+              <>
+                <div className='form-group'>
+                  <label className='form-label'>Deporte *</label>
+                  <select className='form-input' {...register('deporte', { required: 'Requerido' })}>
+                    <option value='tenis'>Tenis</option>
+                    <option value='padel'>Pádel</option>
+                  </select>
+                </div>
+                <div className='form-group'>
+                  <label className='form-label'>Modalidad *</label>
+                  <select className='form-input' {...register('modalidad', { required: 'Requerido' })}>
+                    <option value='individual'>Individual</option>
+                    <option value='dobles'>Dobles</option>
+                  </select>
+                </div>
+                <div className='form-group'>
+                  <label className='form-label'>Categoría *</label>
+                  <select
+                    className='form-input'
+                    {...register('categoria_id', { required: 'Selecciona la categoría' })}
+                  >
+                    <option value=''>Seleccionar categoría</option>
+                    {categoriasDisponibles.map((categoria) => (
+                      <option key={categoria.id} value={categoria.id}>
+                        {categoria.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.categoria_id && <p className='form-error'>{errors.categoria_id.message}</p>}
+                </div>
+              </>
+            )}
 
             {selectedTournament && (
               <div
@@ -961,7 +1001,7 @@ function ParticipantSelector({
       <label className='form-label'>{label}</label>
       <select className='form-input' {...register(modeField)}>
         <option value='fijo'>{fixedLabel} definido</option>
-        <option value='ganador'>Ganador de otro partido</option>
+        <option value='ganador' disabled={!sourceMatches.length}>Ganador de otro partido</option>
       </select>
 
       {mode === 'ganador' ? (

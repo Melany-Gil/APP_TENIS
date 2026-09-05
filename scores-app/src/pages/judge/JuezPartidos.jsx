@@ -98,7 +98,7 @@ export default function JuezPartidos() {
   const timerInput = liveData
     ? { ...liveData, estado: liveData.estado === 'en_vivo' && !score?.terminado ? 'en_vivo' : (score?.terminado ? 'finalizado' : liveData.estado) }
     : null
-  const { formatted: timerFormatted, isPaused: timerPaused, isStopped: timerStopped } = useMatchTimer(timerInput)
+  const { formatted: timerFormatted, isPaused: timerPaused, isStopped: timerStopped } = useMatchTimer(timerInput, timerInput?.estado)
 
   const isLive = liveData?.estado === 'en_vivo'
   const isPaused = Boolean(liveData?.pausado_at)
