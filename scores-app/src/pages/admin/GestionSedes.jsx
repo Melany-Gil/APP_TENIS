@@ -16,6 +16,7 @@ export default function GestionSedes() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showCancha, setShowCancha] = useState(null) // sedeId al que agregar cancha
+  const [editingCancha, setEditingCancha] = useState(null)
   const { addToast } = useUIStore()
 
   const {
@@ -29,7 +30,7 @@ export default function GestionSedes() {
     register: regC,
     handleSubmit: handleC,
     reset: resetC,
-    formState: { isSubmitting: isSubmittingC },
+    formState: { errors: errorsC, isSubmitting: isSubmittingC },
   } = useForm()
 
   const fetchSedes = async () => {
@@ -74,13 +75,58 @@ export default function GestionSedes() {
   }
 
   const onSubmitCancha = async (data) => {
+    const sedeId = showCancha
     try {
-      await sedeService.createCancha(showCancha, data)
-      addToast({ type: 'success', title: 'Cancha agregada' })
+      if (editingCancha) {
+        await sedeService.updateCancha(editingCancha.id, data)
+        addToast({ type: 'success', title: 'Cancha actualizada' })
+      } else {
+        await sedeService.createCancha(sedeId, data)
+        addToast({ type: 'success', title: 'Cancha agregada' })
+      }
       setShowCancha(null)
-      fetchCanchas(showCancha)
+      setEditingCancha(null)
+      fetchCanchas(sedeId)
     } catch (err) {
       addToast({ type: 'error', title: 'Error', message: err.message })
+    }
+  }
+
+  const openCreateCancha = (sedeId) => {
+    resetC({ nombre: '', deporte: 'ambos', superficie: 'Cemento' })
+    setEditingCancha(null)
+    setShowCancha(sedeId)
+  }
+
+  const openEditCancha = (sedeId, cancha) => {
+    resetC({
+      nombre: cancha.nombre,
+      deporte: cancha.deporte,
+      superficie: cancha.superficie,
+    })
+    setEditingCancha(cancha)
+    setShowCancha(sedeId)
+  }
+
+  const closeCanchaForm = () => {
+    setShowCancha(null)
+    setEditingCancha(null)
+  }
+
+  const handleDeleteCancha = async (sedeId, cancha) => {
+    const ok = await confirm({
+      title: 'Eliminar cancha',
+      message: `La cancha "${cancha.nombre}" dejará de estar disponible para nuevos partidos. Los registros históricos se conservarán.`,
+      confirmLabel: 'Eliminar',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await sedeService.removeCancha(cancha.id)
+      addToast({ type: 'success', title: 'Cancha eliminada' })
+      fetchCanchas(sedeId)
+    } catch (err) {
+      addToast({ type: 'error', title: 'No se pudo eliminar', message: err.message })
     }
   }
 
@@ -173,14 +219,15 @@ export default function GestionSedes() {
         </div>
       )}
 
-      {/* Formulario nueva cancha */}
+      {/* Formulario para crear o editar cancha */}
       {showCancha && (
         <div className='card p-5 animate-fade-up' style={{ borderColor: 'var(--color-brand)' }}>
           <div className='flex items-center justify-between mb-4'>
             <h2 className='text-base font-semibold' style={{ color: 'var(--text-primary)' }}>
-              Agregar cancha — {sedes.find((s) => s.id === showCancha)?.nombre}
+              {editingCancha ? 'Editar cancha' : 'Agregar cancha'} —{' '}
+              {sedes.find((s) => s.id === showCancha)?.nombre}
             </h2>
-            <button onClick={() => setShowCancha(null)} className='btn-ghost p-1'>
+            <button onClick={closeCanchaForm} className='btn-ghost p-1'>
               <X className='w-4 h-4' />
             </button>
           </div>
@@ -191,10 +238,11 @@ export default function GestionSedes() {
             <div className='form-group'>
               <label className='form-label'>Nombre *</label>
               <input
-                className='form-input'
+                className={`form-input ${errorsC.nombre ? 'error' : ''}`}
                 placeholder='Cancha 1'
                 {...regC('nombre', { required: 'Requerido' })}
               />
+              {errorsC.nombre && <p className='form-error'>{errorsC.nombre.message}</p>}
             </div>
             <div className='form-group'>
               <label className='form-label'>Deporte</label>
@@ -218,9 +266,9 @@ export default function GestionSedes() {
             </div>
             <div className='sm:col-span-3 flex gap-3'>
               <Button type='submit' loading={isSubmittingC}>
-                Agregar cancha
+                {editingCancha ? 'Guardar cambios' : 'Agregar cancha'}
               </Button>
-              <Button type='button' variant='secondary' onClick={() => setShowCancha(null)}>
+              <Button type='button' variant='secondary' onClick={closeCanchaForm}>
                 Cancelar
               </Button>
             </div>
@@ -259,10 +307,7 @@ export default function GestionSedes() {
               </div>
               <div className='flex items-center gap-1'>
                 <button
-                  onClick={() => {
-                    resetC({ deporte: 'ambos', superficie: 'Cemento' })
-                    setShowCancha(sede.id)
-                  }}
+                  onClick={() => openCreateCancha(sede.id)}
                   className='btn-ghost p-2 text-xs flex items-center gap-1'
                   style={{ color: 'var(--color-brand)' }}
                 >
@@ -319,6 +364,27 @@ export default function GestionSedes() {
                         <span className='text-xs ml-2' style={{ color: 'var(--text-muted)' }}>
                           {c.deporte} · {c.superficie}
                         </span>
+                      </div>
+                      <div className='flex items-center gap-1 shrink-0'>
+                        <button
+                          type='button'
+                          onClick={() => openEditCancha(sede.id, c)}
+                          className='btn-ghost p-2'
+                          title={`Editar ${c.nombre}`}
+                          aria-label={`Editar ${c.nombre}`}
+                        >
+                          <Pencil className='w-4 h-4' />
+                        </button>
+                        <button
+                          type='button'
+                          onClick={() => handleDeleteCancha(sede.id, c)}
+                          className='btn-ghost p-2'
+                          style={{ color: '#ef4444' }}
+                          title={`Eliminar ${c.nombre}`}
+                          aria-label={`Eliminar ${c.nombre}`}
+                        >
+                          <Trash2 className='w-4 h-4' />
+                        </button>
                       </div>
                     </div>
                   ))

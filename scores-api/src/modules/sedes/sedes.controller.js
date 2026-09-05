@@ -41,6 +41,14 @@ exports.createCancha = async (req, res) => {
   }
 }
 
+exports.updateCancha = async (req, res) => {
+  try {
+    return success(res, await service.updateCancha(req.params.canchaId, req.body))
+  } catch (err) {
+    return error(res, err.message || 'Error al actualizar cancha', err.status || 500)
+  }
+}
+
 exports.removeCancha = async (req, res) => {
   try {
     return success(res, await service.removeCancha(req.params.canchaId))

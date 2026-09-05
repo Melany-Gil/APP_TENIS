@@ -7,6 +7,7 @@ router.get('/:id/canchas', requireAuth, controller.getCanchasBySede)
 router.post('/', requireAuth, requireAdmin, controller.create)
 router.delete('/:id', requireAuth, requireAdmin, controller.remove)
 router.post('/:id/canchas', requireAuth, requireAdmin, controller.createCancha)
+router.put('/canchas/:canchaId', requireAuth, requireAdmin, controller.updateCancha)
 router.delete('/canchas/:canchaId', requireAuth, requireAdmin, controller.removeCancha)
 
 module.exports = router

@@ -6,4 +6,6 @@ export const sedeService = {
   create: (data) => api.post('/sedes', data),
   remove: (id) => api.delete(`/sedes/${id}`),
   createCancha: (sedeId, data) => api.post(`/sedes/${sedeId}/canchas`, data),
+  updateCancha: (canchaId, data) => api.put(`/sedes/canchas/${canchaId}`, data),
+  removeCancha: (canchaId) => api.delete(`/sedes/canchas/${canchaId}`),
 }

@@ -25,6 +25,7 @@ const routes = {
   jugadores: require('../src/modules/jugadores/jugadores.routes'),
   partidos: require('../src/modules/matches/matches.routes'),
   anuncios: require('../src/modules/news/news.routes'),
+  sedes: require('../src/modules/sedes/sedes.routes'),
 }
 
 const handlersFor = (router, method, path) => {
@@ -65,6 +66,8 @@ test('las operaciones de administración siguen protegidas', () => {
     [routes.partidos, 'put', '/:id/pausa', requireOfficial],
     [routes.partidos, 'put', '/:id/saque', requireOfficial],
     [routes.anuncios, 'post', '/', requireAdmin],
+    [routes.sedes, 'put', '/canchas/:canchaId', requireAdmin],
+    [routes.sedes, 'delete', '/canchas/:canchaId', requireAdmin],
   ]
 
   for (const [router, method, path, roleGuard] of protectedWrites) {
