@@ -1,4 +1,5 @@
 const db = require('../../config/db')
+const { describeDependencies, rethrowDeleteConflict } = require('../../utils/deleteConflict')
 
 exports.getAll = async ({ deporte } = {}) => {
   let sql = 'SELECT id, nombre, deporte, orden FROM categorias WHERE 1 = 1'
@@ -48,9 +49,34 @@ exports.update = async (id, { nombre, deporte, orden }) => {
 }
 
 exports.remove = async (id) => {
-  const [existing] = await db.query('SELECT id FROM categorias WHERE id = ?', [id])
+  const [existing] = await db.query('SELECT id, nombre FROM categorias WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Categoría no encontrada' }
 
-  await db.query('DELETE FROM categorias WHERE id = ?', [id])
+  const [[usage]] = await db.query(
+    `SELECT
+       (SELECT COUNT(*) FROM partidos WHERE categoria_id = ?) AS partidos,
+       (SELECT COUNT(*) FROM equipos_padel WHERE categoria_id = ?) AS parejas,
+       (SELECT COUNT(*) FROM torneos WHERE categoria_id = ?) AS torneos,
+       (SELECT COUNT(*) FROM jugadores WHERE categoria_id = ?) AS jugadores`,
+    [id, id, id, id]
+  )
+  const dependencies = describeDependencies([
+    { count: usage.partidos, singular: 'partido', plural: 'partidos' },
+    { count: usage.parejas, singular: 'pareja', plural: 'parejas' },
+    { count: usage.torneos, singular: 'torneo', plural: 'torneos' },
+    { count: usage.jugadores, singular: 'jugador', plural: 'jugadores' },
+  ])
+  if (dependencies.length) {
+    throw {
+      status: 409,
+      message: `La categoría "${existing[0].nombre}" no se puede eliminar porque está vinculada a ${dependencies.join(', ')}. Elimina o reasigna primero esos registros.`,
+    }
+  }
+
+  try {
+    await db.query('DELETE FROM categorias WHERE id = ?', [id])
+  } catch (error) {
+    rethrowDeleteConflict(error, 'esta categoría')
+  }
   return { message: 'Categoría eliminada correctamente' }
 }

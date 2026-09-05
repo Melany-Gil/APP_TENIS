@@ -606,3 +606,65 @@ test('create permite usar el ganador pendiente de otro partido como participante
   assert.equal(result.origen_partido1.participante1, 'Ana Rojas')
   assert.equal(result.origen_partido1.participante2, 'Marta León')
 })
+
+test('remove explica cuáles partidos dependen del ganador', async () => {
+  let call = 0
+  const fakeDb = {
+    async query() {
+      call += 1
+      if (call === 1) return [[{ id: 20 }]]
+      if (call === 2) return [[{ id: 21 }, { id: 22 }]]
+      throw new Error('No debe borrar un partido con encuentros dependientes')
+    },
+  }
+
+  await assert.rejects(
+    loadService(fakeDb).remove(20),
+    (error) =>
+      error.status === 409 && /#20/.test(error.message) && /#21, #22/.test(error.message)
+  )
+})
+
+test('un juez crea sus partidos asignándoselos automáticamente', async () => {
+  const calls = []
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params })
+      if (/FROM torneos/.test(sql) && !/LEFT JOIN/.test(sql)) {
+        return [[{ id: 7, deporte: 'tenis', categoria_id: 3, modalidad: 'individual' }]]
+      }
+      if (/FROM jugadores/.test(sql)) return [[{ id: 10 }, { id: 11 }]]
+      if (/FROM users/.test(sql)) return [[{ id: 9 }]]
+      if (/INSERT INTO partidos/.test(sql)) return [{ insertId: 40 }]
+      if (/WHERE p\.id = \? LIMIT 1/.test(sql)) {
+        return [[{
+          id: 40,
+          torneo_id: 7,
+          torneo_nombre: 'Copa interna',
+          torneo_modalidad: 'individual',
+          deporte: 'tenis',
+          estado: 'programado',
+          categoria_id: 3,
+          categoria_nombre: '4ta',
+          juez_id: 9,
+          j1_id: 10,
+          j1_nombre: 'Ana',
+          j1_apellido: 'Rojas',
+          j2_id: 11,
+          j2_nombre: 'Laura',
+          j2_apellido: 'Díaz',
+        }]]
+      }
+      return [[]]
+    },
+  }
+
+  await loadService(fakeDb).create(
+    { torneo_id: 7, jugador1_id: 10, jugador2_id: 11, juez_id: 3 },
+    { id: 9, rol: 'juez' }
+  )
+
+  const insert = calls.find((call) => /INSERT INTO partidos/.test(call.sql))
+  assert.equal(insert.params[16], 9)
+  assert.equal(insert.params[17], 9)
+})

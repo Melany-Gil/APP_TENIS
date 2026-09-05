@@ -22,3 +22,12 @@ export function confirm(options = {}) {
     useConfirmStore.getState().open(options, resolve)
   })
 }
+
+/** Muestra un aviso modal con una sola acción para cerrarlo. */
+export function showAlert(options = {}) {
+  return confirm({
+    ...options,
+    confirmLabel: options.confirmLabel ?? 'Entendido',
+    alertOnly: true,
+  })
+}

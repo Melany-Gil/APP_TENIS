@@ -182,3 +182,26 @@ test('una cuenta no puede vincularse a dos jugadores', async () => {
     (error) => error.status === 409 && /ya está vinculada/.test(error.message)
   )
 })
+
+test('explica todas las relaciones que impiden eliminar un jugador', async () => {
+  const calls = []
+  const fakeDb = {
+    async query(sql) {
+      calls.push(sql)
+      if (/SELECT id, nombre, apellido FROM jugadores/.test(sql)) return [[playerRow]]
+      if (/SELECT\s+\(SELECT COUNT\(\*\) FROM equipos_padel/.test(sql)) {
+        return [[{ parejas: 2, partidos: 3, inscripciones: 0 }]]
+      }
+      throw new Error('No debe intentar borrar un jugador relacionado')
+    },
+  }
+
+  await assert.rejects(
+    loadService(fakeDb).remove(8),
+    (error) =>
+      error.status === 409 &&
+      /2 parejas/.test(error.message) &&
+      /3 partidos/.test(error.message)
+  )
+  assert.equal(calls.some((sql) => /^DELETE/.test(sql.trim())), false)
+})

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { showAlert } from '../utils/confirm'
 
 // Elimina el almacenamiento usado por la versión anterior, que guardaba el JWT.
 localStorage.removeItem('auth-storage')
@@ -20,6 +21,16 @@ api.interceptors.response.use(
     const payload = error.response?.data || error
     if (payload && typeof payload === 'object' && error.response?.status) {
       payload.status = error.response.status
+    }
+    if (
+      error.config?.method?.toLowerCase() === 'delete' &&
+      Number(error.response?.status) >= 400
+    ) {
+      void showAlert({
+        title: 'No se puede eliminar',
+        message: payload?.message || 'El registro tiene relaciones que impiden eliminarlo.',
+        danger: true,
+      })
     }
     return Promise.reject(payload)
   }

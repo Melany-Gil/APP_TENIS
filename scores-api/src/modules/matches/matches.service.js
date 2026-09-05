@@ -1,4 +1,5 @@
 const db = require('../../config/db')
+const { rethrowDeleteConflict } = require('../../utils/deleteConflict')
 
 const MAX_SETS = 127
 
@@ -515,18 +516,25 @@ exports.remove = async (id) => {
     `SELECT id
      FROM partidos
      WHERE origen_partido1_id = ? OR origen_partido2_id = ?
-     LIMIT 1`,
+     ORDER BY id ASC`,
     [id, id]
   )
   if (dependents.length) {
+    const ids = dependents.slice(0, 3).map((match) => `#${match.id}`).join(', ')
+    const suffix = dependents.length > 3 ? ` y ${dependents.length - 3} más` : ''
     throw {
       status: 409,
-      message: 'No puedes eliminar este partido porque su ganador participa en otro encuentro',
+      message: `No puedes eliminar el partido #${id} porque su ganador se usa como participante en ${dependents.length === 1 ? 'el partido' : 'los partidos'} ${ids}${suffix}. Elimina o modifica primero ${dependents.length === 1 ? 'ese encuentro' : 'esos encuentros'}.`,
     }
   }
 
-  await db.query('DELETE FROM sets_partido WHERE partido_id = ?', [id])
-  await db.query('DELETE FROM partidos WHERE id = ?', [id])
+  try {
+    await db.query("DELETE FROM favoritos WHERE tipo = 'partido' AND referencia_id = ?", [id])
+    await db.query('DELETE FROM sets_partido WHERE partido_id = ?', [id])
+    await db.query('DELETE FROM partidos WHERE id = ?', [id])
+  } catch (error) {
+    rethrowDeleteConflict(error, `el partido #${id}`)
+  }
 
   return { message: 'Partido eliminado correctamente' }
 }

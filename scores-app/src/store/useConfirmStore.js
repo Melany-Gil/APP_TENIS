@@ -12,6 +12,7 @@ const useConfirmStore = create((set) => ({
   confirmLabel: 'Confirmar',
   cancelLabel: 'Cancelar',
   danger: false,
+  alertOnly: false,
   requireText: null, // si se define, el usuario debe escribir este texto exacto
   resolver: null,
 
@@ -23,6 +24,7 @@ const useConfirmStore = create((set) => ({
       confirmLabel: options.confirmLabel ?? 'Confirmar',
       cancelLabel: options.cancelLabel ?? 'Cancelar',
       danger: options.danger ?? false,
+      alertOnly: options.alertOnly ?? false,
       requireText: options.requireText ?? null,
       resolver,
     }),

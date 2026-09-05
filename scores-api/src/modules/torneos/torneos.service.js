@@ -1,4 +1,5 @@
 const db = require('../../config/db')
+const { rethrowDeleteConflict } = require('../../utils/deleteConflict')
 
 const MODALIDADES = ['individual', 'dobles']
 const SISTEMAS = ['por_definir', 'eliminacion_directa', 'todos_contra_todos', 'grupos_eliminacion']
@@ -123,7 +124,11 @@ exports.remove = async (id) => {
     }
   }
 
-  await db.query('DELETE FROM torneos WHERE id = ?', [id])
+  try {
+    await db.query('DELETE FROM torneos WHERE id = ?', [id])
+  } catch (error) {
+    rethrowDeleteConflict(error, 'este torneo')
+  }
   return { message: 'Torneo eliminado correctamente' }
 }
 

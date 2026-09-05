@@ -1,5 +1,6 @@
 const db = require('../../config/db')
 const { getPlayerStats } = require('../../utils/playerStats')
+const { describeDependencies, rethrowDeleteConflict } = require('../../utils/deleteConflict')
 
 // Las categorías pertenecen a los partidos, no al perfil del jugador.
 // Por eso las estadísticas se calculan desde los resultados finalizados.
@@ -95,13 +96,41 @@ exports.update = async (id, body) => {
 }
 
 exports.remove = async (id) => {
-  const [existing] = await db.query('SELECT id FROM jugadores WHERE id = ?', [id])
+  const [existing] = await db.query(
+    'SELECT id, nombre, apellido FROM jugadores WHERE id = ?',
+    [id]
+  )
   if (!existing.length) {
     throw { status: 404, message: 'Jugador no encontrado' }
   }
 
-  await db.query('DELETE FROM jugador_stats WHERE jugador_id = ?', [id])
-  await db.query('DELETE FROM jugadores WHERE id = ?', [id])
+  const [[usage]] = await db.query(
+    `SELECT
+       (SELECT COUNT(*) FROM equipos_padel
+        WHERE jugador1_id = ? OR jugador2_id = ?) AS parejas,
+       (SELECT COUNT(*) FROM partidos
+        WHERE jugador1_id = ? OR jugador2_id = ?) AS partidos,
+       (SELECT COUNT(*) FROM inscripciones WHERE jugador_id = ?) AS inscripciones`,
+    [id, id, id, id, id]
+  )
+  const dependencies = describeDependencies([
+    { count: usage.parejas, singular: 'pareja', plural: 'parejas' },
+    { count: usage.partidos, singular: 'partido', plural: 'partidos' },
+    { count: usage.inscripciones, singular: 'inscripción', plural: 'inscripciones' },
+  ])
+  if (dependencies.length) {
+    throw {
+      status: 409,
+      message: `${existing[0].nombre} ${existing[0].apellido} no se puede eliminar porque está vinculado a ${dependencies.join(', ')}. Elimina o reasigna primero esos registros.`,
+    }
+  }
+
+  try {
+    await db.query('DELETE FROM jugador_stats WHERE jugador_id = ?', [id])
+    await db.query('DELETE FROM jugadores WHERE id = ?', [id])
+  } catch (error) {
+    rethrowDeleteConflict(error, 'este jugador')
+  }
 
   return { message: 'Jugador eliminado correctamente' }
 }

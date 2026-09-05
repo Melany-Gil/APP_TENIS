@@ -10,6 +10,7 @@ export default function ConfirmDialog() {
     confirmLabel,
     cancelLabel,
     danger,
+    alertOnly,
     requireText,
     resolver,
     close,
@@ -111,9 +112,11 @@ export default function ConfirmDialog() {
           className='flex gap-3 px-5 py-4'
           style={{ borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-hover)' }}
         >
-          <button onClick={handleCancel} className='btn-secondary flex-1'>
-            {cancelLabel}
-          </button>
+          {!alertOnly && (
+            <button onClick={handleCancel} className='btn-secondary flex-1'>
+              {cancelLabel}
+            </button>
+          )}
           <button
             onClick={handleConfirm}
             disabled={!canConfirm}
