@@ -24,6 +24,9 @@ const countriesRoutes = require('./src/modules/countries/countries.routes')
 
 const app = express()
 app.set('trust proxy', 1)
+const readiness = require('./src/config/readiness')(ensureSchema)
+// También protege el arranque gestionado: ninguna ruta usa un esquema incompleto.
+app.use(readiness.middleware)
 
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
@@ -143,7 +146,7 @@ const port = process.env.PORT || 3001
 let schemaPromise = null
 app.ensureSchemaOnce = () => {
   if (!schemaPromise) {
-    schemaPromise = ensureSchema().catch((error) => {
+    schemaPromise = readiness.start().catch((error) => {
       console.error('❌  No fue posible actualizar el esquema:', error.message)
       throw error
     })
@@ -167,9 +170,7 @@ app.start = () => {
 if (require.main === module) {
   app.start()
 } else {
-  // Arranque gestionado (Passenger u otro loader): migra el esquema en segundo
-  // plano. Los primeros milisegundos tras un despliegue pueden servir peticiones
-  // mientras corre el ALTER; se resuelve solo en cuanto termina.
+  // El middleware devuelve 503 hasta terminar; si falla, mantiene el bloqueo.
   app.ensureSchemaOnce().catch(() => {})
 }
 

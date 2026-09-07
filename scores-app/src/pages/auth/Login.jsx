@@ -10,6 +10,7 @@ import Input from '../../components/ui/Input'
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
+  const [accessType, setAccessType] = useState('documento')
   const { login } = useAuthStore()
   const { addToast } = useUIStore()
   const navigate = useNavigate()
@@ -19,12 +20,13 @@ export default function Login() {
     register,
     handleSubmit,
     setError,
+    resetField,
     formState: { errors, isSubmitting },
   } = useForm()
 
   const onSubmit = async (credentials) => {
     try {
-      const response = await authService.login(credentials)
+      const response = await authService.login({ ...credentials, tipo_acceso: accessType })
       const user = response?.user ?? response?.data?.user
       if (!user) throw new Error('Respuesta inválida del servidor')
 
@@ -70,16 +72,29 @@ export default function Login() {
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className='flex flex-col gap-5'>
+        <fieldset disabled={isSubmitting}>
+          <legend className='form-label mb-2'>¿Cómo quieres ingresar?</legend>
+          <div className='flex gap-4'>
+            {[['documento', 'Con documento'], ['usuario', 'Con usuario (jueces)']].map(([value, label]) => (
+              <label key={value} className='flex items-center gap-2 text-sm'>
+                <input type='radio' name='tipo_acceso' value={value} checked={accessType === value}
+                  onChange={() => { setAccessType(value); resetField('identificador'); resetField('password') }} />
+                {label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <div className='form-group'>
-          <label className='form-label'>Documento o usuario</label>
+          <label htmlFor='login-identifier' className='form-label'>{accessType === 'documento' ? 'Número de documento' : 'Usuario del juez'}</label>
           <div className='relative'>
             <UserRound
               className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none'
               style={{ color: 'var(--text-muted)' }}
             />
             <input
+              id='login-identifier'
               autoComplete='username'
-              placeholder='Documento o usuario'
+              placeholder={accessType === 'documento' ? 'Tu documento' : 'Tu usuario asignado'}
               className={`form-input pl-10 ${errors.identificador ? 'error' : ''}`}
               {...register('identificador', {
                 required: 'Ingresa tu documento o usuario',

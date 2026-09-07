@@ -16,6 +16,39 @@ const loadService = (fakeDb) => {
   return require(servicePath)
 }
 
+for (const scenario of [
+  { name: 'jugador inexistente o inactivo', data: { jugador1_id: 99 }, found: [] },
+  { name: 'jugador duplicado', data: { jugador1_id: 11 }, found: [{ id: 11 }] },
+  { name: 'identificador inválido', data: { jugador1_id: 'abc' }, found: [] },
+  { name: 'pareja en partido individual', data: { equipo1_id: 9 }, found: [] },
+]) {
+  test(`edición de participantes rechaza ${scenario.name} sin escribir`, async () => {
+    const service = loadService({ async query(sql) {
+      if (sql.includes('SELECT * FROM partidos')) return [[{ id: 1, juez_id: 5, deporte: 'tenis', jugador1_id: 10, jugador2_id: 11 }]]
+      if (sql.includes('FROM jugadores')) return [scenario.found]
+      throw new Error('No debe escribir ni consultar el resultado')
+    } })
+    await assert.rejects(service.updateParticipants(1, scenario.data, { id: 5, rol: 'juez' }), (err) => err.status === 400)
+  })
+}
+
+test('edición de participantes guarda un jugador registrado y activo', async () => {
+  let saved = false
+  const service = loadService({ async query(sql, params) {
+    if (sql.includes('SELECT * FROM partidos')) return [[{ id: 1, juez_id: 5, deporte: 'tenis', jugador1_id: 10, jugador2_id: 11 }]]
+    if (sql.includes('FROM jugadores')) {
+      assert.match(sql, /activo = TRUE/)
+      assert.deepEqual(params, [12, 11, 'tenis'])
+      return [[{ id: 12 }, { id: 11 }]]
+    }
+    if (sql.startsWith('UPDATE partidos')) { saved = true; return [{}] }
+    throw new Error(sql)
+  } })
+  service.getById = async () => ({ id: 1 })
+  await service.updateParticipants(1, { jugador1_id: 12 }, { id: 5, rol: 'juez' })
+  assert.equal(saved, true)
+})
+
 for (const modality of ['individual', 'dobles']) {
   test(`permite crear y editar un partido libre ${modality}`, async () => {
     const calls = []

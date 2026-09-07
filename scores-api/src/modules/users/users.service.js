@@ -1,5 +1,6 @@
 const db = require('../../config/db')
 const bcrypt = require('bcryptjs')
+const { validateIdentifierCrossing } = require('../../utils/loginIdentifiers')
 
 const BASE_FIELDS =
   'u.id, u.numero_documento, u.nombre, u.apellido, u.email, u.telefono, u.avatar, u.rol, u.activo, u.created_at'
@@ -70,6 +71,7 @@ exports.create = async ({
 
   const aliasSupported = await hasUsuarioColumn()
   const alias = aliasSupported ? normalizeUsuario(usuario) : null
+  if (aliasSupported) await validateIdentifierCrossing(db, { documento: numero_documento, usuario: alias })
 
   const [existing] = await db.query(
     'SELECT id FROM users WHERE numero_documento = ? OR email = ? LIMIT 1',
@@ -122,6 +124,7 @@ exports.updateUsuario = async (id, usuario) => {
   if (!existing.length) throw { status: 404, message: 'Usuario no encontrado' }
 
   const alias = normalizeUsuario(usuario)
+  await validateIdentifierCrossing(db, { usuario: alias, id })
   if (alias) {
     const [dup] = await db.query('SELECT id FROM users WHERE usuario = ? AND id != ? LIMIT 1', [
       alias,

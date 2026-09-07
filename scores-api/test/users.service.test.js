@@ -82,6 +82,7 @@ test('crear usuario guarda el alias y valida que no esté repetido', async () =>
       if (/information_schema\.COLUMNS/.test(sql)) return [[{ total: 1 }]]
       if (/numero_documento = \? OR email = \?/.test(sql)) return [[]]
       if (/SELECT id FROM users WHERE usuario = \? LIMIT 1/.test(sql)) return [[]]
+      if (/AND id != \?/.test(sql)) return [[]]
       if (/INSERT INTO users/.test(sql)) return [{ insertId: 11 }]
       return [[{
         id: 11,
@@ -170,6 +171,7 @@ test('updateUsuario permite fijar y retirar el alias', async () => {
       if (/information_schema\.COLUMNS/.test(sql)) return [[{ total: 1 }]]
       if (/SELECT id FROM users WHERE id = \?/.test(sql)) return [[{ id: 7 }]]
       if (/SELECT id FROM users WHERE usuario = \? AND id != \?/.test(sql)) return [[]]
+      if (/SELECT id FROM users WHERE numero_documento = \? AND id != \?/.test(sql)) return [[]]
       if (/UPDATE users SET usuario/.test(sql)) return [{ affectedRows: 1 }]
       return [[{ id: 7, numero_documento: '1', nombre: 'J', apellido: 'P', email: 'j@e.com', rol: 'juez', activo: 1 }]]
     },
@@ -181,4 +183,29 @@ test('updateUsuario permite fijar y retirar el alias', async () => {
 
   const updates = calls.filter((call) => /UPDATE users SET usuario/.test(call.sql))
   assert.deepEqual(updates.map((call) => call.params[0]), ['nuevo.alias', null])
+})
+
+for (const field of ['usuario', 'numero_documento']) {
+  test(`crear cuenta rechaza conflicto cruzado de ${field}`, async () => {
+    const service = loadService({ async query(sql) {
+      if (/information_schema/.test(sql)) return [[{ total: 1 }]]
+      if (/AND id !=/.test(sql) && sql.includes(field === 'usuario' ? 'WHERE numero_documento' : 'WHERE usuario')) return [[{ id: 9 }]]
+      if (/INSERT/.test(sql)) assert.fail('No debe guardar una cuenta en conflicto')
+      return [[]]
+    } })
+    await assert.rejects(service.create({ numero_documento: '12345', usuario: '54321', nombre: 'A', apellido: 'B', email: 'a@b.com', password: 'Secret123' }), error => error.status === 409 && /coincide/.test(error.message))
+  })
+}
+
+test('editar alias rechaza documento de otra cuenta', async () => {
+  const service = loadService({ async query(sql, params) {
+    if (/information_schema/.test(sql)) return [[{ total: 1 }]]
+    if (/WHERE id =/.test(sql)) return [[{ id: 7 }]]
+    if (/WHERE numero_documento/.test(sql)) {
+      assert.deepEqual(params, ['12345', 7])
+      return [[{ id: 9 }]]
+    }
+    assert.fail('No debe actualizar un alias en conflicto')
+  } })
+  await assert.rejects(service.updateUsuario(7, '12345'), error => error.status === 409)
 })

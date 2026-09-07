@@ -544,7 +544,7 @@ exports.remove = async (id) => {
 }
 
 exports.updateParticipants = async (id, data, user) => {
-  const [existing] = await db.query('SELECT id, juez_id FROM partidos WHERE id = ?', [id])
+  const [existing] = await db.query('SELECT * FROM partidos WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
 
   const match = existing[0]
@@ -554,6 +554,28 @@ exports.updateParticipants = async (id, data, user) => {
 
   const updates = []
   const params = []
+
+  const participantFields = ['jugador1_id', 'jugador2_id', 'equipo1_id', 'equipo2_id']
+  const changedFields = participantFields.filter((key) => data[key] !== undefined)
+  if (changedFields.length) {
+    const doubles = Boolean(match.equipo1_id || match.equipo2_id)
+    const allowed = doubles ? ['equipo1_id', 'equipo2_id'] : ['jugador1_id', 'jugador2_id']
+    for (const key of changedFields) {
+      if (!allowed.includes(key) || !/^[1-9]\d*$/.test(String(data[key])) || !Number.isSafeInteger(Number(data[key]))) {
+        throw { status: 400, message: 'Selecciona un participante registrado válido para la modalidad del partido' }
+      }
+      const side = key.includes('1') ? 1 : 2
+      if (match[`origen_partido${side}_id`]) {
+        throw { status: 400, message: 'Este participante depende del ganador de otro partido. Modifica el origen desde la edición del encuentro.' }
+      }
+    }
+    const ids = allowed.map((key) => Number(data[key] ?? match[key])).filter(Boolean)
+    if (new Set(ids).size !== ids.length) {
+      throw { status: 400, message: 'Los participantes del partido deben ser diferentes' }
+    }
+    if (doubles) await validateTeams(ids, match.deporte, match.categoria_id)
+    else await validatePlayers(ids, match.deporte)
+  }
 
   const cleanName = (value) => {
     const text = String(value ?? '').trim()

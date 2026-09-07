@@ -1,7 +1,7 @@
 import api from './api'
 
 export const authService = {
-  login: ({ identificador, password }) => api.post('/auth/login', { identificador, password }),
+  login: ({ identificador, password, tipo_acceso }) => api.post('/auth/login', { identificador, password, tipo_acceso }),
 
   register: ({ numero_documento, nombre, apellido, email, password }) =>
     api.post('/auth/register', { numero_documento, nombre, apellido, email, password }),

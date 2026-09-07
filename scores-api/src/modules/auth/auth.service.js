@@ -47,7 +47,10 @@ const mailFromAddress = () => {
   return (addressBetweenBrackets?.[1] || configured.split(/[;,]/)[0]).trim()
 }
 
-exports.login = async ({ identificador, numero_documento, password }) => {
+exports.login = async ({ identificador, numero_documento, password, tipo_acceso }) => {
+  if (tipo_acceso !== undefined && !['documento', 'usuario'].includes(tipo_acceso)) {
+    throw { status: 400, message: 'Tipo de acceso inválido' }
+  }
   // Acepta el número de documento (cualquier usuario) o el alias "usuario"
   // (solo cuentas con rol juez). Se conserva `numero_documento` por
   // compatibilidad con clientes antiguos.
@@ -58,6 +61,10 @@ exports.login = async ({ identificador, numero_documento, password }) => {
 
   let rows
   try {
+    if (tipo_acceso) {
+      const condition = tipo_acceso === 'usuario' ? "usuario = ? AND rol = 'juez'" : 'numero_documento = ?'
+      ;[rows] = await db.query(`SELECT * FROM users WHERE activo = TRUE AND ${condition} LIMIT 1`, [credential])
+    } else {
     ;[rows] = await db.query(
       `SELECT * FROM users
        WHERE activo = TRUE
@@ -66,10 +73,12 @@ exports.login = async ({ identificador, numero_documento, password }) => {
        LIMIT 1`,
       [credential, credential, credential]
     )
+    }
   } catch (error) {
     // Si la columna `usuario` aún no existe (migración pendiente tras un
     // despliegue), se degrada a login solo por documento para no bloquear el acceso.
     if (error.code !== 'ER_BAD_FIELD_ERROR') throw error
+    if (tipo_acceso === 'usuario') throw { status: 503, message: 'El acceso por usuario no está disponible temporalmente. Usa tu documento.' }
     ;[rows] = await db.query(
       'SELECT * FROM users WHERE numero_documento = ? AND activo = TRUE LIMIT 1',
       [credential]

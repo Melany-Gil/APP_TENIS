@@ -33,6 +33,30 @@ const judgeRow = {
   password: passwordHash,
 }
 
+for (const mode of ['documento', 'usuario']) {
+  test(`acceso explícito por ${mode} no mezcla identificadores`, async () => {
+    const service = loadService({ async query(sql, params) {
+      assert.doesNotMatch(sql, /\bOR\b/)
+      assert.match(sql, mode === 'documento' ? /numero_documento = \?/ : /usuario = \? AND rol = 'juez'/)
+      assert.deepEqual(params, ['12345'])
+      return [[judgeRow]]
+    } })
+    assert.equal((await service.login({ identificador: '12345', password: 'Secret123', tipo_acceso: mode })).user.id, 7)
+  })
+}
+
+test('acceso por usuario no cambia a documento si falta la columna', async () => {
+  let calls = 0
+  const service = loadService({ async query() { calls++; throw { code: 'ER_BAD_FIELD_ERROR' } } })
+  await assert.rejects(service.login({ identificador: '12345', password: 'Secret123', tipo_acceso: 'usuario' }), error => error.status === 503)
+  assert.equal(calls, 1)
+})
+
+test('rechaza modo de acceso desconocido', async () => {
+  const service = loadService({ async query() { assert.fail('No debe consultar') } })
+  await assert.rejects(service.login({ identificador: '12345', password: 'Secret123', tipo_acceso: 'otro' }), error => error.status === 400)
+})
+
 test('login por número de documento sigue funcionando', async () => {
   const calls = []
   const service = loadService({
