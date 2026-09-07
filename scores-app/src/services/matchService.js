@@ -31,7 +31,8 @@ const toJudgeState = (control) => {
       punto_j1: displayPoints[0] ?? '0',
       punto_j2: displayPoints[1] ?? '0',
       numero_servicio: Number(rawScore.serviceAttempt || 1),
-      deuce: displayPoints[0] === '40' && displayPoints[1] === '40',
+      deuce: rawScore.mode === 'game' && displayPoints[0] === '40' && displayPoints[1] === '40',
+      mode: rawScore.mode,
       terminado: Boolean(winner),
       ganador: winner,
       breakpoint: control.breakpoint || null,
@@ -75,6 +76,7 @@ export const matchService = {
   // Adaptadores para la mesa unificada incluida en el diseño del equipo.
   getAssignments: () => api.get('/partidos/gestion/mis-partidos'),
   getLiveState: async (id) => judgeResponse(await api.get(`/partidos/${id}/control`)),
+  addJudgeEvent: async (id, data) => judgeResponse(await api.post(`/partidos/${id}/eventos`, data)),
   startLive: async (id) => judgeResponse(await api.post(`/partidos/${id}/iniciar`)),
   pauseLive: async (id, pausado) => judgeResponse(await api.put(`/partidos/${id}/pausa`, { pausado })),
   setServer: async (id, servidor) => judgeResponse(await api.put(`/partidos/${id}/saque`, { servidor })),

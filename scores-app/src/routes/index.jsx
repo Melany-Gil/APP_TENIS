@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import useAuthStore from '../store/useAuthStore'
 import AuthLayout from '../layouts/AuthLayout'
 import AppLayout from '../layouts/AppLayout'
 import AdminLayout from '../layouts/AdminLayout'
@@ -47,6 +48,13 @@ const JuezPartidos = lazy(() => import('../pages/judge/JuezPartidos'))
 // nunca se desmontan al navegar entre páginas — solo el contenido
 // interno muestra un loader pequeño mientras carga el chunk.
 export default function AppRouter() {
+  const { user, isAuthenticated } = useAuthStore()
+  const { pathname } = useLocation()
+  // A judge's signed-in workspace has only these two destinations, including
+  // when following an old bookmark or typing a public URL directly.
+  if (isAuthenticated && user?.rol === 'juez' && !['/juez', '/juez/perfil'].includes(pathname)) {
+    return <Navigate to={pathname === '/profile' ? '/juez/perfil' : '/juez'} replace />
+  }
   return (
     <Routes>
       {/* Auth */}
@@ -104,6 +112,7 @@ export default function AppRouter() {
         }
       >
         <Route path='/juez' element={<JuezPartidos />} />
+        <Route path='/juez/perfil' element={<Profile />} />
         <Route path='/juez/partido/:id' element={<Navigate to='/juez' replace />} />
       </Route>
 

@@ -64,6 +64,7 @@ export default function Profile() {
   }, [updateUser])
 
   const loadMatches = useCallback(async () => {
+    if (user?.rol === 'juez') { setMatchesLoading(false); return }
     try {
       const response = await matchService.getMyMatches()
       setMatches(response.data || EMPTY_MATCHES)
@@ -78,7 +79,7 @@ export default function Profile() {
     } finally {
       setMatchesLoading(false)
     }
-  }, [addToast])
+  }, [addToast, user?.rol])
 
   useEffect(() => {
     loadProfile()
@@ -236,7 +237,7 @@ export default function Profile() {
         </form>
       )}
 
-      <section className='space-y-4'>
+      {user?.rol !== 'juez' && <section className='space-y-4'>
         <div>
           <h2 className='font-bold flex items-center gap-2' style={{ color: 'var(--text-primary)' }}>
             <Trophy className='w-4 h-4' /> Mis partidos
@@ -262,7 +263,7 @@ export default function Profile() {
             <MatchSection title='Historial' matches={matches.historial} history empty='Aún no tienes resultados.' />
           </div>
         )}
-      </section>
+      </section>}
 
       <div className='card overflow-hidden'>
         {menu.map((item, index) => (

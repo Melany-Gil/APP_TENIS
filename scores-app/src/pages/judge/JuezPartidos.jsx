@@ -1,639 +1,248 @@
-import { useEffect, useState, useCallback } from 'react'
-import { Play, Pause, Undo2, Flag, RefreshCw, MapPin, Timer, Circle, BarChart3, Zap, ClipboardList, Pencil, Check, X } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { ArrowLeft, Pause, Play, Undo2, RefreshCw, X, Settings2, BarChart3 } from 'lucide-react'
 import { matchService } from '../../services/matchService'
 import { getParticipantName } from '../../utils/matchParticipants'
-import Button from '../../components/ui/Button'
+import { createJudgeSession } from '../../utils/judgeSession'
+import { confirm } from '../../utils/confirm'
 import MatchStats from '../../components/match/MatchStats'
-import useUIStore from '../../store/useUIStore'
 import { useMatchTimer } from '../../hooks/useMatchTimer'
 import { useMatchRealtime } from '../../hooks/useMatchRealtime'
-import { cn } from '../../utils/cn'
-import Avatar from '../../components/ui/Avatar'
+import './judge.css'
+
+const reasons = [
+  ['tiro_ganador', 'Tiro ganador', 'La pelota no pudo ser devuelta'],
+  ['ace', 'Ace', 'Saque que el receptor no toca'],
+  ['error_no_forzado', 'Error del rival', 'Error no forzado'],
+  ['error_forzado', 'Error provocado', 'Forzaste el error del rival'],
+  ['infraccion', 'Infracción del rival', 'Por ejemplo, tocar la red'],
+  ['penalizacion', 'Penalización', 'Punto otorgado por sanción'],
+]
+const reasonLabel = (event, names) => {
+  if (!event) return 'Todavía no hay acciones registradas'
+  if (event.tipo === 'primera_falta') return 'Primera falta · segundo saque'
+  if (event.tipo === 'let') return 'Let · se repite el saque'
+  if (event.tipo === 'cambio_servidor') return 'Cambio de sacador'
+  const reason = event.motivo === 'doble_falta' ? 'Doble falta' : reasons.find(([key]) => key === event.motivo)?.[1] || 'Punto sin detalle'
+  return `${names[event.ganador]} · ${reason}`
+}
 
 export default function JuezPartidos() {
   const [matches, setMatches] = useState([])
-  const [selected, setSelected] = useState(null)
-  const [state, setState] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [quickMode, setQuickMode] = useState(true)
-  const [pendingPoint, setPendingPoint] = useState(null) // { ganador: 'jugador1'|'jugador2' }
-  const [showStats, setShowStats] = useState(false)
-  const [editingName, setEditingName] = useState(null) // 'jugador1' | 'jugador2'
-  const [editNameValue, setEditNameValue] = useState('')
-  const [savingName, setSavingName] = useState(false)
-  const { addToast } = useUIStore()
+  const [listLoading, setListLoading] = useState(true)
+  const [listError, setListError] = useState('')
+  const [view, setView] = useState({ match: null, control: null, busy: false })
+  const sessionRef = useRef(null)
+  const [quick, setQuick] = useState(true)
+  const [pending, setPending] = useState(null)
+  const [panel, setPanel] = useState(null)
+  const [online, setOnline] = useState(navigator.onLine)
+  const [nameDraft, setNameDraft] = useState(['', ''])
+  const [nameBusy, setNameBusy] = useState(false)
+  const [nameError, setNameError] = useState('')
+  const listRequest = useRef(0)
 
   const refreshMatches = useCallback(async () => {
+    const request = ++listRequest.current
+    setListLoading(true)
     try {
-      const res = await matchService.getAssignments()
-      setMatches(res.data || [])
-    } catch {
-      addToast({ type: 'error', title: 'No se pudieron cargar tus partidos' })
-    }
-  }, [addToast])
-
-  const loadState = async (match) => {
-    setSelected(match)
-    setLoading(true)
-    setShowStats(false)
-    setPendingPoint(null)
-    try {
-      const res = await matchService.getLiveState(match.id)
-      setState(res.data)
-    } catch (err) {
-      addToast({ type: 'error', title: 'Error', message: err.message })
+      const response = await matchService.getAssignments()
+      if (request !== listRequest.current) return
+      setMatches(response.data || [])
+      setListError('')
+    } catch (error) {
+      if (request === listRequest.current) setListError(error.message || 'No se pudieron cargar tus partidos')
     } finally {
-      setLoading(false)
+      if (request === listRequest.current) setListLoading(false)
     }
-  }
-
-  const action = useCallback(async (operation) => {
-    if (!selected) return
-    setLoading(true)
-    try {
-      await operation()
-      const res = await matchService.getLiveState(selected.id)
-      setState(res.data)
-      await refreshMatches()
-    } catch (err) {
-      addToast({ type: 'error', title: 'No se pudo actualizar', message: err.message })
-    } finally {
-      setLoading(false)
-    }
-  }, [addToast, refreshMatches, selected])
-
-  const handlePointClick = (ganador) => {
-    if (quickMode) {
-      // Modo rápido: registra directamente sin metadata
-      action(() => matchService.recordPoint(selected.id, ganador))
-    } else {
-      // Modo detallado: abre panel de metadata
-      setPendingPoint({ ganador })
-    }
-  }
-
-  const confirmPoint = (metadata = {}) => {
-    if (!pendingPoint) return
-    action(() =>
-      matchService.recordPoint(selected.id, pendingPoint.ganador, {
-        ...metadata,
-      }, score?.numero_servicio)
-    )
-    setPendingPoint(null)
-  }
-
-  const handleReasonSelect = (reason) => {
-    if (!pendingPoint) return
-    if (reason === 'falta' && score?.numero_servicio === 1) {
-      action(() => matchService.addEvent(selected.id, { tipo: 'primera_falta' }))
-      setPendingPoint(null)
-      return
-    }
-    const motivoMap = { winner: 'tiro_ganador', ace: 'ace', error_no_forzado: 'error_no_forzado', doble_falta: 'doble_falta' }
-    action(() =>
-      matchService.addEvent(selected.id, {
-        tipo: 'punto',
-        ganador: pendingPoint.ganador,
-        motivo: motivoMap[reason] || 'punto_sin_detalle',
-      })
-    )
-    setPendingPoint(null)
-  }
-
-  const handleSaveName = async () => {
-    if (!editingName || !selected) return
-    setSavingName(true)
-    try {
-      const sideKey = editingName === 'jugador1' ? 'nombre_override_j1' : 'nombre_override_j2'
-      await matchService.updateParticipants(selected.id, { [sideKey]: editNameValue || null })
-      const res = await matchService.getLiveState(selected.id)
-      setState(res.data)
-      setEditingName(null)
-      await refreshMatches()
-    } catch {
-    } finally {
-      setSavingName(false)
-    }
-  }
+  }, [])
 
   useEffect(() => {
+    const session = createJudgeSession(matchService, setView)
+    sessionRef.current = session
     refreshMatches()
+    return () => { session.dispose(); ++listRequest.current }
   }, [refreshMatches])
 
-  useMatchRealtime(useCallback((event) => {
-    refreshMatches()
-    if (selected && (event.matchId === null || Number(event.matchId) === Number(selected.id))) {
-      matchService.getLiveState(selected.id).then((response) => setState(response.data)).catch(() => {})
+  const selectedId = view.match?.id
+  useEffect(() => {
+    const recover = () => {
+      setOnline(navigator.onLine)
+      if (navigator.onLine && document.visibilityState === 'visible') sessionRef.current?.sync()
     }
-  }, [refreshMatches, selected]))
+    window.addEventListener('online', recover)
+    window.addEventListener('offline', recover)
+    window.addEventListener('focus', recover)
+    document.addEventListener('visibilitychange', recover)
+    const interval = setInterval(recover, 30000)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('online', recover)
+      window.removeEventListener('offline', recover)
+      window.removeEventListener('focus', recover)
+      document.removeEventListener('visibilitychange', recover)
+    }
+  }, [selectedId])
 
-  const p1 = selected && getParticipantName(selected, 1)
-  const p2 = selected && getParticipantName(selected, 2)
-  const p1Photo = selected?.jugador1?.foto
-  const p2Photo = selected?.jugador2?.foto
+  useMatchRealtime(useCallback((event) => {
+    if (selectedId) {
+      if (event.matchId == null || Number(event.matchId) === Number(selectedId)) sessionRef.current?.sync()
+    } else refreshMatches()
+  }, [selectedId, refreshMatches]))
+
+  const state = view.control
+  const match = state?.partido || view.match
+  const names = { jugador1: getParticipantName(match || {}, 1) || 'Jugador 1', jugador2: getParticipantName(match || {}, 2) || 'Jugador 2' }
   const score = state?.marcador
-  const liveData = state?.en_vivo
-  const timerInput = liveData
-    ? { ...liveData, estado: liveData.estado === 'en_vivo' && !score?.terminado ? 'en_vivo' : (score?.terminado ? 'finalizado' : liveData.estado) }
-    : null
-  const { formatted: timerFormatted, isPaused: timerPaused, isStopped: timerStopped } = useMatchTimer(timerInput, timerInput?.estado)
+  const live = state?.en_vivo
+  const finished = score?.terminado || ['finalizado', 'cancelado'].includes(live?.estado)
+  const paused = Boolean(live?.pausado_at)
+  const playing = live?.estado === 'en_vivo' && !finished
+  const locked = view.busy || view.needsSync || !online || nameBusy
+  const canScore = playing && !paused && !locked
+  const server = live?.saca || 'jugador1'
+  const receiver = server === 'jugador1' ? 'jugador2' : 'jugador1'
+  const lastEvent = state?.eventos_recientes?.[0]
+  const { formatted: elapsed } = useMatchTimer(live, live?.estado)
 
-  const isLive = liveData?.estado === 'en_vivo'
-  const isPaused = Boolean(liveData?.pausado_at)
-  const isFinished = score?.terminado
-
-  return (
-    <div className='max-w-5xl mx-auto p-4 sm:p-8 space-y-5'>
-      {/* Header */}
-      <div className='flex justify-between items-center'>
-        <div>
-          <h1 className='text-2xl font-bold'>Mesa del juez</h1>
-          <p className='text-sm' style={{ color: 'var(--text-muted)' }}>
-            Cada punto queda registrado y se puede deshacer.
-          </p>
-        </div>
-        <Button
-          variant='secondary'
-          onClick={refreshMatches}
-          leftIcon={<RefreshCw className='w-4 h-4' />}
-        >
-          Actualizar
-        </Button>
-      </div>
-
-      <div className='grid lg:grid-cols-[280px_1fr] gap-5'>
-        {/* Match list sidebar */}
-        <div className='card overflow-hidden'>
-          {matches.length ? (
-            matches.map((match) => (
-              <button
-                key={match.id}
-                onClick={() => loadState(match)}
-                className={cn(
-                  'w-full text-left p-4 border-b last:border-0 transition-colors',
-                  selected?.id === match.id
-                    ? 'bg-[var(--bg-hover)]'
-                    : 'hover:bg-[var(--bg-hover)]'
-                )}
-              >
-                <p className='font-semibold text-sm'>
-                  {getParticipantName(match, 1) || 'Por definir'} vs{' '}
-                  {getParticipantName(match, 2) || 'Por definir'}
-                </p>
-                <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
-                  {match.torneo?.nombre || 'Partido libre'} · {{ en_vivo: 'En vivo', finalizado: 'Finalizado', programado: 'Programado', cancelado: 'Cancelado' }[match.estado] || match.estado}
-                  {match.cancha && (
-                    <span className='inline-flex items-center gap-0.5 ml-1'>
-                      <MapPin className='w-3 h-3 inline' />
-                      {match.cancha.nombre}
-                    </span>
-                  )}
-                </p>
-              </button>
-            ))
-          ) : (
-            <p className='p-6 text-sm text-center'>No tienes partidos asignados.</p>
-          )}
-        </div>
-
-        {/* Scoring panel */}
-        <div className='card p-5 min-h-[320px]'>
-          {selected && state ? (
-            <>
-              {/* Match header */}
-              <div className='flex justify-between items-start gap-3 mb-2'>
-                <div>
-                  <h2 className='font-bold text-lg'>{p1} vs {p2}</h2>
-                  <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                    Al mejor de {state.reglas.mejor_de} · sets a {state.reglas.juegos_por_set}
-                    {selected.cancha && ` · ${selected.cancha.nombre}`}
-                  </p>
-                </div>
-                <div className='flex items-center gap-2'>
-                  {liveData?.iniciado_at && (
-                    <div
-                      className={cn(
-                        'flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-mono font-semibold',
-                        timerStopped ? 'bg-gray-500/10 text-gray-500'
-                        : timerPaused ? 'bg-amber-500/10 text-amber-500'
-                        : 'bg-[var(--color-live)]/10 text-[var(--color-live)]'
-                      )}
-                    >
-                      <Timer className='w-3.5 h-3.5' />
-                      {timerFormatted}
-                    </div>
-                  )}
-                  <span
-                    className={cn(
-                      'text-xs px-2.5 py-1 rounded-full font-semibold',
-                      isFinished ? 'bg-gray-500/10 text-gray-500'
-                      : isLive && !isPaused ? 'bg-[var(--color-live)]/10 text-[var(--color-live)]'
-                      : isPaused ? 'bg-amber-500/10 text-amber-500'
-                      : 'bg-blue-500/10 text-blue-500'
-                    )}
-                  >
-                    {isFinished ? 'Finalizado' : isPaused ? 'Pausado' : isLive ? 'En vivo' : 'Programado'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Scoreboard */}
-              <div className='rounded-xl overflow-hidden mt-4' style={{ border: '1px solid var(--border-color)' }}>
-                <div
-                  className='grid items-center text-xs font-semibold uppercase tracking-wider py-2 px-4'
-                  style={{
-                    gridTemplateColumns: `1fr repeat(${Math.max(score.sets.length + (isFinished ? 0 : 1), 3)}, 48px) 56px`,
-                    backgroundColor: 'var(--bg-hover)',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  <span>Jugador</span>
-                  {Array.from({ length: Math.max(score.sets.length + (isFinished ? 0 : 1), 3) }, (_, i) => (
-                    <span key={i} className='text-center'>S{i + 1}</span>
-                  ))}
-                  <span className='text-center'>Pts</span>
-                </div>
-                <PlayerRow name={p1} photo={p1Photo} score={score} playerKey='j1' pointKey='punto_j1'
-                  isWinner={score.ganador === 'jugador1'} isServing={liveData?.saca === 'jugador1'}
-                  isFinished={isFinished} totalSetsToShow={Math.max(score.sets.length + (isFinished ? 0 : 1), 3)}
-                  side='jugador1' editingName={editingName} editNameValue={editNameValue}
-                  setEditNameValue={setEditNameValue} setEditingName={setEditingName}
-                  onSaveName={handleSaveName} savingName={savingName} />
-                <div className='h-px' style={{ backgroundColor: 'var(--border-color)' }} />
-                <PlayerRow name={p2} photo={p2Photo} score={score} playerKey='j2' pointKey='punto_j2'
-                  isWinner={score.ganador === 'jugador2'} isServing={liveData?.saca === 'jugador2'}
-                  isFinished={isFinished} totalSetsToShow={Math.max(score.sets.length + (isFinished ? 0 : 1), 3)}
-                  side='jugador2' editingName={editingName} editNameValue={editNameValue}
-                  setEditNameValue={setEditNameValue} setEditingName={setEditingName}
-                  onSaveName={handleSaveName} savingName={savingName} />
-              </div>
-
-              {/* Status badges */}
-              <div className='flex justify-center gap-4 mt-3 text-xs' style={{ color: 'var(--text-muted)' }}>
-                {score.deuce && <span className='font-semibold' style={{ color: 'var(--club-clay)' }}>DEUCE</span>}
-                {score.breakpoint && (
-                  <span className='font-bold' style={{ color: '#ef4444' }}>
-                    {score.breakpoint.count === 2 ? '2 BREAK POINTS' : 'BREAK POINT'}
-                  </span>
-                )}
-                {score.currentSet.tiebreak && !isFinished && <span className='font-semibold' style={{ color: 'var(--club-clay)' }}>TIE-BREAK</span>}
-                {isFinished && score.ganador && (
-                  <span className='font-semibold' style={{ color: 'var(--color-live)' }}>
-                    🏆 Ganador: {score.ganador === 'jugador1' ? p1 : p2}
-                  </span>
-                )}
-              </div>
-
-              {/* Mode toggle + Stats button */}
-              {isLive && !isFinished && (
-                <div className='rounded-xl p-3 mt-5 mb-3' style={{ backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)' }}>
-                <div className='flex items-center justify-between'>
-                  <div className='flex items-center gap-3'>
-                    <button
-                      onClick={() => { setQuickMode(!quickMode); setPendingPoint(null) }}
-                      className='relative w-14 h-7 rounded-full transition-colors'
-                      style={{ backgroundColor: quickMode ? 'var(--color-live)' : '#6366f1' }}
-                    >
-                      <span
-                        className='absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform'
-                        style={{ left: quickMode ? '2px' : 'calc(100% - 26px)' }}
-                      />
-                    </button>
-                    <div>
-                      <span className='text-sm font-semibold flex items-center gap-1.5' style={{ color: quickMode ? 'var(--color-live)' : '#6366f1' }}>
-                        {quickMode ? <><Zap className='w-4 h-4' /> Modo rápido</> : <><ClipboardList className='w-4 h-4' /> Modo detallado</>}
-                      </span>
-                      <p className='text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>
-                        {quickMode
-                          ? '1 click = punto registrado. Sin detalles de saque ni golpe.'
-                          : 'Cada punto abre un panel para marcar tipo de saque, ace, winner, etc.'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowStats(!showStats)}
-                    className='flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0'
-                    style={{
-                      backgroundColor: showStats ? 'var(--bg-primary)' : 'transparent',
-                      color: 'var(--text-muted)',
-                      border: '1px solid var(--border-color)',
-                    }}
-                  >
-                    <BarChart3 className='w-3.5 h-3.5' />
-                    📊
-                  </button>
-                </div>
-              </div>
-              )}
-
-              {/* Stats panel (visible also when finished) */}
-              {isFinished && (
-                <div className='flex justify-end mt-4 mb-3'>
-                  <button
-                    onClick={() => setShowStats(!showStats)}
-                    className='flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors'
-                    style={{
-                      backgroundColor: showStats ? 'var(--bg-hover)' : 'transparent',
-                      color: 'var(--text-muted)',
-                      border: '1px solid var(--border-color)',
-                    }}
-                  >
-                    <BarChart3 className='w-3.5 h-3.5' />
-                    {showStats ? 'Ocultar estadísticas' : 'Ver estadísticas'}
-                  </button>
-                </div>
-              )}
-
-              {showStats && (
-                <div className='card p-4 mt-3 mb-4' style={{ border: '1px solid var(--border-color)' }}>
-                  <MatchStats matchId={selected.id} player1={p1} player2={p2} />
-                </div>
-              )}
-
-              {/* Point detail panel */}
-              {pendingPoint && !quickMode && (
-                <PointDetailPanel
-                  ganador={pendingPoint.ganador}
-                  p1={p1}
-                  p2={p2}
-                  isFirstServe={score?.numero_servicio === 1}
-                  isServing={liveData?.saca === pendingPoint.ganador}
-                  onSelectReason={handleReasonSelect}
-                  onCancel={() => setPendingPoint(null)}
-                  loading={loading}
-                />
-              )}
-
-              {/* Controls */}
-              <div className='grid sm:grid-cols-2 gap-3 mt-4'>
-                {!isLive && !isFinished && (
-                  <Button
-                    className='sm:col-span-2'
-                    disabled={loading}
-                    onClick={() => action(() => matchService.startLive(selected.id))}
-                    leftIcon={<Play className='w-4 h-4' />}
-                  >
-                    Iniciar partido
-                  </Button>
-                )}
-
-                {isLive && !isFinished && (
-                  <Button
-                    variant={isPaused ? 'primary' : 'secondary'}
-                    disabled={loading}
-                    onClick={() => action(() => matchService.pauseLive(selected.id, !isPaused))}
-                    leftIcon={isPaused ? <Play className='w-4 h-4' /> : <Pause className='w-4 h-4' />}
-                  >
-                    {isPaused ? 'Reanudar' : 'Pausar'}
-                  </Button>
-                )}
-
-                {isLive && !isFinished && (
-                  <Button
-                    variant='secondary'
-                    disabled={loading}
-                    onClick={() =>
-                      action(() =>
-                        matchService.setServer(selected.id, liveData.saca === 'jugador1' ? 'jugador2' : 'jugador1')
-                      )
-                    }
-                  >
-                    Cambiar saque → {liveData?.saca === 'jugador1' ? p2 : p1}
-                  </Button>
-                )}
-
-                {isLive && !isPaused && !isFinished && !pendingPoint && (
-                  <>
-                    <button
-                      disabled={loading}
-                      onClick={() => handlePointClick('jugador1')}
-                      className='rounded-xl p-4 text-center font-bold text-lg transition-all active:scale-95 disabled:opacity-50'
-                      style={{
-                        backgroundColor: 'var(--bg-hover)',
-                        border: quickMode ? '2px solid var(--border-color)' : '2px solid #6366f1',
-                        color: 'var(--text-primary)',
-                      }}
-                    >
-                      <span className='text-sm font-normal block' style={{ color: 'var(--text-muted)' }}>
-                        {liveData?.saca === 'jugador1' && '🟢 Sacando · '}Punto para
-                      </span>
-                      {p1}
-                      {!quickMode && (
-                        <span className='text-xs font-normal block mt-1' style={{ color: '#6366f1' }}>
-                          📋 Toca para agregar detalle
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      disabled={loading}
-                      onClick={() => handlePointClick('jugador2')}
-                      className='rounded-xl p-4 text-center font-bold text-lg transition-all active:scale-95 disabled:opacity-50'
-                      style={{
-                        backgroundColor: 'var(--bg-hover)',
-                        border: quickMode ? '2px solid var(--border-color)' : '2px solid #6366f1',
-                        color: 'var(--text-primary)',
-                      }}
-                    >
-                      <span className='text-sm font-normal block' style={{ color: 'var(--text-muted)' }}>
-                        {liveData?.saca === 'jugador2' && '🟢 Sacando · '}Punto para
-                      </span>
-                      {p2}
-                      {!quickMode && (
-                        <span className='text-xs font-normal block mt-1' style={{ color: '#6366f1' }}>
-                          📋 Toca para agregar detalle
-                        </span>
-                      )}
-                    </button>
-                  </>
-                )}
-
-                {isLive && !isFinished && (
-                  <Button
-                    variant='secondary'
-                    disabled={loading}
-                    onClick={() => action(() => matchService.undoPoint(selected.id))}
-                    leftIcon={<Undo2 className='w-4 h-4' />}
-                  >
-                    Deshacer último punto
-                  </Button>
-                )}
-
-                {isFinished && liveData?.estado !== 'finalizado' && (
-                  <Button
-                    className='sm:col-span-2'
-                    disabled={loading}
-                    onClick={() => action(() => matchService.finishLive(selected.id))}
-                    leftIcon={<Flag className='w-4 h-4' />}
-                  >
-                    Finalizar partido
-                  </Button>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className='text-center py-20 text-sm' style={{ color: 'var(--text-muted)' }}>
-              Selecciona un partido para operar el marcador.
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ── Point Detail Panel ── */
-function PointDetailPanel({ ganador, p1, p2, isFirstServe, isServing, onSelectReason, onCancel, loading }) {
-  const playerName = ganador === 'jugador1' ? p1 : p2
-
-  const negativeReasons = [
-    { value: 'error_no_forzado', label: 'Error no forzado', desc: 'Error del rival', icon: '❌' },
-    ...(isFirstServe
-      ? [{ value: 'falta', label: 'Falta', desc: 'Primera falta', icon: '⚠️' }]
-      : [{ value: 'doble_falta', label: 'Doble falta', desc: 'Segunda falta', icon: '🚫' }]
-    ),
-  ]
-
-  const positiveReasons = [
-    { value: 'ace', label: 'Ace', desc: 'Saque directo', icon: '🔥' },
-    { value: 'winner', label: 'Winner', desc: 'Tiro ganador', icon: '💥' },
-  ]
-
-  const isDisabled = (reason) => {
-    if (reason === 'ace') return !isServing
-    if (reason === 'doble_falta') return isFirstServe || isServing
-    if (reason === 'falta') return !isFirstServe
-    return false
+  const write = async (operation) => {
+    if (locked) return false
+    const success = await sessionRef.current.write(operation)
+    if (success) { setPending(null); setPanel(null) }
+    return success
+  }
+  const point = (ganador, motivo = 'punto_sin_detalle') => write((id) => matchService.addJudgeEvent(id, { tipo: 'punto', ganador, motivo }))
+  const select = (item) => {
+    setPending(null); setPanel(null)
+    sessionRef.current.select(item)
+  }
+  const undo = async () => {
+    if (await confirm({ title: 'Deshacer última acción', message: reasonLabel(lastEvent, names), confirmLabel: 'Deshacer' })) {
+      await write((id) => matchService.undoPoint(id))
+    }
+  }
+  const openSettings = () => {
+    setNameDraft([match?.nombre_override_j1 || '', match?.nombre_override_j2 || ''])
+    setNameError(''); setPanel('settings')
+  }
+  const saveNames = async (event) => {
+    event.preventDefault()
+    if (nameBusy || locked) return
+    setNameBusy(true); setNameError('')
+    try {
+      await matchService.updateParticipants(selectedId, { nombre_override_j1: nameDraft[0] || null, nombre_override_j2: nameDraft[1] || null })
+      await sessionRef.current.sync()
+      setPanel(null)
+    } catch (error) { setNameError(error.message || 'No se pudieron guardar los nombres') }
+    finally { setNameBusy(false) }
   }
 
-  return (
-    <div
-      className='rounded-xl p-4 mt-4 space-y-4 animate-fade-up'
-      style={{ backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)' }}
-    >
-      <div className='flex justify-between items-center'>
-        <h3 className='font-semibold text-sm'>
-          ¿Cómo terminó el punto para{' '}
-          <span style={{ color: 'var(--color-live)' }}>{playerName}</span>?
-        </h3>
-        <button onClick={onCancel} className='text-xs' style={{ color: 'var(--text-muted)' }}>Cancelar</button>
+  if (!view.match) return (
+    <section className='space-y-4 py-2'>
+      <div className='flex items-center justify-between gap-2'>
+        <div><h1 className='text-xl font-bold'>Mesa de juez</h1><p className='text-sm text-[var(--text-muted)]'>Selecciona el partido que vas a arbitrar.</p></div>
+        <button className='btn-ghost p-3' onClick={refreshMatches} disabled={listLoading} aria-label='Actualizar partidos'><RefreshCw size={20} /></button>
       </div>
+      {listError && <p role='alert'>{listError}</p>}
+      {listLoading && <p role='status'>Cargando partidos…</p>}
+      {!listLoading && !matches.length && <p className='card p-5'>No tienes partidos asignados.</p>}
+      <div className='grid sm:grid-cols-2 gap-3'>
+        {matches.map((item) => <button key={item.id} onClick={() => select(item)} className='card p-4 text-left hover:bg-[var(--bg-hover)]'>
+          <span className='text-xs text-[var(--text-muted)]'>{item.cancha?.nombre || 'Cancha por definir'} · {item.torneo?.nombre || 'Partido libre'}</span>
+          <strong className='block my-2'>{getParticipantName(item, 1)} <span className='font-normal'>vs</span> {getParticipantName(item, 2)}</strong>
+          <span className='text-sm'>{{ en_vivo: '● En vivo', programado: 'Programado', finalizado: 'Finalizado', cancelado: 'Cancelado' }[item.estado] || item.estado} →</span>
+        </button>)}
+      </div>
+    </section>
+  )
 
-      <div className='grid grid-cols-2 gap-3'>
-        <div className='space-y-2'>
-          <p className='text-[10px] font-bold uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>Negativo</p>
-          {negativeReasons.map((opt) => (
-            <button
-              key={opt.value}
-              disabled={loading || isDisabled(opt.value)}
-              onClick={() => onSelectReason(opt.value)}
-              className='w-full text-left px-3 py-2.5 rounded-lg transition-all disabled:opacity-35 disabled:cursor-not-allowed'
-              style={{
-                backgroundColor: 'var(--bg-primary)',
-                border: '1px solid var(--border-color)',
-              }}
-            >
-              <span className='text-sm font-medium' style={{ color: 'var(--text-primary)' }}>
-                {opt.icon} {opt.label}
-              </span>
-              <span className='block text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>
-                {opt.desc}
-              </span>
-            </button>
-          ))}
-        </div>
-        <div className='space-y-2'>
-          <p className='text-[10px] font-bold uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>Positivo</p>
-          {positiveReasons.map((opt) => (
-            <button
-              key={opt.value}
-              disabled={loading || isDisabled(opt.value)}
-              onClick={() => onSelectReason(opt.value)}
-              className='w-full text-left px-3 py-2.5 rounded-lg transition-all disabled:opacity-35 disabled:cursor-not-allowed'
-              style={{
-                backgroundColor: 'var(--bg-primary)',
-                border: '1px solid var(--border-color)',
-              }}
-            >
-              <span className='text-sm font-medium' style={{ color: 'var(--text-primary)' }}>
-                {opt.icon} {opt.label}
-              </span>
-              <span className='block text-xs mt-0.5' style={{ color: 'var(--text-muted)' }}>
-                {opt.desc}
-              </span>
-            </button>
-          ))}
-        </div>
+  return (
+    <section className='judge-desk' aria-label='Control del partido'>
+      <div className='judge-toolbar'>
+        <button className='judge-tool' disabled={view.busy || nameBusy} onClick={() => { select(null); refreshMatches() }}><ArrowLeft size={17} /> Partidos</button>
+        <span className='text-xs truncate'>{match?.cancha?.nombre || 'Mesa de juez'}</span>
+        <button className='judge-tool' disabled={view.busy || view.syncing} onClick={() => sessionRef.current.sync()} aria-label='Sincronizar marcador'><RefreshCw size={17} /></button>
       </div>
-    </div>
+      {!state ? <div className='card p-6' role='status'>{view.error || 'Cargando marcador…'}</div> : <>
+        <div className='judge-status'>
+          <span>{finished ? (live?.estado === 'cancelado' ? 'Cancelado' : 'Finalizado') : paused ? 'Pausado' : playing ? '● En vivo' : 'Programado'}</span>
+          <span>{elapsed}</span>
+          <span>{score.currentSet.tiebreak ? 'Tie-break' : score.deuce ? (match?.formato?.modo_game === 'sin_ventaja' ? 'Punto decisivo' : 'Iguales') : score.breakpoint ? `${score.breakpoint.count} punto(s) de quiebre` : `Set ${score.sets.length + (finished ? 0 : 1)}`}</span>
+        </div>
+        <div className='judge-scoreboard'>
+          <div className='judge-score-heading'><span>Jugador / pareja</span><span>Sets</span><span>Games</span><span>Puntos</span></div>
+          {['jugador1', 'jugador2'].map((side, i) => <div key={side} className='judge-score-row'>
+            <div className='min-w-0'><strong className='judge-player-name'>{names[side]}</strong><span className='text-xs text-[var(--text-muted)]'>{!finished && server === side ? `● Saca · ${score.numero_servicio}º servicio` : finished && score.ganador === side ? 'Ganador' : ' '}</span></div>
+            <span>{score.sets.filter((set) => set[`games_j${i + 1}`] > set[`games_j${2 - i}`]).length}</span>
+            <span>{score.currentSet[`games_j${i + 1}`]}</span>
+            <strong className='judge-points'>{finished ? '—' : score[`punto_j${i + 1}`]}</strong>
+          </div>)}
+          <div className='judge-sets'>Sets: {score.sets.length ? score.sets.map((set, i) => <span key={i}>S{i + 1}: {set.games_j1}–{set.games_j2}</span>) : 'sin sets terminados'}</div>
+        </div>
+        <div className='judge-feedback' role='status' aria-live='polite'>
+          {!online ? 'Sin conexión · no se enviarán puntos' : view.busy ? 'Guardando… espera la confirmación' : view.needsSync ? 'Sin confirmar · pulsa sincronizar' : `Último: ${reasonLabel(lastEvent, names)}`}
+        </div>
+        {view.error && <p role='alert' className='text-xs text-red-500'>{view.error}</p>}
+        {playing && <>
+          <label className='judge-mode'><input type='checkbox' checked={!quick} disabled={locked || Boolean(pending)} onChange={(event) => setQuick(!event.target.checked)} /> Registrar motivo del punto <span>{quick ? '1 toque' : '2 toques'}</span></label>
+          <div className='judge-point-buttons'>
+            {['jugador1', 'jugador2'].map((side, i) => <button key={side} className={`judge-point judge-side-${i + 1}`} disabled={!canScore || Boolean(pending)} onClick={() => quick ? point(side) : setPending(side)}>
+              <span className='text-sm'>Punto para</span><strong>{names[side]}</strong><span className='text-3xl leading-none'>+1</span>
+            </button>)}
+          </div>
+          <div className='judge-service-controls'>
+            <button className='judge-tool' disabled={!canScore} onClick={() => score.numero_servicio === 1 ? write((id) => matchService.addJudgeEvent(id, { tipo: 'primera_falta' })) : point(receiver, 'doble_falta')}>
+              {score.numero_servicio === 1 ? '1ª falta · sin punto' : 'Doble falta · punto al receptor'}
+            </button>
+            <button className='judge-tool' disabled={!canScore} onClick={() => write((id) => matchService.addJudgeEvent(id, { tipo: 'let' }))}>Let / repetir</button>
+          </div>
+        </>}
+        {!playing && !finished && <button className='btn-primary py-4' disabled={locked} onClick={() => write((id) => matchService.startLive(id))}><Play size={18} /> Iniciar partido</button>}
+        {finished && <p className='text-sm font-semibold text-center'>{score.ganador ? `Ganador: ${names[score.ganador]}. Resultado guardado.` : 'Este partido no admite puntos.'}</p>}
+        <div className='judge-bottom-controls'>
+          {playing && <button className='judge-tool' disabled={locked} onClick={() => write((id) => matchService.pauseLive(id, !paused))}>{paused ? <Play size={18} /> : <Pause size={18} />}{paused ? 'Reanudar' : 'Pausar'}</button>}
+          <button className='judge-tool' disabled={locked || !lastEvent || live?.estado === 'cancelado'} onClick={undo}><Undo2 size={18} /> Deshacer</button>
+          <button className='judge-tool' disabled={view.busy} onClick={() => setPanel('stats')}><BarChart3 size={18} /> Estadísticas</button>
+          <button className='judge-tool' disabled={view.busy} onClick={openSettings}><Settings2 size={18} /> Ajustes</button>
+        </div>
+      </>}
+
+      {pending && <JudgePanel title={`Punto para ${names[pending]}`} onClose={() => setPending(null)} busy={view.busy}>
+        <p className='text-sm mb-3'>Selecciona cómo terminó el punto. Los errores corresponden al rival.</p>
+        <div className='grid grid-cols-2 gap-2'>
+          {reasons.map(([key, label, description]) => <button key={key} className='judge-reason' disabled={locked || !canScore || (key === 'ace' && pending !== server)} onClick={() => point(pending, key)}><strong>{label}</strong><span>{description}</span></button>)}
+        </div>
+        {view.error && <p role='alert' className='text-sm mt-3'>{view.error}</p>}
+      </JudgePanel>}
+      {panel && <JudgePanel title={panel === 'stats' ? 'Estadísticas y últimas acciones' : 'Ajustes del partido'} onClose={() => setPanel(null)} busy={nameBusy || view.busy}>
+        {panel === 'stats' ? <>
+          <MatchStats matchId={selectedId} player1={names.jugador1} player2={names.jugador2} />
+          <h3 className='font-bold mt-5 mb-2'>Últimas acciones</h3>
+          <ol className='space-y-2 text-sm'>{state?.eventos_recientes?.map((event) => <li key={event.id}>#{event.secuencia} · {reasonLabel(event, names)}</li>)}</ol>
+        </> : <div className='space-y-4'>
+          <p className='text-sm'>Al mejor de {state?.reglas.mejor_de} sets · {state?.reglas.juegos_por_set} games por set. El formato configurado del torneo se conserva.</p>
+          <p className='text-xs'>El saque cambia automáticamente. Corrígelo aquí solo si es necesario.</p>
+          <button className='judge-tool w-full' disabled={!canScore} onClick={async () => {
+            // Close the native modal so the global confirmation stays reachable.
+            setPanel(null)
+            if (await confirm({ title: 'Cambiar sacador', message: `¿Debe sacar ${names[receiver]}?`, confirmLabel: 'Cambiar saque' })) await write((id) => matchService.setServer(id, receiver))
+          }}>Cambiar saque a {names[receiver]}</button>
+          <form className='space-y-3' onSubmit={saveNames}>
+            <h3 className='font-semibold'>Nombres en pantalla</h3><p className='text-xs'>Solo cambia la etiqueta; no sustituye al jugador registrado. Vacío restaura su nombre.</p>
+            {nameDraft.map((name, index) => <label key={index} className='block text-sm'>Jugador / pareja {index + 1}<input className='form-input mt-1' maxLength={120} value={name} onChange={(event) => setNameDraft((old) => old.map((value, i) => i === index ? event.target.value : value))} /></label>)}
+            <button className='btn-primary' disabled={locked}>{nameBusy ? 'Guardando…' : 'Guardar nombres'}</button>
+            {nameError && <p role='alert'>{nameError}</p>}
+          </form>
+        </div>}
+      </JudgePanel>}
+    </section>
   )
 }
 
-/* ── Player Row ── */
-function PlayerRow({ name, photo, score, playerKey, pointKey, isWinner, isServing, isFinished, totalSetsToShow, side, editingName, editNameValue, setEditNameValue, setEditingName, onSaveName, savingName }) {
-  const gamesKey = `games_${playerKey}`
-  const point = score?.[pointKey] ?? '0'
-  const isEditing = editingName === side
-
-  return (
-    <div
-      className='grid items-center py-3 px-4'
-      style={{
-        gridTemplateColumns: `1fr repeat(${totalSetsToShow}, 48px) 56px`,
-        backgroundColor: isWinner ? 'var(--color-live-bg, rgba(34,197,94,0.05))' : 'transparent',
-      }}
-    >
-      <div className='flex items-center gap-2 min-w-0'>
-        {isServing && !isFinished && (
-          <Circle className='w-2.5 h-2.5 fill-[var(--color-live)] text-[var(--color-live)] shrink-0' />
-        )}
-        <Avatar src={photo} name={name} size='xs' />
-        {isEditing ? (
-          <div className='flex items-center gap-1 flex-1 min-w-0'>
-            <input
-              type='text'
-              value={editNameValue}
-              onChange={(e) => setEditNameValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && onSaveName()}
-              className='text-sm font-bold bg-transparent border-b-2 flex-1 min-w-0 outline-none'
-              style={{ borderColor: 'var(--color-brand)', color: 'var(--text-primary)' }}
-              autoFocus
-            />
-            <button onClick={onSaveName} disabled={savingName} className='p-1'><Check className='w-3.5 h-3.5' style={{ color: 'var(--color-brand)' }} /></button>
-            <button onClick={() => setEditingName(null)} className='p-1'><X className='w-3.5 h-3.5' style={{ color: 'var(--text-muted)' }} /></button>
-          </div>
-        ) : (
-          <>
-            <span className={cn('truncate text-sm', isWinner ? 'font-bold' : 'font-medium')}
-              style={{ color: isWinner ? 'var(--color-live)' : 'var(--text-primary)' }}>
-              {name || '—'}
-            </span>
-            <button onClick={() => { setEditingName(side); setEditNameValue('') }} className='p-1 opacity-50 hover:opacity-100'><Pencil className='w-3 h-3' style={{ color: 'var(--text-muted)' }} /></button>
-          </>
-        )}
-        {isWinner && <span className='text-xs'>🏆</span>}
-      </div>
-
-      {Array.from({ length: totalSetsToShow }, (_, i) => {
-        const completedSet = score.sets[i]
-        const isCurrent = i === score.sets.length && !isFinished
-        let value = ''
-        if (completedSet) value = completedSet[gamesKey]
-        else if (isCurrent) value = score.currentSet[gamesKey]
-        const isSetWinner = completedSet &&
-          completedSet[gamesKey] > completedSet[`games_${playerKey === 'j1' ? 'j2' : 'j1'}`]
-        return (
-          <span key={i}
-            className={cn('text-center text-base tabular-nums', isCurrent ? 'font-bold' : 'font-medium', isSetWinner ? 'font-bold' : '')}
-            style={{ color: isCurrent ? 'var(--text-primary)' : isSetWinner ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-            {value !== '' && value !== undefined ? value : '/'}
-          </span>
-        )
-      })}
-
-      <span className='text-center text-lg font-bold tabular-nums'
-        style={{ color: isFinished ? 'var(--text-muted)' : 'var(--club-clay, #c2410c)' }}>
-        {isFinished ? '' : point}
-      </span>
-    </div>
-  )
+function JudgePanel({ title, children, onClose, busy }) {
+  const ref = useRef(null)
+  useEffect(() => { ref.current?.showModal() }, [])
+  return <dialog ref={ref} className='judge-dialog' aria-labelledby='judge-panel-title' onCancel={(event) => { event.preventDefault(); if (!busy) onClose() }}>
+    <div className='judge-dialog-heading'><h2 className='font-bold' id='judge-panel-title'>{title}</h2><button className='judge-tool' onClick={onClose} disabled={busy} aria-label='Cerrar panel'><X size={20} /></button></div>
+    <div className='p-4'>{children}</div>
+  </dialog>
 }
