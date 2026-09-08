@@ -26,7 +26,7 @@ export default function Avatar({ src, name, size = 'md', className }) {
   )
 
   if (resolvedSrc) {
-    return <img src={resolvedSrc} alt={name ? `Foto de ${name}` : 'Foto de perfil'} className={sharedClassName} />
+    return <img src={resolvedSrc} alt={name ? `Foto de ${name}` : 'Foto de perfil'} className={sharedClassName} loading='lazy' decoding='async' />
   }
 
   return (

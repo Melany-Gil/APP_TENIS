@@ -76,68 +76,6 @@ const columnForeignKeyExists = async (tableName, columnName) => {
   return Number(rows[0].total) > 0
 }
 
-const runOneTimeMatchCleanup = async () => {
-  const migrationId = '2026-09-03-clear-all-matches'
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS app_migrations (
-      id         VARCHAR(100) NOT NULL,
-      applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `)
-
-  const connection = await db.getConnection()
-  try {
-    await connection.beginTransaction()
-    const [applied] = await connection.query(
-      'SELECT id FROM app_migrations WHERE id = ? FOR UPDATE',
-      [migrationId]
-    )
-    if (applied.length) {
-      await connection.commit()
-      return null
-    }
-
-    const [[before]] = await connection.query(`
-      SELECT
-        (SELECT COUNT(*) FROM partidos) AS partidos,
-        (SELECT COUNT(*) FROM jugadores) AS jugadores,
-        (SELECT COUNT(*) FROM users) AS usuarios
-    `)
-
-    // Favoritos no tiene una FK polimórfica; se limpia explícitamente.
-    await connection.query("DELETE FROM favoritos WHERE tipo = 'partido'")
-    // Sets, eventos y estado en vivo usan ON DELETE CASCADE.
-    await connection.query('DELETE FROM partidos')
-
-    const [[after]] = await connection.query(`
-      SELECT
-        (SELECT COUNT(*) FROM partidos) AS partidos,
-        (SELECT COUNT(*) FROM jugadores) AS jugadores,
-        (SELECT COUNT(*) FROM users) AS usuarios
-    `)
-    if (
-      Number(after.partidos) !== 0 ||
-      Number(after.jugadores) !== Number(before.jugadores) ||
-      Number(after.usuarios) !== Number(before.usuarios)
-    ) {
-      throw new Error('La limpieza de partidos no superó la verificación de integridad')
-    }
-
-    await connection.query('INSERT INTO app_migrations (id) VALUES (?)', [migrationId])
-    await connection.commit()
-    return {
-      partidosEliminados: Number(before.partidos),
-      jugadoresConservados: Number(after.jugadores),
-      usuariosConservados: Number(after.usuarios),
-    }
-  } catch (error) {
-    await connection.rollback()
-    throw error
-  } finally {
-    connection.release()
-  }
-}
 
 exports.ensureSchema = async () => {
   const roleType = await getColumnType('users', 'rol')
@@ -497,13 +435,12 @@ exports.ensureSchema = async () => {
     )
   }
 
-  const cleanup = await runOneTimeMatchCleanup()
-  if (cleanup) {
-    console.log(
-      `🧹  Limpieza única completada: ${cleanup.partidosEliminados} partidos eliminados; ` +
-        `${cleanup.jugadoresConservados} jugadores y ${cleanup.usuariosConservados} usuarios conservados`
-    )
+  // Additive delivery key: a retried point cannot be counted twice.
+  if (!(await columnExists('eventos_partido', 'client_action_id'))) {
+    await db.query('ALTER TABLE eventos_partido ADD COLUMN client_action_id CHAR(36) NULL, ADD UNIQUE KEY uq_event_client_action (client_action_id)')
   }
+
+  // Never run historical data-cleanup jobs during application startup.
 
   console.log('✅  Esquema de partidos y jueces actualizado')
 }

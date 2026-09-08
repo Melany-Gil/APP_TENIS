@@ -58,7 +58,7 @@ export default function SponsorDock({ defaultMinimized = false }) {
           onClick={() => setIsMinimized(false)}
           aria-label={`Mostrar patrocinador ${activeSponsor.name}`}
         >
-          <img src={activeSponsor.image} alt='' aria-hidden='true' />
+          <img src={activeSponsor.image} alt='' aria-hidden='true' loading='lazy' decoding='async' />
           <span className='sponsor-dock-pill-copy'>
             <span>Patrocinado por</span>
             <strong>{activeSponsor.name}</strong>
@@ -97,7 +97,7 @@ export default function SponsorDock({ defaultMinimized = false }) {
         </div>
 
         <Link to='/sponsors' className='sponsor-dock-image' aria-label='Ver todos los patrocinadores'>
-          <img src={activeSponsor.image} alt={`Patrocinador: ${activeSponsor.name}`} />
+          <img src={activeSponsor.image} alt={`Patrocinador: ${activeSponsor.name}`} loading='lazy' decoding='async' />
         </Link>
 
         <div className='sponsor-dock-footer'>

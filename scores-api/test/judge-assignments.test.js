@@ -35,6 +35,41 @@ test('la bandeja del juez solicita solamente sus partidos asignados', async () =
   assert.deepEqual(receivedFilters, { juez_id: 12, orden: 'asc' })
 })
 
+test('reintentar el mismo UUID no inserta otro punto incluso si ya finalizó', async () => {
+  let inserts = 0
+  const event = { tipo: 'punto', ganador: 'jugador1', motivo: 'ace', client_action_id: require('node:crypto').randomUUID(), expected_revision: '0:0' }
+  const connection = {
+    async beginTransaction() {}, async commit() {}, async rollback() {}, release() {},
+    async query(sql) {
+      if (/SELECT \* FROM partidos/.test(sql)) return [[{ id: 30, juez_id: 12, estado: 'finalizado' }]]
+      if (/WHERE client_action_id/.test(sql)) return [[{ ...event, partido_id: 30, created_by: 12 }]]
+      if (/INSERT/.test(sql)) inserts++
+      return [[]]
+    },
+  }
+  const service = loadService({ getConnection: async () => connection }, {})
+  service.getControl = async () => ({ marcador: { winner: 'jugador1' } })
+  const result = await service.addEvent(30, event, { id: 12, rol: 'juez' })
+  assert.equal(inserts, 0)
+  assert.equal(result.marcador.winner, 'jugador1')
+})
+
+test('revisión desactualizada rechaza la acción sin modificar el partido', async () => {
+  const row = { id: 30, juez_id: 12, estado: 'en_vivo' }
+  const event = { tipo: 'punto', ganador: 'jugador1', motivo: 'ace', client_action_id: require('node:crypto').randomUUID(), expected_revision: '0:0', expected_configuration: require('../src/modules/matches/eventDelivery').configurationOf(row) }
+  const connection = {
+    async beginTransaction() {}, async commit() {}, async rollback() {}, release() {},
+    async query(sql) {
+      if (/SELECT \* FROM partidos/.test(sql)) return [[row]]
+      if (/WHERE client_action_id/.test(sql)) return [[]]
+      if (/AS sequence/.test(sql)) return [[{ sequence: 2, active: 2 }]]
+      assert.fail('No debe modificar datos')
+    },
+  }
+  const service = loadService({ getConnection: async () => connection }, {})
+  await assert.rejects(service.addEvent(30, event, { id: 12, rol: 'juez' }), error => error.status === 409)
+})
+
 test('un juez puede abrir el control de un partido que le corresponde', async () => {
   let call = 0
   const fakeDb = {

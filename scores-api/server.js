@@ -6,6 +6,8 @@ const path = require('path')
 const express = require('express')
 const cors = require('cors')
 const helmet = require('helmet')
+const compression = require('compression')
+const { setAssetCacheHeaders } = require('./src/utils/assetCache')
 const { rateLimit } = require('express-rate-limit')
 const { ensureSchema } = require('./src/config/schema')
 const { UPLOAD_ROOT } = require('./src/middlewares/upload.middleware')
@@ -34,6 +36,8 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .filter(Boolean)
 
 app.use(helmet())
+// SSE must flush each event immediately; never buffer the live stream.
+app.use(compression({ filter: (req, res) => req.originalUrl.split('?')[0] !== '/api/partidos/stream' && compression.filter(req, res) }))
 app.use(
   cors({
     origin(origin, callback) {
@@ -102,18 +106,16 @@ const setNoStoreHeaders = (res) => {
 
 const setHtmlHeaders = (res) => {
   setNoStoreHeaders(res)
-  // Limpia únicamente archivos en caché de versiones anteriores; conserva cookies y sesión.
-  res.setHeader('Clear-Site-Data', '"cache"')
+  // Revalidate the HTML without clearing the browser's useful asset cache.
 }
 
 if (fs.existsSync(frontendDist)) {
   app.use(
     express.static(frontendDist, {
-      maxAge: 0,
-      etag: false,
-      lastModified: false,
+      etag: true,
+      lastModified: true,
       setHeaders(res, filePath) {
-        setNoStoreHeaders(res)
+        setAssetCacheHeaders(res, filePath)
         if (filePath.endsWith('.html')) {
           setHtmlHeaders(res)
         }

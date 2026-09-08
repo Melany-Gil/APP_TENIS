@@ -4,14 +4,14 @@ import { useMatchRealtime } from '../../hooks/useMatchRealtime'
 import { matchService } from '../../services/matchService'
 
 const ROWS = [
-  ['Puntos ganados', 'puntos_ganados'],
-  ['Aces', 'aces'],
-  ['Dobles faltas', 'dobles_faltas'],
-  ['Primer servicio', 'porcentaje_primer_servicio', '%'],
-  ['Puntos ganados con primer servicio', 'puntos_primer_servicio_ganados'],
-  ['Puntos ganados con segundo servicio', 'puntos_segundo_servicio_ganados'],
+  ['Total de puntos ganados', 'puntos_ganados'],
+  ['Saques directos (aces)', 'aces'],
+  ['Dobles faltas cometidas', 'dobles_faltas'],
+  ['Primeros saques válidos', 'porcentaje_primer_servicio', '%'],
+  ['Puntos ganados al primer saque', 'puntos_primer_servicio_ganados'],
+  ['Puntos ganados al segundo saque', 'puntos_segundo_servicio_ganados'],
   ['Tiros ganadores', 'tiros_ganadores'],
-  ['Errores no forzados', 'errores_no_forzados'],
+  ['Errores no forzados cometidos', 'errores_no_forzados'],
 ]
 
 export default function MatchStats({ matchId, player1, player2, initialStats = null }) {
@@ -56,6 +56,7 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
 
   return (
     <div className='space-y-4'>
+      <p className='text-xs' style={{ color: 'var(--text-muted)' }}>Solo incluye acciones confirmadas por el servidor. Los aces y errores dependen de los motivos registrados por el juez. El porcentaje de primeros saques se calcula sobre los puntos con servicio registrado.</p>
       {totalSets > 1 && (
         <div className='flex gap-1.5 flex-wrap'>
           <FilterButton active={selectedSet === null} onClick={() => setSelectedSet(null)}>Partido</FilterButton>

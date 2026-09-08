@@ -1,5 +1,6 @@
 const db = require('../../config/db')
 const matchesService = require('./matches.service')
+const { validateDelivery, assertSameDelivery, revisionOf, configurationOf } = require('./eventDelivery')
 const {
   applyEvent,
   computeBreakpoint,
@@ -13,7 +14,7 @@ exports.getManagedMatches = async (user) => {
   return matchesService.getAll({ juez_id: user.id, orden: 'asc' })
 }
 
-exports.getControl = async (id, user) => {
+exports.getControl = async (id, user, { lightweight = false } = {}) => {
   const matchRow = await getManageableMatch(id, user)
   const match = await matchesService.getById(id)
   const [lastEvents] = await db.query(
@@ -25,11 +26,11 @@ exports.getControl = async (id, user) => {
      LIMIT 20`,
     [id]
   )
-  const state = lastEvents.length
+  let state = lastEvents.length
     ? parseJson(lastEvents[0].marcador_despues)
     : createInitialState(matchRow)
 
-  const [pointEvents] = await db.query(
+  const [pointEvents] = lightweight ? [[]] : await db.query(
     `SELECT tipo, ganador, motivo, servidor, numero_servicio, marcador_antes
      FROM eventos_partido
      WHERE partido_id = ? AND anulado_at IS NULL
@@ -44,13 +45,22 @@ exports.getControl = async (id, user) => {
     [id]
   )
 
+  const [revisionRows] = await db.query(
+    `SELECT COALESCE(MAX(secuencia), 0) AS sequence,
+      COUNT(CASE WHEN anulado_at IS NULL THEN 1 END) AS active,
+      (SELECT marcador_despues FROM eventos_partido WHERE partido_id = ? AND anulado_at IS NULL ORDER BY secuencia DESC LIMIT 1) AS latest_state
+     FROM eventos_partido WHERE partido_id = ?`, [id, id]
+  )
+  if (revisionRows[0] && 'latest_state' in revisionRows[0]) state = parseJson(revisionRows[0].latest_state) || createInitialState(matchRow)
   const breakpoint = computeBreakpoint(state, matchRow)
 
   return {
     partido: match,
     marcador: { ...serializeState(state), breakpoint },
     breakpoint,
-    estadisticas: buildStats(pointEvents),
+    estadisticas: lightweight ? null : buildStats(pointEvents),
+    revision: revisionOf(revisionRows[0]),
+    configuration: configurationOf(matchRow),
     eventos_recientes: lastEvents.map(formatEvent),
     en_vivo: formatLiveState(liveRows[0]),
   }
@@ -154,12 +164,28 @@ exports.changeServer = async (id, server, user) =>
   exports.addEvent(id, { tipo: 'cambio_servidor', ganador: server }, user)
 
 exports.addEvent = async (id, event, user) => {
+  validateDelivery(event)
   const connection = await db.getConnection()
   try {
     await connection.beginTransaction()
     const [matches] = await connection.query('SELECT * FROM partidos WHERE id = ? FOR UPDATE', [id])
     if (!matches.length) throw { status: 404, message: 'Partido no encontrado' }
     assertCanManage(matches[0], user)
+    if (event.client_action_id) {
+      const [saved] = await connection.query('SELECT partido_id, created_by, tipo, ganador, motivo FROM eventos_partido WHERE client_action_id = ? LIMIT 1', [event.client_action_id])
+      if (saved.length) {
+        assertSameDelivery(saved[0], event, user, id)
+        await connection.commit()
+        return exports.getControl(id, user, { lightweight: true })
+      }
+      if (event.expected_configuration !== configurationOf(matches[0])) {
+        throw { status: 409, message: 'Cambió el formato o los participantes del partido. Revisa las acciones pendientes.' }
+      }
+      const [versions] = await connection.query('SELECT COALESCE(MAX(secuencia), 0) AS sequence, COUNT(CASE WHEN anulado_at IS NULL THEN 1 END) AS active FROM eventos_partido WHERE partido_id = ?', [id])
+      if (event.expected_revision !== revisionOf(versions[0])) {
+        throw { status: 409, message: 'El marcador cambió desde otro dispositivo. Revisa la acción pendiente antes de continuar.' }
+      }
+    }
     if (matches[0].estado === 'finalizado' || matches[0].estado === 'cancelado') {
       throw { status: 409, message: 'Este partido ya no admite cambios' }
     }
@@ -193,8 +219,8 @@ exports.addEvent = async (id, event, user) => {
     await connection.query(
       `INSERT INTO eventos_partido
          (partido_id, secuencia, tipo, ganador, motivo, servidor, numero_servicio,
-          marcador_antes, marcador_despues, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          marcador_antes, marcador_despues, created_by, client_action_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         sequence,
@@ -206,6 +232,7 @@ exports.addEvent = async (id, event, user) => {
         JSON.stringify(serializeState(before)),
         JSON.stringify(serializeState(after)),
         user.id,
+        event.client_action_id || null,
       ]
     )
 
@@ -218,7 +245,7 @@ exports.addEvent = async (id, event, user) => {
     connection.release()
   }
 
-  return exports.getControl(id, user)
+  return exports.getControl(id, user, { lightweight: true })
 }
 
 exports.undoLastEvent = async (id, user) => {
