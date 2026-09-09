@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Clock3, MapPin, Star } from 'lucide-react'
 import LiveBadge from './LiveBadge'
+import MatchJudge from './MatchJudge'
 import ScoreDisplay from './ScoreDisplay'
 import useFavoritesStore from '../../store/useFavoritesStore'
 import { formatClockTime, formatDate } from '../../utils/formatDate'
@@ -111,6 +112,8 @@ export default function MatchCard({ match }) {
             {match.cancha.superficie ? ` · ${match.cancha.superficie}` : ''}
           </div>
         )}
+
+        <MatchJudge match={match} className='px-4 py-2' />
 
         {match.notas && (
           <div

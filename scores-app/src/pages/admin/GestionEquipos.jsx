@@ -23,6 +23,7 @@ export default function GestionEquipos() {
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm()
 
@@ -47,7 +48,7 @@ export default function GestionEquipos() {
   }, [])
 
   const openCreate = () => {
-    reset({ deporte: 'tenis', categoria_id: '' })
+    reset({ nombre: '', jugador1_id: '', jugador2_id: '', deporte: 'tenis', categoria_id: '' })
     setEditing(null)
     setShowForm(true)
   }
@@ -65,6 +66,19 @@ export default function GestionEquipos() {
   }
 
   const selectedDeporte = watch('deporte') || 'tenis'
+  const jugador1Id = watch('jugador1_id')
+  const jugador2Id = watch('jugador2_id')
+  useEffect(() => {
+    if (editing || !showForm) return
+    const integrantes = [jugador1Id, jugador2Id].map((id) =>
+      jugadores.find((jugador) => String(jugador.id) === String(id))
+    )
+    const apellidos = integrantes.map((jugador) => String(jugador?.apellido || '').trim())
+    const nombre = apellidos.every(Boolean) && String(jugador1Id) !== String(jugador2Id)
+      ? apellidos.join(' / ')
+      : ''
+    setValue('nombre', nombre, { shouldValidate: Boolean(nombre) })
+  }, [jugador1Id, jugador2Id, jugadores, editing, showForm, setValue])
   const jugadoresDisponibles = jugadores.filter(
     (jugador) => jugador.deporte === selectedDeporte || jugador.deporte === 'ambos'
   )
@@ -139,9 +153,11 @@ export default function GestionEquipos() {
             <div className='sm:col-span-2'>
               <Input
                 label='Nombre de la pareja *'
-                placeholder='García / López'
+                placeholder={editing ? 'García / López' : 'Selecciona los dos jugadores'}
+                readOnly={!editing}
+                hint={!editing ? 'Se genera automáticamente con los apellidos registrados de ambos jugadores.' : undefined}
                 error={errors.nombre?.message}
-                {...register('nombre', { required: 'Requerido' })}
+                {...register('nombre', { required: 'Selecciona dos jugadores distintos con apellidos registrados' })}
               />
             </div>
 

@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, BarChart3, CalendarDays, Clock3, MapPin, MessageSquareText, Star } from 'lucide-react'
 import LiveBadge from '../components/match/LiveBadge'
 import MatchStats from '../components/match/MatchStats'
+import MatchJudge from '../components/match/MatchJudge'
 import MatchPhoto from '../components/match/MatchPhoto'
 import MatchPhotoCapture from '../components/match/MatchPhotoCapture'
 import useAuthStore from '../store/useAuthStore'
@@ -108,6 +109,8 @@ export default function Match() {
             <span className='inline-flex items-center gap-1'><MapPin className='w-3 h-3' />{match.cancha.nombre}</span>
           )}
         </div>
+
+        <MatchJudge match={match} className='justify-center mb-4' />
 
         <div className='space-y-4'>
           <ScoreRow
