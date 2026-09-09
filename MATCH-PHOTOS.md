@@ -12,6 +12,10 @@ MATCH_PHOTOS_DIR=/home/u320257431/domains/legal-branding.com/uploads/matches
 
 No modificar UPLOAD_DIR ni mover los avatares existentes. No se usa Drive ni Google Cloud. La carpeta la crea la aplicación con permisos restringidos si su usuario tiene acceso al padre; no usar permisos 777. Si falta la variable o es relativa, subir devuelve 503 sin impedir la marcación. Metadatos de fotos se guardan en fotos_partido, creada aditivamente por ensureSchema; el contenido permanece en disco, fuera del despliegue. Respaldar archivos **y base de datos** para restaurar las asociaciones.
 
+## Recuperar una foto que quedó pendiente tras el primer despliegue
+
+No borrar datos del navegador ni descartar la pendiente. Configurar MATCH_PHOTOS_DIR en hPanel y redeployar. Abrir el mismo partido con el mismo usuario/dispositivo y pulsar **Reintentar ahora**. También se puede descargar una copia local desde el diálogo. La ruta autenticada GET /api/partidos/:id/foto/estado verifica configuración y acceso de escritura sin crear archivos y sin exponer la ruta. Los errores de configuración, permisos o capacidad ya no se describen como pérdida de internet. El servidor debe confirmar la misma versión antes de eliminar la copia pendiente de IndexedDB.
+
 ## Seguridad y operación
 
 - Lectura pública coherente con los detalles de partidos públicos. El juez confirma que tiene autorización de publicación. No hay listado del directorio, rutas del sistema ni acceso a archivos arbitrarios.

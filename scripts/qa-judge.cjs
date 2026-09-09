@@ -19,7 +19,7 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     let state = createInitialState(), events = [], snapshots = [], posts = 0, reads = 0, drop = false, sequence = 0
     const receipts = new Set()
     let paused = false
-    let photo = null, photoWrites = 0
+    let photo = null, photoWrites = 0, photoStorageBlocked = false
     const photoBytes = await sharp({ create: { width: 1200, height: 800, channels: 3, background: '#15764a' } }).jpeg().toBuffer()
     const control = () => ({ partido: match, marcador: serializeState(state), revision: `${sequence}:${events.length}`, configuration: 'fixture', eventos_recientes: events, en_vivo: { iniciado_at: new Date().toISOString(), pausado_at: paused ? new Date().toISOString() : null, segundos_pausa: 0 } })
     await page.addInitScript((user) => localStorage.setItem('auth-storage-v2', JSON.stringify({ state: { isAuthenticated: true, user }, version: 0 })), user)
@@ -29,8 +29,10 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
         const endpoint = url.pathname.replace('/api', '')
         let data
         if (endpoint.endsWith('/stream')) return route.fulfill({ status: 200, contentType: 'text/event-stream', body: ': fixture\n\n' })
+        if (endpoint.endsWith('/foto/estado')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data: { configured: true, writable: true } }) })
         if (endpoint.endsWith('/foto/imagen')) return route.fulfill({ contentType: 'image/jpeg', body: photoBytes })
         if (endpoint.endsWith('/foto') && req.method() === 'PUT') {
+          if (photoStorageBlocked) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, code: 'PHOTO_STORAGE_UNCONFIGURED', message: 'Falta configurar MATCH_PHOTOS_DIR en Hostinger.' }) })
           const body = req.postDataBuffer().toString('latin1')
           const field = name => body.match(new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]*)`))?.[1] || ''
           assert.equal(field('consentimiento'), 'true')
@@ -171,6 +173,19 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await photoDialog.getByRole('button', { name: 'Reemplazar foto del partido' }).click()
     await photoDialog.getByText('Foto guardada en el servidor.', { exact: true }).waitFor()
     assert.equal(photoWrites, 2); assert.equal(photo.momento, 'final')
+    await photoDialog.locator('input[type=file]').last().setInputFiles({ name: 'correction.jpg', mimeType: 'image/jpeg', buffer: photoBytes })
+    await photoDialog.getByRole('combobox').selectOption('final')
+    await photoDialog.getByRole('checkbox').check()
+    photoStorageBlocked = true
+    page.once('dialog', d => d.accept())
+    await photoDialog.getByRole('button', { name: 'Reemplazar foto del partido' }).click()
+    await photoDialog.getByText(/Falta configurar MATCH_PHOTOS_DIR/).waitFor()
+    assert.equal(photoWrites, 2, 'Configuration failure does not report success')
+    await photoDialog.getByRole('link', { name: 'Guardar copia en el dispositivo' }).waitFor()
+    photoStorageBlocked = false
+    await photoDialog.getByRole('button', { name: 'Reintentar ahora' }).click()
+    await photoDialog.getByText('Foto guardada en el servidor.', { exact: true }).waitFor()
+    assert.equal(photoWrites, 3, 'Pending photo is recovered after fixing server configuration')
     await photoDialog.getByRole('button', { name: 'Cerrar fotografía' }).click()
     await page.screenshot({ path: path.join(os.tmpdir(), 'tenis-judge-mobile.png') })
     await page.getByRole('button', { name: 'Estadísticas', exact: true }).click()

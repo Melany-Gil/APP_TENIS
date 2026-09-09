@@ -1,8 +1,17 @@
 const fs = require('node:fs/promises')
+const { constants } = require('node:fs')
 const path = require('node:path')
 const sharp = require('sharp')
 
-const fail = (status, message) => Object.assign(new Error(message), { status })
+const fail = (status, message, code) => Object.assign(new Error(message), { status, code })
+
+function publicError(error) {
+  if (['EACCES', 'EPERM', 'EROFS'].includes(error.code)) return fail(503, 'Hostinger no permite escribir en la carpeta de fotos. Un administrador debe revisar los permisos de MATCH_PHOTOS_DIR.', 'PHOTO_STORAGE_PERMISSIONS')
+  if (['ENOSPC', 'EDQUOT'].includes(error.code)) return fail(503, 'El almacenamiento del servidor está lleno. La foto sigue pendiente en tu dispositivo.', 'PHOTO_STORAGE_FULL')
+  if (['ENOENT', 'ENOTDIR'].includes(error.code)) return fail(503, 'La carpeta de fotos del servidor no está disponible. Revisa MATCH_PHOTOS_DIR en Hostinger.', 'PHOTO_STORAGE_UNAVAILABLE')
+  if (error.code === 'ER_NO_SUCH_TABLE') return fail(503, 'Falta preparar la tabla de fotografías en el servidor. Un administrador debe revisar el despliegue.', 'PHOTO_SCHEMA_NOT_READY')
+  return error
+}
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function authorize(match, user) {
@@ -32,7 +41,7 @@ async function normalize(buffer) {
 
 function createPhotoService(db, directory = process.env.MATCH_PHOTOS_DIR) {
   function root() {
-    if (!directory || !path.isAbsolute(directory)) throw fail(503, 'Las fotos de partidos aún no están configuradas en el servidor')
+    if (!directory || !path.isAbsolute(directory)) throw fail(503, 'Falta configurar MATCH_PHOTOS_DIR en Hostinger y volver a desplegar la aplicación. La foto no se ha perdido.', 'PHOTO_STORAGE_UNCONFIGURED')
     return path.resolve(directory)
   }
   function file(version, thumb = false) {
@@ -50,6 +59,23 @@ function createPhotoService(db, directory = process.env.MATCH_PHOTOS_DIR) {
     root()
     const [rows] = await db.query('SELECT id, juez_id FROM partidos WHERE id = ?', [id])
     authorize(rows[0], user)
+  }
+  async function status(id, user) {
+    await check(id, user)
+    // Read-only diagnostic; a missing child directory can be created on upload.
+    let candidate = root()
+    for (;;) {
+      try {
+        const stat = await fs.stat(candidate)
+        if (!stat.isDirectory()) throw Object.assign(new Error('Not a directory'), { code: 'ENOTDIR' })
+        await fs.access(candidate, constants.W_OK)
+        return { configured: true, writable: true }
+      } catch (error) {
+        const parent = path.dirname(candidate)
+        if (error.code !== 'ENOENT' || parent === candidate) throw publicError(error)
+        candidate = parent
+      }
+    }
   }
   async function save(id, user, input, buffer) {
     validate(input)
@@ -88,7 +114,7 @@ function createPhotoService(db, directory = process.env.MATCH_PHOTOS_DIR) {
         await fs.unlink(file(input.version, true)).catch(() => {})
       }
       if (error.code === 'EEXIST') throw fail(409, 'Una carga anterior quedó interrumpida. Descarta la pendiente y vuelve a seleccionar la foto.')
-      throw error
+      throw publicError(error)
     } finally { conn.release() }
     // Replacement is explicit; old files can also remain in provider backups.
     if (previous) {
@@ -97,7 +123,7 @@ function createPhotoService(db, directory = process.env.MATCH_PHOTOS_DIR) {
     }
     return get(id)
   }
-  return { get, check, save, file }
+  return { get, check, save, file, status }
 }
 
-module.exports = { createPhotoService, authorize, validate, normalize }
+module.exports = { createPhotoService, authorize, validate, normalize, publicError }

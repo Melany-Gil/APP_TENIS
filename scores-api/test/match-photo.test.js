@@ -5,7 +5,7 @@ const { randomUUID } = require('node:crypto')
 const fs = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
-const { authorize, validate, normalize, createPhotoService } = require('../src/modules/matches/match-photo.service')
+const { authorize, validate, normalize, createPhotoService, publicError } = require('../src/modules/matches/match-photo.service')
 
 const input = () => ({ version: randomUUID(), expected: '', momento: 'inicio', consentimiento: 'true' })
 const source = () => sharp({ create: { width: 2000, height: 1000, channels: 3, background: '#36a761' } }).jpeg().withMetadata({ exif: { IFD0: { Artist: 'Private metadata' } } }).toBuffer()
@@ -63,8 +63,23 @@ test('one photo per match, idempotent replay and explicit version-checked replac
 })
 test('missing persistent directory fails closed, without silently writing inside deployment', async () => {
   const { db } = fixture()
-  await assert.rejects(createPhotoService(db, '').check(1, { rol: 'admin' }), e => e.status === 503)
+  await assert.rejects(createPhotoService(db, '').check(1, { rol: 'admin' }), e => e.status === 503 && e.code === 'PHOTO_STORAGE_UNCONFIGURED')
   await assert.rejects(createPhotoService(db, 'uploads').check(1, { rol: 'admin' }), e => e.status === 503)
+})
+test('storage errors explain configuration, permissions and capacity without leaking paths', () => {
+  for (const [code, expected] of [['EACCES', 'PHOTO_STORAGE_PERMISSIONS'], ['ENOSPC', 'PHOTO_STORAGE_FULL'], ['ENOENT', 'PHOTO_STORAGE_UNAVAILABLE'], ['ER_NO_SUCH_TABLE', 'PHOTO_SCHEMA_NOT_READY']]) {
+    const result = publicError(Object.assign(new Error('/home/private-account/secret'), { code }))
+    assert.equal(result.status, 503); assert.equal(result.code, expected)
+    assert.ok(!result.message.includes('/home/'))
+  }
+})
+test('read-only storage diagnosis supports a missing child directory', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'tenis-photo-status-'))
+  try {
+    const service = createPhotoService(fixture().db, path.join(directory, 'matches'))
+    assert.deepEqual(await service.status(1, { rol: 'admin' }), { configured: true, writable: true })
+    assert.deepEqual(await fs.readdir(directory), [])
+  } finally { await fs.rm(directory, { recursive: true, force: true }) }
 })
 test('lost commit response retains files and replay confirms without duplicate write', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'tenis-photo-commit-'))

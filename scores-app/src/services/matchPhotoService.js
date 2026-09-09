@@ -2,6 +2,7 @@ import api from './api'
 
 export const photoUrl = (id, version, thumbnail = false) => `${api.defaults.baseURL.replace(/\/$/, '')}/partidos/${id}/foto/imagen?v=${encodeURIComponent(version)}${thumbnail ? '&miniatura=1' : ''}`
 export const getPhoto = id => api.get(`/partidos/${id}/foto`)
+export const getPhotoStatus = id => api.get(`/partidos/${id}/foto/estado`)
 export const sendPhoto = (id, item, signal) => {
   const form = new FormData()
   form.append('version', item.version)

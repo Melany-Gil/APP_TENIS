@@ -44,6 +44,9 @@ test('HTTP photo authorization, multipart, public image, replacement and forged 
   try {
     assert.equal((await upload(null, randomUUID())).status, 401)
     assert.equal((await upload(99, randomUUID())).status, 403)
+    assert.equal((await fetch(`${base}/estado`)).status, 401)
+    const diagnostic = await fetch(`${base}/estado`, { headers: { Authorization: `Bearer ${token(12)}` } })
+    assert.deepEqual((await diagnostic.json()).data, { configured: true, writable: true })
     assert.equal(writes, 0)
     assert.deepEqual((await (await fetch(base)).json()).data, null)
     const version = randomUUID()

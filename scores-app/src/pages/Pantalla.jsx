@@ -434,7 +434,7 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
                 </div>
                 <span className='rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/55'>En tiempo real</span>
               </div>
-              <MatchPhoto key={match.id} matchId={match.id} />
+              <MatchPhoto key={match.id} matchId={match.id} dark />
               <MatchStats matchId={match.id} player1={p1} player2={p2} />
             </section>
             <div className='mt-5 pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-sm text-white/55'>
