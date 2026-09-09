@@ -4,6 +4,7 @@ const { chromium } = require(process.argv[2] || 'playwright')
 const assert = require('node:assert/strict')
 const path = require('node:path')
 const os = require('node:os')
+const sharp = require('../scores-api/node_modules/sharp')
 const { createInitialState, applyEvent, serializeState } = require('../scores-api/src/modules/matches/score.engine')
 
 ;(async () => {
@@ -18,6 +19,8 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     let state = createInitialState(), events = [], snapshots = [], posts = 0, reads = 0, drop = false, sequence = 0
     const receipts = new Set()
     let paused = false
+    let photo = null, photoWrites = 0
+    const photoBytes = await sharp({ create: { width: 1200, height: 800, channels: 3, background: '#15764a' } }).jpeg().toBuffer()
     const control = () => ({ partido: match, marcador: serializeState(state), revision: `${sequence}:${events.length}`, configuration: 'fixture', eventos_recientes: events, en_vivo: { iniciado_at: new Date().toISOString(), pausado_at: paused ? new Date().toISOString() : null, segundos_pausa: 0 } })
     await page.addInitScript((user) => localStorage.setItem('auth-storage-v2', JSON.stringify({ state: { isAuthenticated: true, user }, version: 0 })), user)
     const mockRoute = async route => {
@@ -26,7 +29,16 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
         const endpoint = url.pathname.replace('/api', '')
         let data
         if (endpoint.endsWith('/stream')) return route.fulfill({ status: 200, contentType: 'text/event-stream', body: ': fixture\n\n' })
-        if (endpoint === '/partidos/gestion/mis-partidos') data = [match]
+        if (endpoint.endsWith('/foto/imagen')) return route.fulfill({ contentType: 'image/jpeg', body: photoBytes })
+        if (endpoint.endsWith('/foto') && req.method() === 'PUT') {
+          const body = req.postDataBuffer().toString('latin1')
+          const field = name => body.match(new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]*)`))?.[1] || ''
+          assert.equal(field('consentimiento'), 'true')
+          assert.equal(field('expected'), photo?.version || '')
+          photo = { version: field('version'), momento: field('momento') }; photoWrites++; data = photo
+        }
+        else if (endpoint.endsWith('/foto')) data = photo
+        else if (endpoint === '/partidos/gestion/mis-partidos') data = [match]
         else if (endpoint === '/partidos') data = [{ ...match, estado: url.searchParams.get('estado'), marcador_actual: serializeState(state), fecha_inicio: new Date().toISOString().slice(0,10) }]
         else if (endpoint.endsWith('/control')) { reads++; data = control() }
         else if (endpoint.endsWith('/eventos')) {
@@ -89,7 +101,7 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await page.locator('.judge-point').nth(1).click()
     assert.equal(await page.getByRole('button', { name: /^Ace/ }).isDisabled(), true)
     await page.getByRole('button', { name: /^Error del rival/ }).click()
-    await page.waitForFunction(() => !document.querySelector('dialog'))
+    await page.waitForFunction(() => !document.querySelector('dialog[open]'))
     await settled()
     assert.equal(events[0].motivo, 'error_no_forzado')
     await page.getByRole('button', { name: 'Pausar', exact: true }).click()
@@ -130,6 +142,36 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await secondTab.locator('.judge-point').first().waitFor()
     assert.equal(await secondTab.locator('.judge-point').first().isDisabled(), true, 'Second tab cannot edit the same outbox')
     await secondTab.close()
+    await page.getByRole('button', { name: 'Foto del partido', exact: true }).click()
+    const photoDialog = page.locator('dialog[open]')
+    await photoDialog.locator('input[type=file]').last().setInputFiles({ name: 'partido.jpg', mimeType: 'image/jpeg', buffer: photoBytes })
+    await photoDialog.getByRole('checkbox').check()
+    await page.context().setOffline(true)
+    await photoDialog.getByRole('button', { name: 'Guardar foto del partido' }).click()
+    await photoDialog.getByText('Foto pendiente de envío.', { exact: false }).waitFor()
+    console.log('photo draft saved', await page.evaluate(async () => {
+      const db = await new Promise(resolve => { const r = indexedDB.open('tenis-match-photos', 1); r.onsuccess = () => resolve(r.result) })
+      return new Promise(resolve => { const r = db.transaction('pending').objectStore('pending').getAllKeys(); r.onsuccess = () => { db.close(); resolve(r.result) } })
+    }))
+    assert.equal(photoWrites, 0)
+    await page.screenshot({ path: path.join(os.tmpdir(), 'tenis-photo-mobile.png') })
+    await photoDialog.getByRole('button', { name: 'Cerrar fotografía' }).click()
+    assert.equal(await page.locator('.judge-point').first().isDisabled(), false, 'Photo never blocks points')
+    await page.context().setOffline(false)
+    await page.reload()
+    await page.getByRole('button', { name: /Carlos Rodríguez.*Andrés Martínez/ }).click()
+    await settled()
+    for (let attempt = 0; attempt < 60 && photoWrites === 0; attempt++) await page.waitForTimeout(500)
+    assert.equal(photoWrites, 1, 'Photo survives reload and sends only once')
+    await page.getByRole('button', { name: 'Foto del partido', exact: true }).click()
+    await photoDialog.locator('input[type=file]').last().setInputFiles({ name: 'final.jpg', mimeType: 'image/jpeg', buffer: photoBytes })
+    await photoDialog.getByRole('combobox').selectOption('final')
+    await photoDialog.getByRole('checkbox').check()
+    page.once('dialog', d => d.accept())
+    await photoDialog.getByRole('button', { name: 'Reemplazar foto del partido' }).click()
+    await photoDialog.getByText('Foto guardada en el servidor.', { exact: true }).waitFor()
+    assert.equal(photoWrites, 2); assert.equal(photo.momento, 'final')
+    await photoDialog.getByRole('button', { name: 'Cerrar fotografía' }).click()
     await page.screenshot({ path: path.join(os.tmpdir(), 'tenis-judge-mobile.png') })
     await page.getByRole('button', { name: 'Estadísticas', exact: true }).click()
     await page.getByRole('heading', { name: 'Estadísticas y últimas acciones' }).waitFor()
@@ -149,12 +191,15 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await publicPage.getByRole('heading', { name: 'Jornada de hoy' }).waitFor()
     await publicPage.getByRole('button', { name: 'Ver este partido a detalle' }).first().click()
     await publicPage.getByRole('heading', { name: 'Estadísticas de los jugadores' }).waitFor()
+    await publicPage.getByRole('heading', { name: 'Foto del partido · Final' }).waitFor()
+    await publicPage.getByRole('button', { name: 'Ampliar foto', exact: true }).click()
+    await publicPage.getByRole('button', { name: 'Reducir foto', exact: true }).waitFor()
     assert.equal(await publicPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
     await publicPage.screenshot({ path: path.join(os.tmpdir(), 'tenis-screen-mobile.png'), fullPage: true })
     await publicPage.getByRole('button', { name: 'Regresar a partidos' }).click()
     await publicPage.getByRole('heading', { name: 'Jornada de hoy' }).waitFor()
     assert.deepEqual(failures, [])
-    console.log('PASS: judge mobile layout, scoring, faults, let, undo, pause, network recovery and restricted routes')
+    console.log('PASS: mobile scoring, offline photo queue/reload, explicit replacement, public photo detail, network recovery and restricted routes')
     console.log('Screenshot:', path.join(os.tmpdir(), 'tenis-judge-mobile.png'))
   } finally { await browser.close() }
 })().catch(error => { console.error(error); process.exitCode = 1 })

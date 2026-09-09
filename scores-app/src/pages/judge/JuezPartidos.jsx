@@ -5,6 +5,7 @@ import { getParticipantName } from '../../utils/matchParticipants'
 import { createJudgeSession } from '../../utils/judgeSession'
 import { confirm } from '../../utils/confirm'
 import MatchStats from '../../components/match/MatchStats'
+import MatchPhotoCapture from '../../components/match/MatchPhotoCapture'
 import { useMatchTimer } from '../../hooks/useMatchTimer'
 import { useMatchRealtime } from '../../hooks/useMatchRealtime'
 import './judge.css'
@@ -183,6 +184,7 @@ export default function JuezPartidos() {
       <div className='judge-toolbar'>
         <button className='judge-tool' disabled={view.busy || nameBusy || Boolean(view.pending)} onClick={() => { select(null); refreshMatches() }}><ArrowLeft size={17} /> Partidos</button>
         <span className='text-xs truncate'>{match?.cancha?.nombre || 'Mesa de juez'}</span>
+        <MatchPhotoCapture key={`${userId}:${selectedId}`} matchId={selectedId} userId={userId} finished={finished} disabled={!exclusive} deferUpload={Boolean(view.pendingCount) || view.syncing || !exclusive} />
         <button className='judge-tool' disabled={view.busy || view.syncing} onClick={() => sessionRef.current.sync()} aria-label='Sincronizar marcador'><RefreshCw size={17} /></button>
       </div>
       {!state ? <div className='card p-6' role='status'>{view.error || 'Cargando marcador…'}</div> : <>

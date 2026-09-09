@@ -7,6 +7,7 @@ router.get('/', controller.getAll)
 router.get('/stream', controller.stream)
 router.get('/mios', requireAuth, controller.getMyMatches)
 router.get('/gestion/mis-partidos', requireAuth, requireOfficial, controller.getManaged)
+router.use('/:id/foto', require('./match-photo.routes'))
 // GET  /api/partidos/:id
 router.get('/:id/estadisticas', controller.getStats)
 router.get('/:id', controller.getById)

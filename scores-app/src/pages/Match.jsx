@@ -2,6 +2,9 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, BarChart3, CalendarDays, Clock3, MapPin, MessageSquareText, Star } from 'lucide-react'
 import LiveBadge from '../components/match/LiveBadge'
 import MatchStats from '../components/match/MatchStats'
+import MatchPhoto from '../components/match/MatchPhoto'
+import MatchPhotoCapture from '../components/match/MatchPhotoCapture'
+import useAuthStore from '../store/useAuthStore'
 import { MatchCardSkeleton } from '../components/ui/Skeleton'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { useMatch } from '../hooks/useMatches'
@@ -13,6 +16,7 @@ import { useMatchTimer } from '../hooks/useMatchTimer'
 import Avatar from '../components/ui/Avatar'
 
 export default function Match() {
+  const user = useAuthStore(store => store.user)
   const { id } = useParams()
   const { match, loading } = useMatch(id)
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
@@ -180,6 +184,8 @@ export default function Match() {
         </div>
       )}
 
+      {user?.rol === 'admin' && <MatchPhotoCapture key={`photo:${user.id}:${match.id}`} matchId={match.id} userId={user.id} finished={match.estado === 'finalizado'} />}
+      <MatchPhoto key={match.id} matchId={match.id} />
       {(isLive || match.estado === 'finalizado') && match.deporte === 'tenis' && (
         <section className='card p-4 sm:p-5'>
           <h2 className='font-bold flex items-center gap-2 mb-4' style={{ color: 'var(--text-primary)' }}>

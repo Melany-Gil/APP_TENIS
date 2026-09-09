@@ -441,6 +441,15 @@ exports.ensureSchema = async () => {
   }
 
   // Never run historical data-cleanup jobs during application startup.
+  await db.query(`CREATE TABLE IF NOT EXISTS fotos_partido (
+    partido_id INT NOT NULL PRIMARY KEY,
+    version CHAR(36) NOT NULL UNIQUE,
+    momento ENUM('inicio', 'final') NOT NULL,
+    created_by INT NOT NULL,
+    bytes INT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_foto_partido FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
   console.log('✅  Esquema de partidos y jueces actualizado')
 }
