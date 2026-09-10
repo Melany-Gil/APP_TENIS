@@ -1,7 +1,7 @@
 const router = require('express').Router()
 const { body } = require('express-validator')
 const controller = require('./users.controller')
-const { requireAuth, requireAdmin } = require('../../middlewares/auth.middleware')
+const { requireAuth, requireAdmin, requireOfficial } = require('../../middlewares/auth.middleware')
 const { uploadAvatar } = require('../../middlewares/upload.middleware')
 const validate = require('../../middlewares/validate.middleware')
 
@@ -23,6 +23,9 @@ router.put('/me/avatar', requireAuth, uploadAvatar, controller.uploadAvatar)
 router.delete('/me/avatar', requireAuth, controller.deleteAvatar)
 router.put('/me/password', requireAuth, controller.changePassword)
 
+// Lista de jueces para asignación/reasignación (oficiales y directores)
+router.get('/jueces', requireAuth, requireOfficial, controller.getJudges)
+
 // Rutas de administración
 router.get('/', requireAuth, requireAdmin, controller.getAll)
 router.post(
@@ -42,14 +45,21 @@ router.post(
     body('apellido').trim().isLength({ min: 2, max: 100 }),
     body('email').normalizeEmail().isEmail(),
     body('password').isLength({ min: 8, max: 72 }).matches(/[A-Z]/).matches(/[0-9]/),
-    body('rol').optional().isIn(['admin', 'juez', 'miembro']),
+    body('rol').optional().isIn(['admin', 'juez_director', 'juez', 'miembro']),
     body('telefono').optional({ values: 'falsy' }).trim().isLength({ max: 20 }),
   ],
   validate,
   controller.create
 )
 router.get('/:id', requireAuth, requireAdmin, controller.getById)
-router.put('/:id/rol', requireAuth, requireAdmin, controller.updateRole)
+router.put(
+  '/:id/rol',
+  requireAuth,
+  requireAdmin,
+  [body('rol').isIn(['admin', 'juez_director', 'juez', 'miembro'])],
+  validate,
+  controller.updateRole
+)
 router.put(
   '/:id/usuario',
   requireAuth,

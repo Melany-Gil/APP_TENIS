@@ -16,8 +16,8 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{1
 
 function authorize(match, user) {
   if (!match) throw fail(404, 'Partido no encontrado')
-  if (user.rol !== 'admin' && !(user.rol === 'juez' && Number(match.juez_id) === Number(user.id))) {
-    throw fail(403, 'Solo el juez asignado o un administrador puede guardar la foto de este partido')
+  if (user.rol !== 'admin' && user.rol !== 'juez_director' && !(user.rol === 'juez' && Number(match.juez_id) === Number(user.id))) {
+    throw fail(403, 'Solo el juez asignado, juez director o un administrador puede guardar la foto de este partido')
   }
 }
 

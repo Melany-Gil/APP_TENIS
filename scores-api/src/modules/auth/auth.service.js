@@ -62,13 +62,13 @@ exports.login = async ({ identificador, numero_documento, password, tipo_acceso 
   let rows
   try {
     if (tipo_acceso) {
-      const condition = tipo_acceso === 'usuario' ? "usuario = ? AND rol = 'juez'" : 'numero_documento = ?'
+      const condition = tipo_acceso === 'usuario' ? "usuario = ? AND rol IN ('juez', 'juez_director')" : 'numero_documento = ?'
       ;[rows] = await db.query(`SELECT * FROM users WHERE activo = TRUE AND ${condition} LIMIT 1`, [credential])
     } else {
     ;[rows] = await db.query(
       `SELECT * FROM users
        WHERE activo = TRUE
-         AND (numero_documento = ? OR (usuario = ? AND rol = 'juez'))
+         AND (numero_documento = ? OR (usuario = ? AND rol IN ('juez', 'juez_director')))
        ORDER BY (numero_documento = ?) DESC
        LIMIT 1`,
       [credential, credential, credential]

@@ -7,12 +7,16 @@ import AdminLayout from '../layouts/AdminLayout'
 import ProtectedRoute from './ProtectedRoute'
 import AdminRoute from './AdminRoute'
 import OfficialRoute from './OfficialRoute'
+import DirectorRoute from './DirectorRoute'
 import JudgeLayout from '../layouts/JudgeLayout'
 
 // ── Auth ──────────────────────────────────────────────────
 const Login = lazy(() => import('../pages/auth/Login'))
 const Register = lazy(() => import('../pages/auth/Register'))
 const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'))
+
+// ── Director ──────────────────────────────────────────────
+const DirectorDashboard = lazy(() => import('../pages/judge/DirectorDashboard'))
 
 // ── App ───────────────────────────────────────────────────
 const Home = lazy(() => import('../pages/Home'))
@@ -50,10 +54,17 @@ const JuezPartidos = lazy(() => import('../pages/judge/JuezPartidos'))
 export default function AppRouter() {
   const { user, isAuthenticated } = useAuthStore()
   const { pathname } = useLocation()
-  // A judge's signed-in workspace has only these two destinations, including
-  // when following an old bookmark or typing a public URL directly.
+  // Un juez estándar tiene solo /juez y /juez/perfil
   if (isAuthenticated && user?.rol === 'juez' && !['/juez', '/juez/perfil'].includes(pathname)) {
     return <Navigate to={pathname === '/profile' ? '/juez/perfil' : '/juez'} replace />
+  }
+  // Un juez director tiene acceso a su panel dedicado (/director), a la mesa (/juez) y a su perfil
+  if (
+    isAuthenticated &&
+    user?.rol === 'juez_director' &&
+    !['/director', '/juez', '/juez/perfil'].includes(pathname)
+  ) {
+    return <Navigate to='/director' replace />
   }
   return (
     <Routes>
@@ -102,6 +113,20 @@ export default function AppRouter() {
         />
       </Route>
 
+      {/* Juez Director: panel dedicado de supervisión */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <DirectorRoute>
+              <JudgeLayout />
+            </DirectorRoute>
+          </ProtectedRoute>
+        }
+      >
+        <Route path='/director' element={<DirectorDashboard />} />
+      </Route>
+
+      {/* Control de cancha y mesa de juez */}
       <Route
         element={
           <ProtectedRoute>

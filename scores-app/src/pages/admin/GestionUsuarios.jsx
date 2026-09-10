@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Check, Gavel, Pencil, Plus, Search, Shield, User, X } from 'lucide-react'
+import { AlertCircle, Check, Gavel, Pencil, Plus, Search, Shield, User, X } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { userService } from '../../services/userService'
 import useAuthStore from '../../store/useAuthStore'
@@ -17,6 +17,7 @@ export default function GestionUsuarios() {
   const [editingUsuarioId, setEditingUsuarioId] = useState(null)
   const [usuarioDraft, setUsuarioDraft] = useState('')
   const [savingUsuario, setSavingUsuario] = useState(false)
+  const [createError, setCreateError] = useState(null)
   const { user: me } = useAuthStore()
   const { addToast } = useUIStore()
   const {
@@ -40,6 +41,7 @@ export default function GestionUsuarios() {
   }, [])
 
   const createUser = async (data) => {
+    setCreateError(null)
     try {
       await userService.create({ ...data, usuario: data.usuario?.trim() || undefined })
       addToast({ type: 'success', title: 'Usuario creado correctamente' })
@@ -47,7 +49,9 @@ export default function GestionUsuarios() {
       setShowCreate(false)
       fetchAll()
     } catch (err) {
-      addToast({ type: 'error', title: 'No se pudo crear', message: err.message })
+      const msg = err.message || 'No se pudo crear el usuario'
+      setCreateError(msg)
+      addToast({ type: 'error', title: 'No se pudo crear', message: msg })
     }
   }
 
@@ -78,12 +82,13 @@ export default function GestionUsuarios() {
     if (newRol === usuario.rol) return
     const descriptions = {
       admin: 'Tendrá acceso completo al panel de administración.',
+      juez_director: 'Podrá supervisar todas las canchas, reasignar jueces, bajar partidos y sustituir participantes.',
       juez: 'Podrá crear y controlar los partidos que tenga asignados.',
       miembro: 'Solo tendrá acceso a las funciones generales para miembros.',
     }
     const ok = await confirm({
       title: 'Cambiar rol de usuario',
-      message: `${usuario.nombre} ${usuario.apellido} pasará a tener el rol "${newRol}". ${descriptions[newRol]}`,
+      message: `${usuario.nombre} ${usuario.apellido} pasará a tener el rol "${newRol === 'juez_director' ? 'Juez Director' : newRol}". ${descriptions[newRol]}`,
       confirmLabel: 'Confirmar cambio',
       danger: newRol === 'admin',
     })
@@ -104,6 +109,7 @@ export default function GestionUsuarios() {
   )
 
   const admins = filtered.filter((u) => u.rol === 'admin').length
+  const directores = filtered.filter((u) => u.rol === 'juez_director').length
   const jueces = filtered.filter((u) => u.rol === 'juez').length
   const miembros = filtered.filter((u) => u.rol === 'miembro').length
 
@@ -123,7 +129,10 @@ export default function GestionUsuarios() {
           type='button'
           size='sm'
           leftIcon={showCreate ? <X className='w-4 h-4' /> : <Plus className='w-4 h-4' />}
-          onClick={() => setShowCreate((current) => !current)}
+          onClick={() => {
+            setCreateError(null)
+            setShowCreate((current) => !current)
+          }}
         >
           {showCreate ? 'Cancelar' : 'Nuevo usuario'}
         </Button>
@@ -139,6 +148,13 @@ export default function GestionUsuarios() {
               Los administradores crean las cuentas; no hay registro público para miembros.
             </p>
           </div>
+
+          {createError && (
+            <div className='p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 text-sm flex items-start gap-2.5'>
+              <AlertCircle className='w-4 h-4 mt-0.5 shrink-0' />
+              <span>{createError}</span>
+            </div>
+          )}
           <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
             <label className='form-group'>
               <span className='form-label'>Nombres</span>
@@ -192,7 +208,7 @@ export default function GestionUsuarios() {
               />
               {errors.usuario && <span className='form-error'>{errors.usuario.message}</span>}
               <span className='text-[11px]' style={{ color: 'var(--text-muted)' }}>
-                Si lo defines, el juez podrá iniciar sesión con este usuario o con su documento.
+                Si lo defines, el juez o director podrá iniciar sesión con este usuario o con su documento.
               </span>
             </label>
             <label className='form-group'>
@@ -213,6 +229,7 @@ export default function GestionUsuarios() {
               <select className='form-input' {...register('rol')}>
                 <option value='miembro'>Miembro</option>
                 <option value='juez'>Juez de partido</option>
+                <option value='juez_director'>Juez Director</option>
                 <option value='admin'>Administrador</option>
               </select>
             </label>
@@ -226,7 +243,7 @@ export default function GestionUsuarios() {
       )}
 
       {/* Stats rápidas */}
-      <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
+      <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
         <div className='card p-4 flex items-center gap-3'>
           <div
             className='w-10 h-10 rounded-lg flex items-center justify-center'
@@ -240,6 +257,22 @@ export default function GestionUsuarios() {
             </p>
             <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
               Administradores
+            </p>
+          </div>
+        </div>
+        <div className='card p-4 flex items-center gap-3'>
+          <div
+            className='w-10 h-10 rounded-lg flex items-center justify-center'
+            style={{ backgroundColor: 'rgba(234,179,8,0.15)' }}
+          >
+            <Shield className='w-5 h-5 text-amber-500' />
+          </div>
+          <div>
+            <p className='text-2xl font-black' style={{ color: 'var(--text-primary)' }}>
+              {directores}
+            </p>
+            <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
+              Directores
             </p>
           </div>
         </div>
@@ -339,7 +372,7 @@ export default function GestionUsuarios() {
                 <p className='text-xs truncate' style={{ color: 'var(--text-muted)' }}>
                   CC: {u.numero_documento} · {u.email}
                 </p>
-                {u.rol === 'juez' &&
+                {['juez', 'juez_director'].includes(u.rol) &&
                   (editingUsuarioId === u.id ? (
                     <div className='flex items-center gap-1 mt-0.5'>
                       <input
@@ -400,7 +433,7 @@ export default function GestionUsuarios() {
                   value={u.rol}
                   onChange={(event) => changeRol(u, event.target.value)}
                   disabled={u.id === me?.id}
-                  className='form-input py-1.5 text-xs w-28 disabled:opacity-50'
+                  className='form-input py-1.5 text-xs w-32 disabled:opacity-50'
                   title={
                     u.id === me?.id
                       ? 'No puedes cambiarte el rol'
@@ -409,6 +442,7 @@ export default function GestionUsuarios() {
                 >
                   <option value='miembro'>Miembro</option>
                   <option value='juez'>Juez</option>
+                  <option value='juez_director'>Juez Director</option>
                   <option value='admin'>Admin</option>
                 </select>
               </div>

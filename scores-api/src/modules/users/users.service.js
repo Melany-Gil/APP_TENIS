@@ -65,7 +65,7 @@ exports.create = async ({
   telefono,
   rol = 'miembro',
 }) => {
-  if (!['admin', 'juez', 'miembro'].includes(rol)) {
+  if (!['admin', 'juez_director', 'juez', 'miembro'].includes(rol)) {
     throw { status: 400, message: 'Rol inválido' }
   }
 
@@ -139,9 +139,19 @@ exports.updateUsuario = async (id, usuario) => {
   return exports.getById(id)
 }
 
+exports.getJudges = async () => {
+  const [rows] = await db.query(
+    `SELECT u.id, u.nombre, u.apellido, u.rol, u.usuario
+     FROM users u
+     WHERE u.activo = TRUE AND u.rol IN ('juez', 'juez_director', 'admin')
+     ORDER BY u.nombre ASC, u.apellido ASC`
+  )
+  return rows
+}
+
 exports.updateRole = async (id, rol, requesterId) => {
-  if (!['admin', 'juez', 'miembro'].includes(rol)) {
-    throw { status: 400, message: 'Rol inválido. Debe ser "admin", "juez" o "miembro"' }
+  if (!['admin', 'juez_director', 'juez', 'miembro'].includes(rol)) {
+    throw { status: 400, message: 'Rol inválido. Debe ser "admin", "juez_director", "juez" o "miembro"' }
   }
   if (Number(id) === Number(requesterId)) {
     throw { status: 400, message: 'No puedes cambiar tu propio rol' }

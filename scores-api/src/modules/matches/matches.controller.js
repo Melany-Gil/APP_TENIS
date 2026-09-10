@@ -1,4 +1,5 @@
 const service = require('./matches.service')
+const director = require('./director.service')
 const realtime = require('./match-realtime')
 const { success, error } = require('../../utils/response')
 
@@ -6,6 +7,10 @@ const changed = (res, data, matchId, status = 200, action = 'updated') => {
   realtime.publishMatchChange({ matchId, action })
   return success(res, data, status)
 }
+
+const directorError = (res, err) => error(res,
+  err.status ? err.message : 'No se pudo completar la operación. Actualiza el partido y vuelve a intentarlo.',
+  err.status || 500)
 
 exports.stream = (req, res) => realtime.subscribe(req, res)
 
@@ -59,7 +64,50 @@ exports.updateParticipants = async (req, res) => {
   }
 }
 
+// PUT /api/partidos/:id/reasignar-juez — reasignar juez por juez_director o admin
+exports.reassignJudge = async (req, res) => {
+  try {
+    return changed(res, await director.reassignJudge(req.params.id, req.body, req.user), req.params.id)
+  } catch (err) {
+    return directorError(res, err)
+  }
+}
+
+// PUT /api/partidos/:id/cancelar — bajar / cancelar partido
+exports.cancelMatch = async (req, res) => {
+  try {
+    return changed(res, await director.cancelMatch(req.params.id, req.body, req.user), req.params.id)
+  } catch (err) {
+    return directorError(res, err)
+  }
+}
+
+// PUT /api/partidos/:id/reactivar — reactivar partido cancelado
+exports.reactivateMatch = async (req, res) => {
+  try {
+    return changed(res, await director.reactivateMatch(req.params.id, req.body, req.user), req.params.id)
+  } catch (err) {
+    return directorError(res, err)
+  }
+}
+
 // PUT /api/partidos/:id/marcador — actualizar sets en tiempo real
+exports.correctScore = async (req, res) => {
+  try {
+    return changed(res, await director.correctScore(req.params.id, req.body, req.user), req.params.id)
+  } catch (err) {
+    return directorError(res, err)
+  }
+}
+
+exports.substitute = async (req, res) => {
+  try {
+    return changed(res, await director.substitute(req.params.id, req.body, req.user), req.params.id)
+  } catch (err) {
+    return directorError(res, err)
+  }
+}
+
 exports.updateMarcador = async (req, res) => {
   try {
     return changed(res, await service.updateMarcador(req.params.id, req.body, req.user), req.params.id)

@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { ArrowLeft, Pause, Play, Undo2, RefreshCw, X, Settings2, BarChart3 } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { ArrowLeft, Pause, Play, Undo2, RefreshCw, X, Settings2, BarChart3, UserCheck, AlertTriangle, Search } from 'lucide-react'
 import { matchService } from '../../services/matchService'
 import { getParticipantName } from '../../utils/matchParticipants'
 import { createJudgeSession } from '../../utils/judgeSession'
@@ -25,12 +25,14 @@ const reasonLabel = (event, names) => {
   if (event.tipo === 'primera_falta') return 'Primera falta · segundo saque'
   if (event.tipo === 'let') return 'Let · se repite el saque'
   if (event.tipo === 'cambio_servidor') return 'Cambio de sacador'
+  if (event.tipo === 'correccion') return 'Corrección de marcador por supervisión'
   const reason = event.motivo === 'doble_falta' ? 'Doble falta' : reasons.find(([key]) => key === event.motivo)?.[1] || 'Punto sin detalle'
   return `${names[event.ganador]} · ${reason}`
 }
 
 export default function JuezPartidos() {
-  const userId = useAuthStore((store) => store.user?.id)
+  const user = useAuthStore((store) => store.user)
+  const userId = user?.id
   const [exclusive, setExclusive] = useState(false)
   const lockAllowed = useRef(false)
   const [matches, setMatches] = useState([])
@@ -45,7 +47,44 @@ export default function JuezPartidos() {
   const [nameDraft, setNameDraft] = useState(['', ''])
   const [nameBusy, setNameBusy] = useState(false)
   const [nameError, setNameError] = useState('')
+  const isDirectorOrAdmin = ['admin', 'juez_director'].includes(user?.rol)
+  const [judgeFilter, setJudgeFilter] = useState('todos')
+  const [matchSearch, setMatchSearch] = useState('')
   const listRequest = useRef(0)
+
+  const assignedJudges = useMemo(() => {
+    const map = new Map()
+    matches.forEach((m) => {
+      if (m.juez?.id) {
+        map.set(m.juez.id, `${m.juez.nombre} ${m.juez.apellido || ''}`.trim())
+      }
+    })
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+  }, [matches])
+
+  const visibleMatches = useMemo(() => {
+    if (!isDirectorOrAdmin) return matches
+    return matches.filter((m) => {
+      if (judgeFilter === 'mis_partidos') {
+        if (Number(m.juez?.id) !== Number(userId)) return false
+      } else if (judgeFilter === 'sin_juez') {
+        if (m.juez?.id) return false
+      } else if (judgeFilter !== 'todos') {
+        if (String(m.juez?.id) !== String(judgeFilter)) return false
+      }
+
+      if (matchSearch.trim()) {
+        const q = matchSearch.trim().toLowerCase()
+        const p1 = getParticipantName(m, 1) || ''
+        const p2 = getParticipantName(m, 2) || ''
+        const judgeName = `${m.juez?.nombre || ''} ${m.juez?.apellido || ''}`.toLowerCase()
+        const court = (m.cancha?.nombre || '').toLowerCase()
+        if (!`${p1} ${p2} ${judgeName} ${court}`.toLowerCase().includes(q)) return false
+      }
+
+      return true
+    })
+  }, [matches, isDirectorOrAdmin, judgeFilter, matchSearch, userId])
 
   const refreshMatches = useCallback(async () => {
     const request = ++listRequest.current
@@ -161,19 +200,122 @@ export default function JuezPartidos() {
   if (!view.match) return (
     <section className='space-y-4 py-2'>
       <div className='flex items-center justify-between gap-2'>
-        <div><h1 className='text-xl font-bold'>Mesa de juez</h1><p className='text-sm text-[var(--text-muted)]'>Selecciona el partido que vas a arbitrar.</p></div>
-        <button className='btn-ghost p-3' onClick={refreshMatches} disabled={listLoading} aria-label='Actualizar partidos'><RefreshCw size={20} /></button>
+        <div>
+          <div className='flex items-center gap-2'>
+            <h1 className='text-xl font-bold'>Mesa de juez</h1>
+            {isDirectorOrAdmin && (
+              <span className='text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider' style={{ backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#eab308' }}>
+                Supervisión Jueces
+              </span>
+            )}
+          </div>
+          <p className='text-sm text-[var(--text-muted)]'>
+            {isDirectorOrAdmin
+              ? 'Viendo todos los partidos de la jornada asignados a cada juez. Selecciona el que desees arbitrar.'
+              : 'Selecciona el partido que vas a arbitrar.'}
+          </p>
+        </div>
+        <button className='btn-ghost p-3' onClick={refreshMatches} disabled={listLoading} aria-label='Actualizar partidos'><RefreshCw size={20} className={listLoading ? 'animate-spin' : ''} /></button>
       </div>
-      {listError && <p role='alert'>{listError}</p>}
+
+      {isDirectorOrAdmin && (
+        <div className='p-3.5 rounded-2xl border space-y-2.5' style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border-color)' }}>
+          <div className='flex flex-col sm:flex-row gap-2'>
+            <div className='relative flex-1'>
+              <Search size={15} className='absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]' />
+              <input
+                type='text'
+                placeholder='Buscar por participante, juez o cancha…'
+                value={matchSearch}
+                onChange={(e) => setMatchSearch(e.target.value)}
+                className='form-input pl-9 text-xs'
+              />
+            </div>
+            <div className='w-full sm:w-64'>
+              <select
+                className='form-input text-xs'
+                value={judgeFilter}
+                onChange={(e) => setJudgeFilter(e.target.value)}
+              >
+                <option value='todos'>Todos los jueces ({matches.length})</option>
+                <option value='mis_partidos'>Mis partidos asignados</option>
+                <option value='sin_juez'>Sin juez asignado</option>
+                {assignedJudges.map((j) => (
+                  <option key={j.id} value={j.id}>
+                    Juez: {j.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className='flex items-center justify-between text-[11px] text-[var(--text-muted)] px-0.5'>
+            <span>Mostrando {visibleMatches.length} de {matches.length} partidos</span>
+            {(judgeFilter !== 'todos' || matchSearch) && (
+              <button
+                type='button'
+                onClick={() => { setJudgeFilter('todos'); setMatchSearch('') }}
+                className='font-semibold text-[var(--color-brand)]'
+              >
+                Limpiar filtro
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {listError && <p role='alert' className='text-xs text-red-500'>{listError}</p>}
       {!exclusive && <p role='status' className='text-sm'>Abre la mesa en una sola pestaña y usa un navegador actualizado con HTTPS. Si tienes otra mesa abierta, ciérrala y recarga esta.</p>}
       {listLoading && <p role='status'>Cargando partidos…</p>}
-      {!listLoading && !matches.length && <p className='card p-5'>No tienes partidos asignados.</p>}
+      {!listLoading && !visibleMatches.length && (
+        <p className='card p-5 text-center text-sm text-[var(--text-muted)]'>
+          {isDirectorOrAdmin ? 'No hay partidos que coincidan con el filtro.' : 'No tienes partidos asignados.'}
+        </p>
+      )}
       <div className='grid sm:grid-cols-2 gap-3'>
-        {matches.map((item) => <button key={item.id} onClick={() => select(item)} className='card p-4 text-left hover:bg-[var(--bg-hover)]'>
-          <span className='text-xs text-[var(--text-muted)]'>{item.cancha?.nombre || 'Cancha por definir'} · {item.torneo?.nombre || 'Partido libre'}</span>
-          <strong className='block my-2'>{getParticipantName(item, 1)} <span className='font-normal'>vs</span> {getParticipantName(item, 2)}</strong>
-          <span className='text-sm'>{{ en_vivo: '● En vivo', programado: 'Programado', finalizado: 'Finalizado', cancelado: 'Cancelado' }[item.estado] || item.estado} →</span>
-        </button>)}
+        {visibleMatches.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => select(item)}
+            className='card p-4 text-left hover:bg-[var(--bg-hover)] transition-colors flex flex-col justify-between'
+          >
+            <div>
+              <div className='flex items-center justify-between gap-2 text-xs text-[var(--text-muted)] mb-1'>
+                <span className='truncate'>{item.cancha?.nombre || 'Cancha por definir'} · {item.torneo?.nombre || 'Partido libre'}</span>
+                <span className='shrink-0 font-semibold' style={{ color: item.estado === 'en_vivo' ? '#10b981' : 'var(--text-muted)' }}>
+                  {{ en_vivo: '● En vivo', programado: 'Programado', finalizado: 'Finalizado', cancelado: 'Cancelado' }[item.estado] || item.estado} →
+                </span>
+              </div>
+              <strong className='block my-2 text-base leading-tight'>
+                {getParticipantName(item, 1)} <span className='font-normal text-xs text-[var(--text-muted)]'>vs</span> {getParticipantName(item, 2)}
+              </strong>
+            </div>
+
+            {isDirectorOrAdmin && (
+              <div className='pt-2 mt-2 border-t' style={{ borderColor: 'var(--border-color)' }}>
+                {item.juez ? (
+                  <span
+                    className='text-[11px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1.5'
+                    style={{
+                      backgroundColor: Number(item.juez.id) === Number(userId) ? 'var(--color-brand-dim)' : 'var(--bg-primary)',
+                      color: Number(item.juez.id) === Number(userId) ? 'var(--color-brand)' : 'var(--text-primary)',
+                      border: '1px solid var(--border-color)',
+                    }}
+                  >
+                    <UserCheck size={12} />
+                    Juez: {item.juez.nombre} {item.juez.apellido} {Number(item.juez.id) === Number(userId) ? '(Tú)' : ''}
+                  </span>
+                ) : (
+                  <span
+                    className='text-[11px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 text-amber-500'
+                    style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)' }}
+                  >
+                    <AlertTriangle size={12} /> Sin juez asignado
+                  </span>
+                )}
+              </div>
+            )}
+          </button>
+        ))}
       </div>
     </section>
   )

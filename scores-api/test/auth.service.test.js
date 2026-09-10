@@ -33,11 +33,19 @@ const judgeRow = {
   password: passwordHash,
 }
 
+test('juez director inicia sesión por alias y conserva su rol sin exponer la contraseña', async () => {
+  const service = loadService({ async query() { return [[{ ...judgeRow, rol: 'juez_director' }]] } })
+  const result = await service.login({ identificador: 'juan.perez', tipo_acceso: 'usuario', password: 'Secret123' })
+  assert.equal(result.user.rol, 'juez_director')
+  assert.ok(result.token)
+  assert.equal(Object.hasOwn(result.user, 'password'), false)
+})
+
 for (const mode of ['documento', 'usuario']) {
   test(`acceso explícito por ${mode} no mezcla identificadores`, async () => {
     const service = loadService({ async query(sql, params) {
       assert.doesNotMatch(sql, /\bOR\b/)
-      assert.match(sql, mode === 'documento' ? /numero_documento = \?/ : /usuario = \? AND rol = 'juez'/)
+      assert.match(sql, mode === 'documento' ? /numero_documento = \?/ : /usuario = \? AND rol IN \('juez', 'juez_director'\)/)
       assert.deepEqual(params, ['12345'])
       return [[judgeRow]]
     } })
@@ -72,7 +80,7 @@ test('login por número de documento sigue funcionando', async () => {
   assert.ok(result.token)
   assert.equal(Object.hasOwn(result.user, 'password'), false)
   assert.match(calls[0].sql, /numero_documento = \?/)
-  assert.match(calls[0].sql, /usuario = \? AND rol = 'juez'/)
+  assert.match(calls[0].sql, /usuario = \? AND rol IN \('juez', 'juez_director'\)/)
 })
 
 test('un juez puede iniciar sesión con su usuario', async () => {

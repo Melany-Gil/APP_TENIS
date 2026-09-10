@@ -2,6 +2,7 @@ const { normalizeConfig } = require('./score.engine')
 exports.configurationOf = (match) => JSON.stringify({
   rules: normalizeConfig(match),
   participants: [match.jugador1_id || null, match.jugador2_id || null, match.equipo1_id || null, match.equipo2_id || null],
+  ...(Number(match.control_version) > 0 ? { controlVersion: Number(match.control_version) } : {}),
 })
 
 exports.validateDelivery = (event) => {

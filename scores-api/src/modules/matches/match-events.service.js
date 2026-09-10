@@ -10,7 +10,7 @@ const {
 } = require('./score.engine')
 
 exports.getManagedMatches = async (user) => {
-  if (user.rol === 'admin') return matchesService.getAll({ orden: 'asc' })
+  if (user.rol === 'admin' || user.rol === 'juez_director') return matchesService.getAll({ orden: 'asc' })
   return matchesService.getAll({ juez_id: user.id, orden: 'asc' })
 }
 
@@ -88,6 +88,7 @@ exports.getStats = async (id, setNumber = null) => {
 
   return {
     estadisticas: buildStats(events, selectedSet),
+    tiene_correcciones: events.some((event) => event.tipo === 'correccion'),
     total_sets: setNumbers.length ? Math.max(...setNumbers) : 0,
     set: selectedSet,
   }
@@ -255,9 +256,12 @@ exports.undoLastEvent = async (id, user) => {
     const [matches] = await connection.query('SELECT * FROM partidos WHERE id = ? FOR UPDATE', [id])
     if (!matches.length) throw { status: 404, message: 'Partido no encontrado' }
     assertCanManage(matches[0], user)
+    if (matches[0].estado === 'cancelado') {
+      throw { status: 409, message: 'Reactiva el partido antes de deshacer acciones' }
+    }
 
     const [lastEvents] = await connection.query(
-      `SELECT id
+      `SELECT id, tipo
        FROM eventos_partido
        WHERE partido_id = ? AND anulado_at IS NULL
        ORDER BY secuencia DESC
@@ -265,6 +269,9 @@ exports.undoLastEvent = async (id, user) => {
       [id]
     )
     if (!lastEvents.length) throw { status: 409, message: 'No hay eventos para deshacer' }
+    if (lastEvents[0].tipo === 'correccion') {
+      throw { status: 409, message: 'Una corrección supervisada no se deshace desde la mesa. Solicita otra corrección al director.' }
+    }
 
     await connection.query(
       'UPDATE eventos_partido SET anulado_at = NOW(), anulado_por = ? WHERE id = ?',
@@ -310,7 +317,7 @@ async function getManageableMatch(id, user) {
 }
 
 function assertCanManage(match, user) {
-  if (user.rol === 'admin') return
+  if (user.rol === 'admin' || user.rol === 'juez_director') return
   if (user.rol === 'juez' && Number(match.juez_id) === Number(user.id)) return
   throw { status: 403, message: 'Este partido no está asignado a tu cuenta de juez' }
 }

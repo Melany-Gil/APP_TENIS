@@ -33,7 +33,8 @@ export default function Login() {
       login(user)
       addToast({ type: 'success', title: '¡Bienvenido!', message: `Hola, ${user.nombre}` })
       const redirectTo =
-        requestedRedirect || (user.rol === 'juez' ? '/juez' : user.rol === 'admin' ? '/admin' : '/')
+        requestedRedirect ||
+        (user.rol === 'juez_director' ? '/director' : user.rol === 'juez' ? '/juez' : user.rol === 'admin' ? '/admin' : '/')
       navigate(redirectTo, { replace: true })
     } catch (error) {
       setError('identificador', {
@@ -75,7 +76,7 @@ export default function Login() {
         <fieldset disabled={isSubmitting}>
           <legend className='form-label mb-2'>¿Cómo quieres ingresar?</legend>
           <div className='flex gap-4'>
-            {[['documento', 'Con documento'], ['usuario', 'Con usuario (jueces)']].map(([value, label]) => (
+            {[['documento', 'Con documento'], ['usuario', 'Con usuario (jueces / directores)']].map(([value, label]) => (
               <label key={value} className='flex items-center gap-2 text-sm'>
                 <input type='radio' name='tipo_acceso' value={value} checked={accessType === value}
                   onChange={() => { setAccessType(value); resetField('identificador'); resetField('password') }} />
@@ -85,7 +86,7 @@ export default function Login() {
           </div>
         </fieldset>
         <div className='form-group'>
-          <label htmlFor='login-identifier' className='form-label'>{accessType === 'documento' ? 'Número de documento' : 'Usuario del juez'}</label>
+          <label htmlFor='login-identifier' className='form-label'>{accessType === 'documento' ? 'Número de documento' : 'Usuario del juez o director'}</label>
           <div className='relative'>
             <UserRound
               className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none'
@@ -104,7 +105,7 @@ export default function Login() {
           </div>
           {errors.identificador && <p className='form-error'>{errors.identificador.message}</p>}
           <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
-            Los jueces también pueden entrar con el usuario asignado por el club.
+            Los jueces y directores también pueden entrar con el usuario asignado por el club.
           </p>
         </div>
 

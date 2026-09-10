@@ -112,7 +112,7 @@ export default function GestionPartidos() {
         setPartidos(p.data || [])
         setJugadores(j.data || [])
         setEquipos(e.data || [])
-        setJueces((u.data || []).filter((usuario) => ['juez', 'admin'].includes(usuario.rol)))
+        setJueces((u.data || []).filter((usuario) => ['juez', 'juez_director', 'admin'].includes(usuario.rol)))
         setTorneos(
           (tournaments.data || []).filter((tournament) => tournament.estado !== 'cancelado')
         )
@@ -515,7 +515,7 @@ export default function GestionPartidos() {
                 <option value=''>Sin asignar</option>
                 {jueces.map((juez) => (
                   <option key={juez.id} value={juez.id}>
-                    {juez.nombre} {juez.apellido} {juez.rol === 'admin' ? '(admin)' : ''}
+                    {juez.nombre} {juez.apellido} {juez.rol === 'juez_director' ? '(director)' : juez.rol === 'admin' ? '(admin)' : ''}
                   </option>
                 ))}
               </select>

@@ -1,6 +1,6 @@
 const router = require('express').Router()
 const controller = require('./matches.controller')
-const { requireAuth, requireAdmin, requireOfficial } = require('../../middlewares/auth.middleware')
+const { requireAuth, requireAdmin, requireOfficial, requireDirector, requireScorer } = require('../../middlewares/auth.middleware')
 
 // GET  /api/partidos?estado=en_vivo&deporte=tenis&categoria_id=1
 router.get('/', controller.getAll)
@@ -20,11 +20,19 @@ router.post('/:id/deshacer', requireAuth, requireOfficial, controller.undoEvent)
 // POST /api/partidos
 router.post('/', requireAuth, requireOfficial, controller.create)
 // PUT  /api/partidos/:id
-router.put('/:id', requireAuth, requireOfficial, controller.update)
+router.put('/:id', requireAuth, requireScorer, controller.update)
 // PUT  /api/partidos/:id/participantes  — renombrar o reasignar participantes
 router.put('/:id/participantes', requireAuth, requireOfficial, controller.updateParticipants)
+// PUT  /api/partidos/:id/reasignar-juez — reasignar juez
+router.put('/:id/reasignar-juez', requireAuth, requireDirector, controller.reassignJudge)
+// PUT  /api/partidos/:id/cancelar — bajar o cancelar partido
+router.put('/:id/cancelar', requireAuth, requireDirector, controller.cancelMatch)
+// PUT  /api/partidos/:id/reactivar — reactivar partido cancelado
+router.put('/:id/reactivar', requireAuth, requireDirector, controller.reactivateMatch)
 // PUT  /api/partidos/:id/marcador  — actualizar sets en vivo
-router.put('/:id/marcador', requireAuth, requireOfficial, controller.updateMarcador)
+router.put('/:id/correccion', requireAuth, requireDirector, controller.correctScore)
+router.put('/:id/sustitucion', requireAuth, requireDirector, controller.substitute)
+router.put('/:id/marcador', requireAuth, requireScorer, controller.updateMarcador)
 // DELETE /api/partidos/:id
 router.delete('/:id', requireAuth, requireAdmin, controller.remove)
 

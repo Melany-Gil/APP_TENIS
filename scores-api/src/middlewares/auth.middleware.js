@@ -52,4 +52,6 @@ exports.requireRoles = (...allowedRoles) => async (req, res, next) => {
 }
 
 exports.requireAdmin = exports.requireRoles('admin')
-exports.requireOfficial = exports.requireRoles('admin', 'juez')
+exports.requireDirector = exports.requireRoles('admin', 'juez_director')
+exports.requireScorer = exports.requireRoles('admin', 'juez')
+exports.requireOfficial = exports.requireRoles('admin', 'juez_director', 'juez')

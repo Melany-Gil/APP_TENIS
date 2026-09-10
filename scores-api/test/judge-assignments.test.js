@@ -35,6 +35,28 @@ test('la bandeja del juez solicita solamente sus partidos asignados', async () =
   assert.deepEqual(receivedFilters, { juez_id: 12, orden: 'asc' })
 })
 
+test('director puede supervisar todos los partidos sin ampliar la lista del juez ordinario', async () => {
+  let filters
+  const service = loadService({}, { async getAll(value) { filters = value; return [] } })
+  await service.getManagedMatches({ id: 99, rol: 'juez_director' })
+  assert.deepEqual(filters, { orden: 'asc' })
+})
+
+test('deshacer no permite eliminar una corrección supervisada ni reabrir cancelados', async () => {
+  for (const estado of ['en_vivo', 'cancelado']) {
+    const connection = {
+      async beginTransaction() {}, async commit() {}, async rollback() {}, release() {},
+      async query(sql) {
+        if (sql.includes('SELECT * FROM partidos')) return [[{ id: 10, juez_id: 3, estado }]]
+        if (sql.includes('SELECT id, tipo')) return [[{ id: 20, tipo: 'correccion' }]]
+        throw new Error('No debe escribir')
+      },
+    }
+    const service = loadService({ getConnection: async () => connection }, {})
+    await assert.rejects(service.undoLastEvent(10, { id: 3, rol: 'juez' }), (e) => e.status === 409)
+  }
+})
+
 test('reintentar el mismo UUID no inserta otro punto incluso si ya finalizó', async () => {
   let inserts = 0
   const event = { tipo: 'punto', ganador: 'jugador1', motivo: 'ace', client_action_id: require('node:crypto').randomUUID(), expected_revision: '0:0' }

@@ -17,6 +17,8 @@ const {
   requireAuth,
   requireAdmin,
   requireOfficial,
+  requireScorer,
+  requireDirector,
 } = require('../src/middlewares/auth.middleware')
 
 const routes = {
@@ -61,7 +63,8 @@ test('las operaciones de administración siguen protegidas', () => {
     [routes.equipos, 'post', '/', requireAdmin],
     [routes.jugadores, 'post', '/', requireAdmin],
     [routes.partidos, 'post', '/', requireOfficial],
-    [routes.partidos, 'put', '/:id/marcador', requireOfficial],
+    [routes.partidos, 'put', '/:id/marcador', requireScorer],
+    ...['correccion', 'sustitucion', 'reasignar-juez', 'cancelar', 'reactivar'].map((action) => [routes.partidos, 'put', `/:id/${action}`, requireDirector]),
     [routes.partidos, 'post', '/:id/iniciar', requireOfficial],
     [routes.partidos, 'put', '/:id/pausa', requireOfficial],
     [routes.partidos, 'put', '/:id/saque', requireOfficial],

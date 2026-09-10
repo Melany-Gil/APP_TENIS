@@ -19,6 +19,7 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
   const [totalSets, setTotalSets] = useState(0)
   const [selectedSet, setSelectedSet] = useState(null)
   const [loading, setLoading] = useState(!initialStats)
+  const [hasCorrections, setHasCorrections] = useState(false)
 
   const loadStats = useCallback(({ silent = false } = {}) => {
     if (!matchId) return
@@ -27,6 +28,7 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
       .then((response) => {
         setStats(response.data?.estadisticas || null)
         setTotalSets(Number(response.data?.total_sets || 0))
+        setHasCorrections(Boolean(response.data?.tiene_correcciones))
       })
       .catch(() => setStats(null))
       .finally(() => {
@@ -50,12 +52,14 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
       <div className='text-center py-8' style={{ color: 'var(--text-muted)' }}>
         <BarChart3 className='w-7 h-7 mx-auto mb-2 opacity-40' />
         <p className='text-sm'>Aún no hay estadísticas disponibles.</p>
+        {hasCorrections && <p className='text-xs mt-2'>El marcador contiene una corrección supervisada; no se generan estadísticas de puntos que no fueron registrados.</p>}
       </div>
     )
   }
 
   return (
     <div className='space-y-4'>
+      {hasCorrections && <p className='text-xs rounded-lg p-3 bg-amber-500/10'>Este marcador tiene correcciones supervisadas. Las estadísticas conservan los puntos registrados y pueden no coincidir con los games corregidos.</p>}
       <p className='text-xs' style={{ color: 'var(--text-muted)' }}>Solo incluye acciones confirmadas por el servidor. Los aces y errores dependen de los motivos registrados por el juez. El porcentaje de primeros saques se calcula sobre los puntos con servicio registrado.</p>
       {totalSets > 1 && (
         <div className='flex gap-1.5 flex-wrap'>

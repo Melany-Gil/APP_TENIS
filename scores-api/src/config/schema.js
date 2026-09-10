@@ -79,9 +79,9 @@ const columnForeignKeyExists = async (tableName, columnName) => {
 
 exports.ensureSchema = async () => {
   const roleType = await getColumnType('users', 'rol')
-  if (roleType && !roleType.includes("'juez'")) {
+  if (roleType && !roleType.includes("'juez_director'")) {
     await db.query(
-      "ALTER TABLE users MODIFY rol ENUM('admin','juez','miembro') NOT NULL DEFAULT 'miembro'"
+      "ALTER TABLE users MODIFY rol ENUM('admin','juez_director','juez','miembro') NOT NULL DEFAULT 'miembro'"
     )
   }
 
@@ -401,11 +401,26 @@ exports.ensureSchema = async () => {
   `)
 
   const eventType = await getColumnType('eventos_partido', 'tipo')
-  if (eventType && !eventType.includes("'cambio_servidor'")) {
+  if (eventType && !eventType.includes("'correccion'")) {
     await db.query(
-      "ALTER TABLE eventos_partido MODIFY tipo ENUM('punto','primera_falta','let','cambio_servidor') NOT NULL"
+      "ALTER TABLE eventos_partido MODIFY tipo ENUM('punto','primera_falta','let','cambio_servidor','correccion') NOT NULL"
     )
   }
+
+  if (!(await columnExists('partidos', 'control_version'))) {
+    await db.query('ALTER TABLE partidos ADD COLUMN control_version INT UNSIGNED NOT NULL DEFAULT 0')
+  }
+  await db.query(`CREATE TABLE IF NOT EXISTS auditoria_control_partido (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    partido_id INT NOT NULL,
+    created_by INT NOT NULL,
+    accion VARCHAR(40) NOT NULL,
+    detalle JSON NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_auditoria_partido (partido_id, created_at),
+    CONSTRAINT fk_auditoria_partido FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE,
+    CONSTRAINT fk_auditoria_usuario FOREIGN KEY (created_by) REFERENCES users(id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS estado_en_vivo_partido (

@@ -20,6 +20,15 @@ exports.getMe = async (req, res) => {
   }
 }
 
+// GET /api/users/jueces — oficiales (jueces, juez director, admin)
+exports.getJudges = async (req, res) => {
+  try {
+    return success(res, await service.getJudges())
+  } catch (err) {
+    return error(res, err.message || 'Error al obtener jueces', err.status || 500)
+  }
+}
+
 // GET /api/users/:id — solo admin
 exports.getById = async (req, res) => {
   try {

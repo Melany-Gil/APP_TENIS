@@ -7,6 +7,7 @@ const MAX_SETS = 127
 const MATCH_SELECT = `
   SELECT
     p.id,
+    p.control_version,
     p.torneo_id,
     p.deporte,
     p.estado,
@@ -366,7 +367,7 @@ exports.update = async (id, body, actor) => {
          origen_partido1_id = ?, origen_partido2_id = ?, juez_id = ?, cancha_id = ?,
          mejor_de_sets = ?, juegos_por_set = ?, diferencia_juegos = ?,
          modo_game = ?, set_decisivo = ?, tiebreak_en = ?, tiebreak_puntos = ?,
-         match_tiebreak_puntos = ?, servidor_inicial = ?
+         match_tiebreak_puntos = ?, servidor_inicial = ?, control_version = control_version + 1
      WHERE id = ?`,
     [
       match.torneo_id,
@@ -548,7 +549,7 @@ exports.updateParticipants = async (id, data, user) => {
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
 
   const match = existing[0]
-  if (user.rol !== 'admin' && Number(match.juez_id) !== Number(user.id)) {
+  if (user.rol !== 'admin' && user.rol !== 'juez_director' && Number(match.juez_id) !== Number(user.id)) {
     throw { status: 403, message: 'No tienes permiso para modificar este partido' }
   }
 
@@ -558,6 +559,9 @@ exports.updateParticipants = async (id, data, user) => {
   const participantFields = ['jugador1_id', 'jugador2_id', 'equipo1_id', 'equipo2_id']
   const changedFields = participantFields.filter((key) => data[key] !== undefined)
   if (changedFields.length) {
+    if (user.rol === 'juez_director') {
+      throw { status: 403, message: 'Utiliza la sustitución supervisada desde el panel del director' }
+    }
     const doubles = Boolean(match.equipo1_id || match.equipo2_id)
     const allowed = doubles ? ['equipo1_id', 'equipo2_id'] : ['jugador1_id', 'jugador2_id']
     for (const key of changedFields) {
@@ -914,7 +918,7 @@ function normalizeActor(actor) {
 }
 
 function assertCanManage(match, actor) {
-  if (actor.rol === 'admin') return
+  if (actor.rol === 'admin' || actor.rol === 'juez_director') return
   if (
     actor.rol === 'juez' &&
     (Number(match.juez_id) === actor.id ||
@@ -928,7 +932,7 @@ function assertCanManage(match, actor) {
 async function validateJudge(judgeId) {
   if (!judgeId) return
   const [rows] = await db.query(
-    "SELECT id FROM users WHERE id = ? AND rol IN ('juez','admin') AND activo = TRUE LIMIT 1",
+    "SELECT id FROM users WHERE id = ? AND rol IN ('juez','juez_director','admin') AND activo = TRUE LIMIT 1",
     [judgeId]
   )
   if (!rows.length) throw { status: 400, message: 'El juez seleccionado no está disponible' }
@@ -1018,6 +1022,7 @@ function formatSummary(row) {
   const breakpoint = snapshot && isLiveMatch ? computeBreakpoint(snapshot, matchConfig) : null
   const match = {
     id: row.id,
+    control_version: Number(row.control_version || 0),
     deporte: row.deporte,
     modalidad: row.torneo_modalidad || (row.e1_id || row.e2_id ? 'dobles' : 'individual'),
     torneo: row.torneo_id

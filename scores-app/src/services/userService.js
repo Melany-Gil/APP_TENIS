@@ -2,6 +2,7 @@ import api from './api'
 
 export const userService = {
   getAll: (params = {}) => api.get('/users', { params }),
+  getJudges: () => api.get('/users/jueces'),
   create: (data) => api.post('/users', data),
   getById: (id) => api.get(`/users/${id}`),
   updateRole: (id, rol) => api.put(`/users/${id}/rol`, { rol }),
