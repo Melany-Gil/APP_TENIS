@@ -1,4 +1,8 @@
+// El celular de acceso aplica al ingreso general (miembro + admin).
+// Jueces usan el modo juez por alias; no se les habilita acceso por celular.
 const invalid = (message) => { throw { status: 400, message } }
+const GENERAL_ACCESS_ROLES = new Set(['miembro', 'admin'])
+exports.GENERAL_ACCESS_ROLES = GENERAL_ACCESS_ROLES
 
 // Colombian mobile numbers: accept local, +57 and 0057 notation.
 exports.normalizePhone = (value) => {
@@ -22,17 +26,30 @@ exports.identity = (data, role) => {
   if (document && !/^\d{5,20}$/.test(document)) invalid('El documento debe tener entre 5 y 20 dígitos')
   if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 150)) invalid('Correo inválido (máximo 150 caracteres)')
   if (phone && phone.length > 20) invalid('El teléfono admite hasta 20 caracteres')
-  const phoneKey = role === 'miembro' ? exports.normalizePhone(phone) : null
+  const phoneKey = GENERAL_ACCESS_ROLES.has(role) ? exports.normalizePhone(phone) : null
   if (role === 'miembro' && !document && !phoneKey && !username) invalid('Asigna un usuario de acceso al miembro; no necesita cédula, correo ni celular')
   return { document, email, phone, phoneKey }
 }
 
 exports.assertPhoneAvailable = async (db, key, id = 0) => {
   if (!key) return
-  const [members] = await db.query("SELECT id, telefono FROM users WHERE rol = 'miembro' AND id != ?", [id])
+  // El ingreso general comparte espacio de identificadores (miembro + admin):
+  // un celular no puede repetirse ni coincidir con documento/usuario de otro.
+  const [members] = await db.query("SELECT id, telefono FROM users WHERE rol IN ('miembro', 'admin') AND id != ?", [id])
   for (const member of members) {
     let other
     try { other = exports.normalizePhone(member.telefono) } catch { continue }
-    if (other === key) throw { status: 409, message: 'Ese celular pertenece a otro miembro. Usa un celular diferente; no se pueden compartir credenciales de acceso.' }
+    if (other === key) throw { status: 409, message: 'Ese celular pertenece a otra cuenta de acceso general. Usa un celular diferente; no se pueden compartir credenciales de acceso.' }
+  }
+  try {
+    const [cross] = await db.query(
+      "SELECT id FROM users WHERE id != ? AND (numero_documento = ? OR usuario = ?) LIMIT 1",
+      [id, key, key]
+    )
+    if (cross.length) throw { status: 409, message: 'Ese celular coincide con el documento o usuario de otra cuenta. Usa otro número o pide al administrador revisar ese identificador.' }
+  } catch (err) {
+    if (err.status === 409) throw err
+    // Si la columna `usuario` aún no existe, se omite ese chequeo cruzado.
+    if (err.code !== 'ER_BAD_FIELD_ERROR') throw err
   }
 }

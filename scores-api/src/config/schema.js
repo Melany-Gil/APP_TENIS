@@ -90,7 +90,7 @@ exports.ensureSchema = async () => {
   }
   if (!(await uniqueColumnIndexExists('users', 'telefono_acceso'))) {
     const { normalizePhone } = require('../utils/memberIdentity')
-    const [members] = await db.query("SELECT id, telefono FROM users WHERE rol = 'miembro'")
+    const [members] = await db.query("SELECT id, telefono FROM users WHERE rol IN ('miembro', 'admin')")
     const phones = new Map()
     for (const member of members) {
       try {
@@ -98,11 +98,32 @@ exports.ensureSchema = async () => {
         if (key) phones.set(key, [...(phones.get(key) || []), member.id])
       } catch { /* Existing invalid contact data must not prevent startup. */ }
     }
+    // No se cruza aquí con documento/usuario: esos choques se bloquean al
+    // crear/editar y se resuelven desde Administración sin adivinar cuentas.
     for (const [key, ids] of phones) {
       // Shared numbers require an admin to resolve them; never pick an account.
       if (ids.length === 1) await db.query('UPDATE users SET telefono_acceso = ? WHERE id = ?', [key, ids[0]])
     }
     await db.query('ALTER TABLE users ADD UNIQUE KEY uq_users_telefono_acceso (telefono_acceso)')
+  }
+  // Cuentas creadas antes de habilitar el acceso por celular para admin:
+  // inicializa números históricos válidos y no repetidos sin tocar los ya asignados.
+  try {
+    const { normalizePhone: normalizeAdminPhone } = require('../utils/memberIdentity')
+    const [admins] = await db.query("SELECT id, telefono, telefono_acceso FROM users WHERE rol = 'admin' AND telefono_acceso IS NULL AND telefono IS NOT NULL")
+    for (const admin of admins) {
+      let key = null
+      try { key = normalizeAdminPhone(admin.telefono) } catch { continue }
+      if (!key) continue
+      try {
+        await db.query('UPDATE users SET telefono_acceso = ? WHERE id = ?', [key, admin.id])
+      } catch (err) {
+        // Duplicado con otra cuenta: se deja en NULL para resolución manual.
+        if (err.code !== 'ER_DUP_ENTRY') throw err
+      }
+    }
+  } catch (err) {
+    if (err.code !== 'ER_BAD_FIELD_ERROR') throw err
   }
   if (!(await columnExists('users', 'session_version'))) {
     await db.query('ALTER TABLE users ADD COLUMN session_version INT UNSIGNED NOT NULL DEFAULT 0')

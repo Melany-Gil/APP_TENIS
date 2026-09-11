@@ -37,7 +37,19 @@ exports.update = (id, actorId, data) => mutate(id, actorId, async (conn, user) =
   const details = identity(fields, user.rol)
   await assertPhoneAvailable(conn, details.phoneKey, id)
   if (fields.usuario && !/^[a-zA-Z0-9._-]{3,50}$/.test(fields.usuario)) fail('Usuario inválido: usa de 3 a 50 letras, números, puntos o guiones')
-  await validateIdentifierCrossing(conn, { documento: fields.numero_documento, usuario: fields.usuario, id })
+  await validateIdentifierCrossing(conn, { documento: details.document, usuario: fields.usuario || null, telefono_acceso: details.phoneKey, id })
+  if (details.document) {
+    const [dupDoc] = await conn.query('SELECT id FROM users WHERE numero_documento = ? AND id != ? LIMIT 1', [details.document, id])
+    if (dupDoc.length) fail('Ese documento ya está registrado en otra cuenta', 409)
+  }
+  if (details.email) {
+    const [dupMail] = await conn.query('SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1', [details.email, id])
+    if (dupMail.length) fail('Ese correo ya está registrado en otra cuenta', 409)
+  }
+  if (fields.usuario) {
+    const [dupAlias] = await conn.query('SELECT id FROM users WHERE usuario = ? AND id != ? LIMIT 1', [fields.usuario, id])
+    if (dupAlias.length) fail('Ese usuario ya está en uso por otra cuenta', 409)
+  }
   await conn.query('UPDATE users SET nombre = ?, apellido = ?, numero_documento = ?, email = ?, telefono = ?, usuario = ?, telefono_acceso = ? WHERE id = ?', [fields.nombre, fields.apellido, details.document, details.email, details.phone, fields.usuario || null, details.phoneKey, id])
 })
 
@@ -47,6 +59,7 @@ exports.updateRole = (id, actorId, rol) => mutate(id, actorId, async (conn, user
   protect()
   const details = identity(user, rol)
   await assertPhoneAvailable(conn, details.phoneKey, id)
+  await validateIdentifierCrossing(conn, { documento: details.document, usuario: user.usuario || null, telefono_acceso: details.phoneKey, id })
   await conn.query('UPDATE users SET rol = ?, telefono_acceso = ?, session_version = session_version + 1 WHERE id = ?', [rol, details.phoneKey, id])
 })
 

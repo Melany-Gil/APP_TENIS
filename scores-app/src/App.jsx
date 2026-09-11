@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import AppRouter from './routes'
 import ConfirmDialog from './components/ui/ConfirmDialog'
+import EmailRequiredDialog from './components/profile/EmailRequiredDialog'
 import useUIStore from './store/useUIStore'
 
 export default function App() {
@@ -19,6 +20,8 @@ export default function App() {
       <AppRouter />
       {/* Diálogo de confirmación global — invocado vía confirm() en utils/confirm.js */}
       <ConfirmDialog />
+      {/* Recolección de correo pendiente — bloquea hasta guardar o cerrar sesión */}
+      <EmailRequiredDialog />
     </>
   )
 }

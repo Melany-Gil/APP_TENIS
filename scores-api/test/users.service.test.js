@@ -95,8 +95,10 @@ test('crear usuario guarda el alias y valida que no esté repetido', async () =>
     async query(sql, params) {
       calls.push({ sql, params })
       if (/information_schema\.COLUMNS/.test(sql)) return [[{ total: 1 }]]
-      if (/numero_documento = \? OR email = \?/.test(sql)) return [[]]
+      if (/SELECT id FROM users WHERE numero_documento = \? LIMIT 1/.test(sql)) return [[]]
+      if (/SELECT id FROM users WHERE email = \? LIMIT 1/.test(sql)) return [[]]
       if (/SELECT id FROM users WHERE usuario = \? LIMIT 1/.test(sql)) return [[]]
+      if (/SELECT id FROM users WHERE id != \? AND/.test(sql)) return [[]]
       if (/AND id != \?/.test(sql)) return [[]]
       if (/INSERT INTO users/.test(sql)) return [{ insertId: 11 }]
       return [[{
@@ -132,7 +134,8 @@ test('crear usuario rechaza un alias ya usado por otra cuenta', async () => {
   const fakeDb = {
     async query(sql) {
       if (/information_schema\.COLUMNS/.test(sql)) return [[{ total: 1 }]]
-      if (/numero_documento = \? OR email = \?/.test(sql)) return [[]]
+      if (/SELECT id FROM users WHERE numero_documento = \? LIMIT 1/.test(sql)) return [[]]
+      if (/SELECT id FROM users WHERE email = \? LIMIT 1/.test(sql)) return [[]]
       if (/SELECT id FROM users WHERE usuario = \? LIMIT 1/.test(sql)) return [[{ id: 3 }]]
       return [[]]
     },
@@ -158,7 +161,8 @@ test('crear cuenta por documento sin alias funciona aunque la columna usuario a�
     async query(sql, params) {
       calls.push({ sql, params })
       if (/information_schema\.COLUMNS/.test(sql)) return [[{ total: 0 }]]
-      if (/numero_documento = \? OR email = \?/.test(sql)) return [[]]
+      if (/SELECT id FROM users WHERE numero_documento = \? LIMIT 1/.test(sql)) return [[]]
+      if (/SELECT id FROM users WHERE email = \? LIMIT 1/.test(sql)) return [[]]
       if (/INSERT INTO users/.test(sql)) return [{ insertId: 12 }]
       return [[{ id: 12, numero_documento: '5', nombre: 'A', apellido: 'B', email: 'a@b.com', rol: 'miembro', activo: 1 }]]
     },
@@ -184,6 +188,7 @@ test('updateUsuario permite fijar y retirar el alias', async () => {
       calls.push({ sql, params })
       if (/information_schema\.COLUMNS/.test(sql)) return [[{ total: 1 }]]
       if (/SELECT id FROM users WHERE id = \?/.test(sql)) return [[{ id: 7 }]]
+      if (/SELECT id FROM users WHERE id != \? AND/.test(sql)) return [[]]
       if (/SELECT id FROM users WHERE usuario = \? AND id != \?/.test(sql)) return [[]]
       if (/SELECT id FROM users WHERE numero_documento = \? AND id != \?/.test(sql)) return [[]]
       if (/UPDATE users SET usuario/.test(sql)) return [{ affectedRows: 1 }]
@@ -230,4 +235,58 @@ test('no permite quitar el único usuario de acceso de un miembro sin otros dato
     assert.fail('No debe escribir ni dejar la cuenta sin acceso')
   } })
   await assert.rejects(service.updateUsuario(7, ''), { status: 400 })
+})
+
+test('crear cuenta rechaza documento duplicado con mensaje específico', async () => {
+  const service = loadService({ async query(sql) {
+    if (/information_schema/.test(sql)) return [[{ total: 1 }]]
+    if (/SELECT id FROM users WHERE numero_documento = \? LIMIT 1/.test(sql)) return [[{ id: 9 }]]
+    if (/INSERT/.test(sql)) assert.fail('No debe guardar documento duplicado')
+    return [[]]
+  } })
+  await assert.rejects(
+    service.create({ numero_documento: '12345', nombre: 'A', apellido: 'Beca', email: 'nuevo@test.com', password: 'Secret123' }),
+    (error) => error.status === 409 && /documento ya está registrado/.test(error.message)
+  )
+})
+
+test('crear cuenta rechaza correo duplicado con mensaje específico', async () => {
+  const service = loadService({ async query(sql) {
+    if (/information_schema/.test(sql)) return [[{ total: 1 }]]
+    if (/SELECT id FROM users WHERE email = \? LIMIT 1/.test(sql)) return [[{ id: 9 }]]
+    if (/INSERT/.test(sql)) assert.fail('No debe guardar correo duplicado')
+    return [[]]
+  } })
+  await assert.rejects(
+    service.create({ numero_documento: '99999', nombre: 'A', apellido: 'Beca', email: 'duplicado@test.com', password: 'Secret123' }),
+    (error) => error.status === 409 && /correo ya está registrado/.test(error.message)
+  )
+})
+
+test('crear cuenta rechaza celular que coincide con documento de otra cuenta', async () => {
+  const service = loadService({ async query(sql) {
+    if (/information_schema/.test(sql)) return [[{ total: 1 }]]
+    if (/numero_documento = \? OR usuario = \?/.test(sql)) return [[{ id: 9 }]]
+    if (/INSERT/.test(sql)) assert.fail('No debe guardar celular en conflicto cruzado')
+    return [[]]
+  } })
+  await assert.rejects(
+    service.create({ nombre: 'A', apellido: 'Beca', telefono: '3001234567', password: 'Secret123' }),
+    (error) => error.status === 409 && /coincide/.test(error.message)
+  )
+})
+
+test('updateMe normaliza el correo antes de comprobar duplicados', async () => {
+  const calls = []
+  const service = loadService({ async query(sql, params) {
+    calls.push({ sql, params })
+    if (/information_schema/.test(sql)) return [[{ total: 1 }]]
+    if (/SELECT id, rol, numero_documento/.test(sql)) return [[{ id: 7, rol: 'miembro', numero_documento: null, email: 'viejo@test.com', telefono: null, usuario: 'ana.garcia' }]]
+    if (/SELECT id FROM users WHERE email = \? AND id != \?/.test(sql)) {
+      assert.deepEqual(params, ['nuevo@test.com', 7])
+      return [[{ id: 9 }]]
+    }
+    return [[]]
+  } })
+  await assert.rejects(service.updateMe(7, { email: 'NUEVO@test.com' }), (error) => error.status === 409 && /correo ya está en uso/.test(error.message))
 })

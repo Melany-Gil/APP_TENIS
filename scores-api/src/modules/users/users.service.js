@@ -78,14 +78,15 @@ const createAccount = async ({
   const aliasSupported = aliasReady ?? await hasUsuarioColumn()
   const alias = aliasSupported ? normalizeUsuario(usuario) : null
   if (!aliasSupported && usuario) throw { status: 503, message: 'El acceso por usuario se está preparando. Reintenta en unos minutos.' }
-  if (aliasSupported) await validateIdentifierCrossing(executor, { documento: numero_documento, usuario: alias })
+  if (aliasSupported) await validateIdentifierCrossing(executor, { documento: numero_documento, usuario: alias, telefono_acceso: details.phoneKey })
 
-  const [existing] = await executor.query(
-    'SELECT id FROM users WHERE numero_documento = ? OR email = ? LIMIT 1',
-    [numero_documento, email]
-  )
-  if (existing.length) {
-    throw { status: 409, message: 'El documento o correo ya está registrado' }
+  if (numero_documento) {
+    const [dupDoc] = await executor.query('SELECT id FROM users WHERE numero_documento = ? LIMIT 1', [numero_documento])
+    if (dupDoc.length) throw { status: 409, message: 'Ese documento ya está registrado en otra cuenta' }
+  }
+  if (email) {
+    const [dupMail] = await executor.query('SELECT id FROM users WHERE email = ? LIMIT 1', [email])
+    if (dupMail.length) throw { status: 409, message: 'Ese correo ya está registrado en otra cuenta' }
   }
   if (alias) {
     const [dupAlias] = await executor.query('SELECT id FROM users WHERE usuario = ? LIMIT 1', [alias])
@@ -196,10 +197,14 @@ exports.updateMe = async (id, { nombre, apellido, telefono, email }) => {
   if (!existing.length) throw { status: 404, message: 'Usuario no encontrado' }
   const current = existing[0]
   const details = identity({ ...current, email: email === undefined ? current.email : email, telefono: telefono === undefined ? current.telefono : telefono }, current.rol)
+  // Solo se valida el celular nuevo (assert cubre duplicado y cruce con
+  // documento/usuario ajenos). No se re-validan documento/usuario propios,
+  // que no cambian aquí, para no bloquear el perfil por choques históricos
+  // que solo un admin puede resolver.
   await assertPhoneAvailable(db, details.phoneKey, id)
 
-  if (email) {
-    const [dup] = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, id])
+  if (details.email) {
+    const [dup] = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [details.email, id])
     if (dup.length) throw { status: 409, message: 'Ese correo ya está en uso por otra cuenta' }
   }
 

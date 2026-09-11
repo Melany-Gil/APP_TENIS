@@ -24,7 +24,9 @@ El filtro de estado permite encontrar también cuentas inactivas.
 Las nuevas cuentas de miembros se crean con nombres, apellidos, usuario único
 y contraseña. Celular, correo y cédula son opcionales y se guardan como NULL,
 no como documentos o correos inventados. Administradores y jueces siguen
-necesitando correo y documento. Un miembro existente con documento puede
+necesitando correo y documento al crearse, pero un administrador también puede
+guardar su celular y luego ingresar con usuario, correo, celular o documento
+en el acceso general. Un miembro existente con documento puede
 conservar su acceso por documento aunque no tenga celular.
 
 El login general tiene un único campo «Ingresa tu usuario, correo o celular» para
@@ -39,7 +41,8 @@ El celular siempre requiere contraseña: no es una verificación por SMS.
 Sin correo, la recuperación se solicita al administrador.
 
 Se aceptan 10 dígitos colombianos, +57 y 0057. Un celular de acceso no puede
-pertenecer a dos miembros, incluidos inactivos. Si ya había números compartidos
+pertenecer a dos cuentas de acceso general (miembro o admin), incluidos inactivos,
+ni coincidir con el documento o usuario de otra cuenta. Si ya había números compartidos
 o inválidos, no se asigna arbitrariamente una cuenta: el admin puede asignar un
 usuario de acceso o corregir el celular. El documento anterior sigue
 funcionando. No se importan formularios ni se crean cuentas automáticamente.

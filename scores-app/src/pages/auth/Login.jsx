@@ -40,7 +40,7 @@ export default function Login() {
       navigate(redirectTo, { replace: true })
     } catch (error) {
       setError('identificador', {
-        message: error.message || 'Documento, usuario o contraseña incorrectos',
+        message: error.message || 'Usuario, correo, celular o contraseña incorrectos',
       })
     }
   }

@@ -12,7 +12,11 @@ test('miembro admite NULL en cédula/correo, no credenciales inventadas', () => 
   assert.throws(() => identity({ telefono: '3001234567' }, 'admin'), { status: 400 })
 })
 test('celulares históricos compartidos también bloquean nuevas cuentas', async () => {
-  const db = { query: async () => [[{ id: 3, telefono: '+57 300 1234567' }]] }
+  const db = { query: async (sql) => {
+    // El chequeo cruzado documento/usuario no debe bloquear estos números de prueba.
+    if (sql.includes('telefono_acceso') || sql.includes('numero_documento = ? OR usuario')) return [[]]
+    return [[{ id: 3, telefono: '+57 300 1234567' }]]
+  } }
   await assert.rejects(assertPhoneAvailable(db, '3001234567', 2), { status: 409 })
   await assertPhoneAvailable(db, '3011234567', 2)
 })
