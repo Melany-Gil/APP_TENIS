@@ -18,7 +18,7 @@ import {
   UserRound,
   WifiOff,
 } from 'lucide-react'
-import { ArtCourt, ArtDirector, ArtFormat, ArtJudge, ArtLogin, ArtPanel, ArtScore } from '../components/help/HelpArt'
+import { ArtCourt, ArtDirector, ArtFormat, ArtJudge, ArtLogin, ArtPanel, ArtScore, ArtServe } from '../components/help/HelpArt'
 
 export default function Ayuda() {
   const userRol = useAuthStore((store) => store.user?.rol)
