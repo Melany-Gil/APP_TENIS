@@ -78,6 +78,9 @@ const columnForeignKeyExists = async (tableName, columnName) => {
 
 
 exports.ensureSchema = async () => {
+  if (!(await columnExists('users', 'session_version'))) {
+    await db.query('ALTER TABLE users ADD COLUMN session_version INT UNSIGNED NOT NULL DEFAULT 0')
+  }
   const roleType = await getColumnType('users', 'rol')
   if (roleType && !roleType.includes("'juez_director'")) {
     await db.query(

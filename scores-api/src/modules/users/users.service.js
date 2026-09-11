@@ -40,9 +40,10 @@ const userWithPlayer = (withUsuario) => `
   LEFT JOIN jugadores j ON j.user_id = u.id
 `
 
-exports.getAll = async () => {
+exports.getAll = async ({ estado = 'activos' } = {}) => {
+  if (!['activos', 'inactivos', 'todos'].includes(estado)) throw { status: 400, message: 'Filtro de estado inválido' }
   const [rows] = await db.query(
-    `${userWithPlayer(await hasUsuarioColumn())} WHERE u.activo = TRUE ORDER BY u.created_at DESC`
+    `${userWithPlayer(await hasUsuarioColumn())} ${estado === 'todos' ? '' : `WHERE u.activo = ${estado === 'activos' ? 'TRUE' : 'FALSE'}`} ORDER BY u.created_at DESC`
   )
   return rows.map(formatUser)
 }
@@ -150,17 +151,7 @@ exports.getJudges = async () => {
 }
 
 exports.updateRole = async (id, rol, requesterId) => {
-  if (!['admin', 'juez_director', 'juez', 'miembro'].includes(rol)) {
-    throw { status: 400, message: 'Rol inválido. Debe ser "admin", "juez_director", "juez" o "miembro"' }
-  }
-  if (Number(id) === Number(requesterId)) {
-    throw { status: 400, message: 'No puedes cambiar tu propio rol' }
-  }
-
-  const [existing] = await db.query('SELECT id FROM users WHERE id = ?', [id])
-  if (!existing.length) throw { status: 404, message: 'Usuario no encontrado' }
-
-  await db.query('UPDATE users SET rol = ?, updated_at = NOW() WHERE id = ?', [rol, id])
+  await require('./users.admin.service').updateRole(id, requesterId, rol)
   return exports.getById(id)
 }
 
@@ -192,7 +183,7 @@ exports.changePassword = async (id, currentPassword, newPassword) => {
   if (!rows.length) throw { status: 404, message: 'Usuario no encontrado' }
 
   const match = await bcrypt.compare(currentPassword, rows[0].password)
-  if (!match) throw { status: 401, message: 'La contraseña actual es incorrecta' }
+  if (!match) throw { status: 400, message: 'La contraseña actual es incorrecta' }
 
   const hashed = await bcrypt.hash(newPassword, 12)
   await db.query('UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?', [hashed, id])

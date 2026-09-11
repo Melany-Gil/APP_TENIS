@@ -6,7 +6,7 @@ const mailer = require('../../config/mailer')
 const { generateOTP } = require('../../utils/otp')
 
 const signToken = (user) =>
-  jwt.sign({ id: user.id, rol: user.rol || 'miembro' }, process.env.JWT_SECRET, {
+  jwt.sign({ id: user.id, rol: user.rol || 'miembro', session_version: Number(user.session_version || 0) }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '8h',
   })
 

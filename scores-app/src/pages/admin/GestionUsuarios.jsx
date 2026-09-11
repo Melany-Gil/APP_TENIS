@@ -8,11 +8,15 @@ import { confirm } from '../../utils/confirm'
 import { formatDate } from '../../utils/formatDate'
 import Button from '../../components/ui/Button'
 import Avatar from '../../components/ui/Avatar'
+import UserEditor from '../../components/admin/UserEditor'
 
 export default function GestionUsuarios() {
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [estado, setEstado] = useState('activos')
+  const [editor, setEditor] = useState(null)
+  const [actionBusy, setActionBusy] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [editingUsuarioId, setEditingUsuarioId] = useState(null)
   const [usuarioDraft, setUsuarioDraft] = useState('')
@@ -30,7 +34,7 @@ export default function GestionUsuarios() {
   const fetchAll = () => {
     setLoading(true)
     userService
-      .getAll()
+      .getAll({ estado: 'todos' })
       .then((r) => setUsuarios(r.data || []))
       .catch(() => addToast({ type: 'error', title: 'Error al cargar usuarios' }))
       .finally(() => setLoading(false))
@@ -75,6 +79,7 @@ export default function GestionUsuarios() {
   }
 
   const changeRol = async (usuario, newRol) => {
+    if (actionBusy) return
     if (usuario.id === me?.id) {
       addToast({ type: 'error', title: 'No puedes cambiarte el rol a ti mismo' })
       return
@@ -93,16 +98,42 @@ export default function GestionUsuarios() {
       danger: newRol === 'admin',
     })
     if (!ok) return
+    setActionBusy(true)
     try {
       await userService.updateRole(usuario.id, newRol)
       addToast({ type: 'success', title: 'Rol actualizado' })
       fetchAll()
     } catch (err) {
       addToast({ type: 'error', title: 'Error', message: err.message })
+    } finally {
+      setActionBusy(false)
     }
   }
 
-  const filtered = usuarios.filter((u) =>
+  const changeAccess = async (u, remove = false) => {
+    if (actionBusy) return
+    const ok = await confirm({
+      title: remove ? 'Eliminar usuario definitivamente' : u.activo ? 'Desactivar usuario' : 'Reactivar usuario',
+      message: remove
+        ? `Se eliminará la cuenta de ${u.nombre} ${u.apellido}. Si tiene historial vinculado, la eliminación se bloqueará y te explicaremos el motivo. Puedes desactivarla sin perder sus registros.`
+        : u.activo ? 'Esta cuenta no podrá acceder y sus sesiones se invalidarán. Los partidos, jugadores y el historial se conservan.' : 'Esta cuenta podrá volver a iniciar sesión con sus credenciales.',
+      danger: remove || u.activo,
+      requireText: remove ? `${u.nombre} ${u.apellido}` : undefined,
+      confirmLabel: remove ? 'Eliminar cuenta' : u.activo ? 'Desactivar' : 'Reactivar',
+    })
+    if (!ok) return
+    setActionBusy(true)
+    try {
+      if (remove) await userService.remove(u.id)
+      else await userService.setActive(u.id, !u.activo)
+      addToast({ type: 'success', title: remove ? 'Usuario eliminado' : 'Estado actualizado' })
+      fetchAll()
+    } catch (err) {
+      if (!remove || !err.status) addToast({ type: 'error', title: 'No se pudo completar la operación', message: err.message || 'Comprueba tu conexión y reintenta.' })
+    } finally { setActionBusy(false) }
+  }
+
+  const filtered = usuarios.filter((u) => (estado === 'todos' || Boolean(u.activo) === (estado === 'activos')) &&
     `${u.nombre} ${u.apellido} ${u.email} ${u.numero_documento} ${u.usuario || ''}`
       .toLowerCase()
       .includes(search.toLowerCase())
@@ -325,6 +356,11 @@ export default function GestionUsuarios() {
       </div>
 
       {/* Lista */}
+      <label className='flex items-center gap-3 text-sm'>Estado de las cuentas
+        <select className='form-input w-auto' value={estado} onChange={(e) => setEstado(e.target.value)}>
+          <option value='activos'>Activas</option><option value='inactivos'>Inactivas</option><option value='todos'>Todas</option>
+        </select>
+      </label>
       <div className='card overflow-hidden'>
         {loading ? (
           Array(4)
@@ -338,7 +374,7 @@ export default function GestionUsuarios() {
           filtered.map((u, i) => (
             <div
               key={u.id}
-              className='flex items-center gap-3 px-4 py-3'
+              className='flex flex-wrap items-center gap-3 px-4 py-3'
               style={{
                 borderBottom: i < filtered.length - 1 ? '1px solid var(--border-color)' : 'none',
               }}
@@ -352,7 +388,7 @@ export default function GestionUsuarios() {
               />
 
               {/* Info */}
-              <div className='flex-1 min-w-0'>
+              <div className='flex-1 min-w-0 basis-40'>
                 <div className='flex items-center gap-2'>
                   <p
                     className='text-sm font-semibold truncate'
@@ -418,6 +454,7 @@ export default function GestionUsuarios() {
                     </p>
                   ))}
                 <p className='text-[10px]' style={{ color: 'var(--text-muted)' }}>
+                  {u.activo ? 'Cuenta activa · ' : 'Cuenta inactiva · '}
                   Registrado {formatDate(u.created_at)}
                 </p>
                 {u.jugador && (
@@ -432,7 +469,8 @@ export default function GestionUsuarios() {
                 <select
                   value={u.rol}
                   onChange={(event) => changeRol(u, event.target.value)}
-                  disabled={u.id === me?.id}
+                  disabled={u.id === me?.id || actionBusy}
+                  aria-label={`Rol de ${u.nombre} ${u.apellido}`}
                   className='form-input py-1.5 text-xs w-32 disabled:opacity-50'
                   title={
                     u.id === me?.id
@@ -446,14 +484,21 @@ export default function GestionUsuarios() {
                   <option value='admin'>Admin</option>
                 </select>
               </div>
+              <div className='w-full flex flex-wrap gap-2 pt-2' aria-label={`Acciones de ${u.nombre} ${u.apellido}`}>
+                <Button size='sm' variant='secondary' disabled={actionBusy} onClick={() => setEditor({ user: u, mode: 'edit' })}>Editar datos</Button>
+                <Button size='sm' variant='secondary' disabled={actionBusy || u.id === me?.id} onClick={() => setEditor({ user: u, mode: 'password' })}>Restablecer contraseña</Button>
+                <Button size='sm' variant='secondary' disabled={actionBusy || u.id === me?.id} onClick={() => changeAccess(u)}>{u.activo ? 'Desactivar' : 'Reactivar'}</Button>
+                <Button size='sm' variant='danger' disabled={actionBusy || u.id === me?.id} onClick={() => changeAccess(u, true)}>Eliminar</Button>
+              </div>
             </div>
           ))
         )}
       </div>
 
       <p className='text-xs text-center' style={{ color: 'var(--text-muted)' }}>
-        Selecciona el rol para definir los permisos de cada cuenta
+        Desactivar conserva el historial. Eliminar es definitivo y solo se permite sin registros vinculados. Gestiona tu propia contraseña desde Mi perfil.
       </p>
+      {editor && <UserEditor {...editor} onClose={() => setEditor(null)} onSaved={() => { addToast({ type: 'success', title: 'Cambios guardados' }); fetchAll() }} />}
     </div>
   )
 }

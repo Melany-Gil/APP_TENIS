@@ -1,11 +1,12 @@
 const service = require('./users.service')
+const adminService = require('./users.admin.service')
 const { success, error } = require('../../utils/response')
 const { deleteUpload, toPublicUploadPath } = require('../../middlewares/upload.middleware')
 
 // GET /api/users — solo admin
 exports.getAll = async (req, res) => {
   try {
-    return success(res, await service.getAll())
+    return success(res, await service.getAll(req.query))
   } catch (err) {
     return error(res, err.message || 'Error al obtener usuarios', err.status || 500)
   }
@@ -49,7 +50,7 @@ exports.create = async (req, res) => {
 
 exports.updateRole = async (req, res) => {
   try {
-    return success(res, await service.updateRole(req.params.id, req.body.rol, req.user.id))
+    return success(res, await adminService.updateRole(req.params.id, req.user.id, req.body.rol))
   } catch (err) {
     return error(res, err.message || 'Error al actualizar rol', err.status || 500)
   }
@@ -105,5 +106,15 @@ exports.changePassword = async (req, res) => {
     return success(res, await service.changePassword(req.user.id, currentPassword, newPassword))
   } catch (err) {
     return error(res, err.message || 'Error al cambiar contraseña', err.status || 500)
+  }
+}
+
+for (const [name, payload] of Object.entries({ update: (req) => req.body, setActive: (req) => req.body.activo, resetPassword: (req) => req.body.password, remove: () => undefined })) {
+  exports[name] = async (req, res) => {
+    try {
+      return success(res, await adminService[name](req.params.id, req.user.id, payload(req)))
+    } catch (err) {
+      return error(res, err.status ? err.message : 'No se pudo completar la operación. Reintenta.', err.status || 500)
+    }
   }
 }

@@ -52,6 +52,10 @@ router.post(
   controller.create
 )
 router.get('/:id', requireAuth, requireAdmin, controller.getById)
+router.put('/:id', requireAuth, requireAdmin, controller.update)
+router.put('/:id/estado', requireAuth, requireAdmin, controller.setActive)
+router.put('/:id/password', requireAuth, requireAdmin, controller.resetPassword)
+router.delete('/:id', requireAuth, requireAdmin, controller.remove)
 router.put(
   '/:id/rol',
   requireAuth,

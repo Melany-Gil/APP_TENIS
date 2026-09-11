@@ -33,7 +33,7 @@ test('HTTP: rol real protege supervisión y lista de jueces no expone datos priv
       role = actualRole
       for (const action of ['reasignar-juez', 'cancelar', 'reactivar', 'sustitucion', 'correccion']) {
         const response = await fetch(`${base}/partidos/10/${action}`, { method: 'PUT', headers, body: JSON.stringify({ expected_control_version: 0 }) })
-        assert.equal(response.status, 403)
+        assert.equal(response.status, actualRole ? 403 : 401)
       }
     }
     role = 'juez_director'
@@ -48,6 +48,13 @@ test('HTTP: rol real protege supervisión y lista de jueces no expone datos priv
     assert.doesNotMatch(JSON.stringify(await judges.json()), /numero_documento|email|telefono|password/)
     const admin = await fetch(`${base}/users`, { headers })
     assert.equal(admin.status, 403)
+    for (const actualRole of ['juez_director', 'juez', 'miembro']) {
+      role = actualRole
+      for (const [method, path] of [['PUT', '/users/2'], ['PUT', '/users/2/password'], ['PUT', '/users/2/estado'], ['DELETE', '/users/2']]) {
+        const response = await fetch(`${base}${path}`, { method, headers, body: '{}' })
+        assert.equal(response.status, 403)
+      }
+    }
   } finally {
     await new Promise((resolve) => server.close(resolve))
     server.closeAllConnections()
