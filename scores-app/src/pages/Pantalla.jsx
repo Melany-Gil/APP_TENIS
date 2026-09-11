@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Maximize2, Radio, Trophy } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import MatchStats from '../components/match/MatchStats'
-import ClayCourt from '../components/match/ClayCourt'
 import MatchJudge from '../components/match/MatchJudge'
 import MatchPhoto from '../components/match/MatchPhoto'
 import { SPONSORS } from '../data/sponsors'
@@ -437,7 +436,6 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
                 </div>
                 <span className='rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/55'>En tiempo real</span>
               </div>
-              <div className='mb-5'><ClayCourt match={match} /></div>
               <MatchPhoto key={match.id} matchId={match.id} dark />
               <MatchStats matchId={match.id} player1={p1} player2={p2} />
             </section>

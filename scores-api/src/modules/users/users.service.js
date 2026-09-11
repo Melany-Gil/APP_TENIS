@@ -192,11 +192,19 @@ exports.updateRole = async (id, rol, requesterId) => {
   return exports.getById(id)
 }
 
-exports.updateMe = async (id, { nombre, apellido, telefono, email }) => {
+exports.updateMe = async (id, { nombre, apellido, telefono, email, numero_documento }) => {
   const [existing] = await db.query('SELECT id, rol, numero_documento, email, telefono, usuario FROM users WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Usuario no encontrado' }
   const current = existing[0]
-  const details = identity({ ...current, email: email === undefined ? current.email : email, telefono: telefono === undefined ? current.telefono : telefono }, current.rol)
+  // El documento solo puede registrarse la primera vez desde el propio perfil
+  // (diálogo de datos pendientes). Si ya existe, solo el admin puede corregirlo.
+  const wantsDoc = numero_documento !== undefined
+  const newDocRaw = wantsDoc ? String(numero_documento ?? '').trim() : ''
+  if (current.numero_documento && wantsDoc && newDocRaw && newDocRaw !== String(current.numero_documento)) {
+    throw { status: 400, message: 'Tu documento ya está registrado. Pide al administrador si necesitas corregirlo.' }
+  }
+  const effectiveDoc = current.numero_documento || newDocRaw || null
+  const details = identity({ ...current, numero_documento: effectiveDoc, email: email === undefined ? current.email : email, telefono: telefono === undefined ? current.telefono : telefono }, current.rol)
   // Solo se valida el celular nuevo (assert cubre duplicado y cruce con
   // documento/usuario ajenos). No se re-validan documento/usuario propios,
   // que no cambian aquí, para no bloquear el perfil por choques históricos
@@ -208,6 +216,14 @@ exports.updateMe = async (id, { nombre, apellido, telefono, email }) => {
     if (dup.length) throw { status: 409, message: 'Ese correo ya está en uso por otra cuenta' }
   }
 
+  // El documento es nuevo (antes NULL): evita duplicados y cruces con
+  // usuario/celular de acceso de otras cuentas, que romperían el ingreso.
+  if (!current.numero_documento && details.document) {
+    const [dupDoc] = await db.query('SELECT id FROM users WHERE numero_documento = ? AND id != ? LIMIT 1', [details.document, id])
+    if (dupDoc.length) throw { status: 409, message: 'Ese documento ya está registrado en otra cuenta' }
+    await validateIdentifierCrossing(db, { documento: details.document, usuario: current.usuario || null, telefono_acceso: details.phoneKey, id })
+  }
+
   await db.query(
     `UPDATE users
      SET nombre = COALESCE(?, nombre),
@@ -215,9 +231,10 @@ exports.updateMe = async (id, { nombre, apellido, telefono, email }) => {
          telefono = ?,
          email = ?,
          telefono_acceso = ?,
+         numero_documento = COALESCE(?, numero_documento),
          updated_at = NOW()
      WHERE id = ?`,
-    [nombre || null, apellido || null, details.phone, details.email, details.phoneKey, id]
+    [nombre || null, apellido || null, details.phone, details.email, details.phoneKey, details.document, id]
   )
 
   return exports.getById(id)

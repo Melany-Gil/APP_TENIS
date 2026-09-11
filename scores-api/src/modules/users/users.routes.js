@@ -15,6 +15,7 @@ router.put(
     body('apellido').optional().trim().isLength({ min: 2, max: 100 }),
     body('email').optional({ values: 'falsy' }).trim().isEmail(),
     body('telefono').optional({ values: 'falsy' }).trim().isLength({ max: 20 }),
+    body('numero_documento').optional({ values: 'falsy' }).trim().isLength({ min: 5, max: 20 }).matches(/^\d+$/).withMessage('Documento inválido'),
   ],
   validate,
   controller.updateMe

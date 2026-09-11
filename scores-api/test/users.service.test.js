@@ -290,3 +290,35 @@ test('updateMe normaliza el correo antes de comprobar duplicados', async () => {
   } })
   await assert.rejects(service.updateMe(7, { email: 'NUEVO@test.com' }), (error) => error.status === 409 && /correo ya está en uso/.test(error.message))
 })
+
+test('updateMe permite registrar el documento solo la primera vez', async () => {
+  const service = loadService({ async query(sql) {
+    if (/information_schema/.test(sql)) return [[{ total: 1 }]]
+    if (/SELECT id, rol, numero_documento/.test(sql)) return [[{ id: 7, rol: 'miembro', numero_documento: null, email: null, telefono: null, usuario: 'ana.garcia' }]]
+    if (/SELECT id FROM users WHERE numero_documento/.test(sql)) return [[]]
+    if (/UPDATE users/.test(sql)) return [{ affectedRows: 1 }]
+    if (/FROM users u/.test(sql)) return [[{ id: 7, numero_documento: '55554444', nombre: 'A', apellido: 'B', email: null, rol: 'miembro', activo: 1 }]]
+    return [[]]
+  } })
+  const updated = await service.updateMe(7, { numero_documento: '55554444' })
+  assert.equal(updated.numero_documento, '55554444')
+})
+
+test('updateMe bloquea cambiar un documento ya registrado', async () => {
+  const service = loadService({ async query(sql) {
+    if (/information_schema/.test(sql)) return [[{ total: 1 }]]
+    if (/SELECT id, rol, numero_documento/.test(sql)) return [[{ id: 7, rol: 'miembro', numero_documento: '11111', email: null, telefono: null, usuario: 'ana.garcia' }]]
+    return [[]]
+  } })
+  await assert.rejects(service.updateMe(7, { numero_documento: '22222' }), (error) => error.status === 400 && /ya está registrado/.test(error.message))
+})
+
+test('updateMe rechaza documento duplicado de otra cuenta', async () => {
+  const service = loadService({ async query(sql) {
+    if (/information_schema/.test(sql)) return [[{ total: 1 }]]
+    if (/SELECT id, rol, numero_documento/.test(sql)) return [[{ id: 7, rol: 'miembro', numero_documento: null, email: null, telefono: null, usuario: 'ana.garcia' }]]
+    if (/SELECT id FROM users WHERE numero_documento/.test(sql)) return [[{ id: 9 }]]
+    return [[]]
+  } })
+  await assert.rejects(service.updateMe(7, { numero_documento: '55554444' }), (error) => error.status === 409 && /documento ya está registrado/.test(error.message))
+})
