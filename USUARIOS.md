@@ -27,9 +27,15 @@ no como documentos o correos inventados. Administradores y jueces siguen
 necesitando correo y documento. Un miembro existente con documento puede
 conservar su acceso por documento aunque no tenga celular.
 
-El login ofrece primero «Con usuario» para miembros, jueces y administradores,
-y conserva «Con documento» y «Con celular (miembros)». Son accesos separados para no confundir un celular con
-una cédula. El celular siempre requiere contraseña: no es una verificación por SMS.
+El login general tiene un único campo «Ingresa tu usuario, correo o celular» para
+miembros y administradores, sin radios ni selección de tipo de dato. También
+reconoce el documento de cuentas existentes por compatibilidad. Si el dato coincide
+con dos personas distintas, no elige una: debe usarse un identificador sin conflicto.
+El enlace «Ingresar como juez» cambia el formulario en la misma página a usuario
+y contraseña para jueces y juez director; «Volver al ingreso general» lo restaura.
+El backend aplica la separación de roles para los nuevos modos general/juez.
+Los modos antiguos de API se conservan por compatibilidad con clientes anteriores.
+El celular siempre requiere contraseña: no es una verificación por SMS.
 Sin correo, la recuperación se solicita al administrador.
 
 Se aceptan 10 dígitos colombianos, +57 y 0057. Un celular de acceso no puede

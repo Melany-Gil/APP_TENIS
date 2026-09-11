@@ -33,6 +33,44 @@ const judgeRow = {
   password: passwordHash,
 }
 
+test('ingreso general busca usuario, correo, celular y documento compatible sin escoger entre personas', async () => {
+  for (const value of ['ana.garcia', 'ANA@example.com', '+57 3001234567']) {
+    const service = loadService({ async query(sql, params) {
+      assert.match(sql, /rol IN \('miembro', 'admin'\)/)
+      assert.match(sql, /usuario = \? OR email = \? OR telefono_acceso = \? OR numero_documento = \?/)
+      assert.match(sql, /LIMIT 2/)
+      assert.equal(params[1], value.toLowerCase())
+      assert.equal(params[2], value.startsWith('+57') ? '3001234567' : null)
+      return [[{ ...judgeRow, rol: 'miembro' }]]
+    } })
+    assert.ok((await service.login({ identificador: value, tipo_acceso: 'general', password: 'Secret123' })).token)
+  }
+})
+test('identificadores ambiguos de personas distintas no generan una sesión', async () => {
+  const service = loadService({ query: async () => [[judgeRow, { ...judgeRow, id: 8 }]] })
+  await assert.rejects(service.login({ identificador: '3001234567', tipo_acceso: 'general', password: 'Secret123' }), { status: 401 })
+})
+test('acceso de jueces solo consulta alias de juez o juez director', async () => {
+  for (const role of ['juez', 'juez_director']) {
+    const service = loadService({ async query(sql, params) {
+      assert.match(sql, /rol IN \('juez', 'juez_director'\) AND usuario = \?/)
+      assert.doesNotMatch(sql, /email =|telefono_acceso =|numero_documento =/)
+      assert.deepEqual(params, ['juan.perez'])
+      return [[{ ...judgeRow, rol: role }]]
+    } })
+    const result = await service.login({ identificador: 'juan.perez', tipo_acceso: 'juez', password: 'Secret123' })
+    assert.equal(result.user.rol, role)
+  }
+})
+test('modo nuevo rechaza cuenta fuera de su acceso o contraseña inválida sin conceder sesión', async () => {
+  for (const mode of ['general', 'juez']) {
+    for (const rows of [[], [judgeRow]]) {
+      const service = loadService({ query: async () => [rows] })
+      await assert.rejects(service.login({ identificador: 'juan.perez', tipo_acceso: mode, password: 'incorrecta' }), { status: 401 })
+    }
+  }
+})
+
 test('miembro inicia con celular y contraseña sin correo ni documento', async () => {
   const service = loadService({ async query(sql, params) {
     assert.match(sql, /telefono_acceso = \?/)

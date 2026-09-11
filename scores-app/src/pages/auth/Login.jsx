@@ -10,7 +10,8 @@ import Input from '../../components/ui/Input'
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
-  const [accessType, setAccessType] = useState('usuario')
+  const [accessType, setAccessType] = useState('general')
+  const judgeAccess = accessType === 'juez'
   const { login } = useAuthStore()
   const { addToast } = useUIStore()
   const navigate = useNavigate()
@@ -21,6 +22,7 @@ export default function Login() {
     handleSubmit,
     setError,
     resetField,
+    setFocus,
     formState: { errors, isSubmitting },
   } = useForm()
 
@@ -73,20 +75,8 @@ export default function Login() {
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className='flex flex-col gap-5'>
-        <fieldset disabled={isSubmitting}>
-          <legend className='form-label mb-2'>¿Cómo quieres ingresar?</legend>
-          <div className='flex flex-col gap-3'>
-            {[['usuario', 'Con usuario'], ['documento', 'Con documento'], ['celular', 'Con celular (miembros)']].map(([value, label]) => (
-              <label key={value} className='flex items-center gap-2 text-sm'>
-                <input type='radio' name='tipo_acceso' value={value} checked={accessType === value}
-                  onChange={() => { setAccessType(value); resetField('identificador'); resetField('password') }} />
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
         <div className='form-group'>
-          <label htmlFor='login-identifier' className='form-label'>{accessType === 'celular' ? 'Número de celular' : accessType === 'documento' ? 'Número de documento' : 'Usuario de acceso'}</label>
+          <label htmlFor='login-identifier' className='form-label'>{judgeAccess ? 'Nombre de usuario' : 'Usuario, correo o celular'}</label>
           <div className='relative'>
             <UserRound
               className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none'
@@ -95,18 +85,20 @@ export default function Login() {
             <input
               id='login-identifier'
               autoComplete='username'
-              inputMode={accessType === 'celular' ? 'tel' : 'text'}
-              placeholder={accessType === 'celular' ? 'Ej. 3001234567' : accessType === 'documento' ? 'Tu documento' : 'Tu usuario asignado'}
+              inputMode='text'
+              autoCapitalize='none'
+              spellCheck={false}
+              placeholder={judgeAccess ? 'Ingresa tu nombre de usuario' : 'Ingresa tu usuario, correo o celular'}
               className={`form-input pl-10 ${errors.identificador ? 'error' : ''}`}
               {...register('identificador', {
-                required: 'Ingresa tu celular, documento o usuario según el acceso seleccionado',
+                required: judgeAccess ? 'Ingresa tu nombre de usuario' : 'Ingresa tu usuario, correo o celular',
                 setValueAs: (value) => (typeof value === 'string' ? value.trim() : value),
               })}
             />
           </div>
           {errors.identificador && <p className='form-error'>{errors.identificador.message}</p>}
           <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
-            {accessType === 'usuario' ? 'Usa el usuario y la contraseña asignados por el administrador. No necesitas correo, celular ni cédula.' : accessType === 'celular' ? 'Usa tu celular colombiano y la contraseña entregada por el administrador.' : 'Puedes ingresar con tu documento si ya está registrado en tu cuenta.'}
+            {judgeAccess ? 'Acceso para jueces de partido y juez director.' : 'Usa cualquiera de estos datos que tengas registrado y tu contraseña.'}
           </p>
         </div>
 
@@ -143,6 +135,16 @@ export default function Login() {
           Iniciar sesión
         </Button>
       </form>
+
+      <button type='button' disabled={isSubmitting} className='block w-full text-center text-sm mt-5 font-medium underline disabled:opacity-50'
+        style={{ color: 'var(--color-brand)' }}
+        onClick={() => {
+          setAccessType(judgeAccess ? 'general' : 'juez')
+          resetField('identificador'); resetField('password'); setShowPassword(false)
+          setFocus('identificador')
+        }}>
+        {judgeAccess ? 'Volver al ingreso general' : 'Ingresar como juez'}
+      </button>
 
       <Link
         to='/'

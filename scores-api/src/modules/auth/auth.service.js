@@ -49,7 +49,7 @@ const mailFromAddress = () => {
 }
 
 exports.login = async ({ identificador, numero_documento, password, tipo_acceso }) => {
-  if (tipo_acceso !== undefined && !['documento', 'usuario', 'celular'].includes(tipo_acceso)) {
+  if (tipo_acceso !== undefined && !['general', 'juez', 'documento', 'usuario', 'celular'].includes(tipo_acceso)) {
     throw { status: 400, message: 'Tipo de acceso inválido' }
   }
   // Acepta documento o alias único. Se conserva `numero_documento` por
@@ -60,6 +60,22 @@ exports.login = async ({ identificador, numero_documento, password, tipo_acceso 
   }
 
   let rows
+  if (tipo_acceso === 'general' || tipo_acceso === 'juez') {
+    if (credential.length > 150 || typeof password !== 'string' || !password) throw { status: 400, message: 'Completa tus datos de ingreso' }
+    if (tipo_acceso === 'juez') {
+      ;[rows] = await db.query("SELECT * FROM users WHERE activo = TRUE AND rol IN ('juez', 'juez_director') AND usuario = ? LIMIT 2", [credential])
+    } else {
+      let phone = null
+      try { phone = normalizePhone(credential) } catch { /* A username/email need not be a phone. */ }
+      // Document remains a compatibility fallback for accounts already using it.
+      // Never prefer one person over another when identifiers collide.
+      ;[rows] = await db.query("SELECT * FROM users WHERE activo = TRUE AND rol IN ('miembro', 'admin') AND (usuario = ? OR email = ? OR telefono_acceso = ? OR numero_documento = ?) LIMIT 2", [credential, credential.toLowerCase(), phone, credential])
+    }
+    if (rows.length !== 1 || !(await bcrypt.compare(password, rows[0].password))) {
+      throw { status: 401, message: 'No pudimos iniciar sesión. Revisa tus datos y el acceso seleccionado; si persiste, consulta al administrador.' }
+    }
+    return { token: signToken(rows[0]), user: publicUser(rows[0]) }
+  }
   if (tipo_acceso === 'celular') {
     const phone = normalizePhone(credential)
     ;[rows] = await db.query("SELECT * FROM users WHERE activo = TRUE AND rol = 'miembro' AND telefono_acceso = ? LIMIT 2", [phone])
