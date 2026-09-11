@@ -32,10 +32,11 @@ export default function Ayuda() {
         <h1 className='text-2xl sm:text-4xl font-black mt-3' style={{ letterSpacing: '-0.03em', lineHeight: 1.1 }}>
           Aprende a usar la app, paso a paso
         </h1>
-        <p className='text-sm mt-3 max-w-xl' style={{ color: 'rgba(255,255,255,.75)' }}>
-          Instructivo para miembros y jueces del Subcomité de Tenis. Las ilustraciones son animadas
-          y sirven de mapa: los pasos y botones son los reales de la aplicación.
-        </p>
+          <p className='text-sm mt-3 max-w-xl' style={{ color: 'rgba(255,255,255,.75)' }}>
+            Instructivo para miembros y jueces del Subcomité de Tenis. Los dibujos son esquemas animados
+            hechos para esta guía, no capturas de pantalla: los pasos y botones que describen sí son los
+            reales de la aplicación.
+          </p>
         <div className='tabs mt-5 max-w-md' role='tablist' aria-label='Elige tu guía'>
           <button
             type='button'
@@ -126,7 +127,8 @@ function MemberGuide() {
         >
           <p>
             No hay registro público: el administrador crea tu cuenta desde <strong>Administración → Usuarios</strong> con
-            tus nombres, un usuario único y una contraseña temporal. Celular, correo y cédula pueden venir vacíos.
+            tus nombres, un usuario único y una contraseña inicial que luego podrás cambiar en tu perfil. Celular, correo
+            y cédula pueden venir vacíos.
           </p>
           <p>
             Tu cuenta puede estar <strong>vinculada a tu ficha de jugador</strong>: así tu panel muestra tu agenda,
@@ -379,8 +381,7 @@ function JudgeGuide() {
         >
           <p>
             Cada acción se guarda en una <strong>cola local ordenada</strong> y se envía sola al recuperar la conexión.
-            Verás el aviso <strong><WifiOff size={13} className='inline' /> Sin conexión · acciones en cola</strong> y el
-            conteo pendiente.
+            Verás el aviso <strong>“Sin conexión · los puntos se guardarán aquí”</strong> y el conteo pendiente.
           </p>
           <p>
             Si un supervisor corrigió el partido mientras estabas offline, tu cola queda <strong>en revisión</strong>:
