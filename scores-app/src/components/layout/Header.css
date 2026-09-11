@@ -1,0 +1,43 @@
+/* Dos zonas independientes: marca/cuenta arriba, módulos debajo.
+   Sticky conserva su altura real: no hay offsets fijos ni enlaces ocultos. */
+.top-navigation .top-navigation-primary {
+  justify-content: space-between;
+  gap: 12px;
+  height: auto;
+  min-height: 70px;
+  padding-block: 8px;
+  flex-wrap: wrap;
+}
+.top-navigation .top-navigation-links-organized {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 1480px;
+  margin-inline: auto;
+  padding: 6px 16px 10px;
+  border-top: 1px solid var(--border-color);
+  gap: 4px;
+}
+.top-navigation .top-navigation-links-organized .top-navigation-link {
+  font-size: 13px;
+  padding: 9px 12px;
+  min-height: 40px;
+}
+.top-navigation + .app-main { padding-top: 0; }
+@media (max-width: 640px) {
+  .top-navigation .top-navigation-links-organized {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 6px 10px 8px;
+  }
+  .top-navigation .top-navigation-links-organized .top-navigation-link {
+    font-size: 12px;
+    min-height: 34px;
+    padding: 7px 8px;
+    gap: 6px;
+    border-radius: 10px;
+  }
+}
+@media (max-width: 440px) {
+  .top-navigation .top-navigation-links-organized { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

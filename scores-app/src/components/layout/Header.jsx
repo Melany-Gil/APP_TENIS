@@ -19,6 +19,7 @@ import useAuthStore from '../../store/useAuthStore'
 import { cn } from '../../utils/cn'
 import ThemeToggle from '../common/ThemeToggle'
 import ProfileMenu from './ProfileMenu'
+import './Header.css'
 
 const MOCK_NOTIFS = []
 
@@ -56,7 +57,7 @@ export default function Header() {
   const unread = MOCK_NOTIFS.filter((notification) => !notification.read).length
 
   return (
-    <header className='app-header top-navigation fixed inset-x-0 top-0 z-50'>
+    <header className='app-header top-navigation sticky top-0 z-50'>
       <div className='top-navigation-primary'>
         <div className='top-navigation-brands'>
           <Link to='/' aria-label='Ir al inicio del Club Unión'>
@@ -80,13 +81,6 @@ export default function Header() {
             />
           </a>
         </div>
-
-        <nav
-          className='top-navigation-links top-navigation-links-desktop'
-          aria-label='Navegación principal'
-        >
-        <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} />
-        </nav>
 
         <div className='top-navigation-actions'>
           <ThemeToggle />
@@ -152,8 +146,8 @@ export default function Header() {
       </div>
 
       <nav
-        className='top-navigation-links top-navigation-links-mobile'
-        aria-label='Navegación principal móvil'
+        className='top-navigation-links top-navigation-links-organized'
+        aria-label='Navegación principal'
       >
             <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} />
       </nav>

@@ -1,4 +1,5 @@
-.clay-court { display: block; width: 100%; max-height: 230px; }
+.clay-court-stage { perspective: 900px; padding: 12px 8px 20px; }
+.clay-court { display: block; width: 100%; max-height: 250px; overflow: visible; transform: rotateX(22deg) rotateZ(-1deg); filter: drop-shadow(0 12px 8px rgba(51, 29, 17, .22)); }
 .clay-court-ball { transform: translate(65px, 150px); animation: clay-rally 7s ease-in-out infinite; animation-play-state: paused; }
 .clay-court-moving .clay-court-ball { animation-play-state: running; }
 @keyframes clay-rally {
