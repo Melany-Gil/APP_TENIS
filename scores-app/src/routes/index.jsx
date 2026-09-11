@@ -33,6 +33,7 @@ const Profile = lazy(() => import('../pages/Profile'))
 const Settings = lazy(() => import('../pages/Settings'))
 const Sponsors = lazy(() => import('../pages/Sponsors'))
 const Pantalla = lazy(() => import('../pages/Pantalla'))
+const Ayuda = lazy(() => import('../pages/Ayuda'))
 
 // ── Admin ─────────────────────────────────────────────────
 const Dashboard = lazy(() => import('../pages/admin/Dashboard'))
@@ -88,6 +89,7 @@ export default function AppRouter() {
         <Route path='/sponsors' element={<Sponsors />} />
         <Route path='/padel' element={<Padel />} />
         <Route path='/match/:id' element={<Match />} />
+        <Route path='/ayuda' element={<Ayuda />} />
         <Route path='/player/:id' element={<Player />} />
         <Route path='/team/:id' element={<Team />} />
         <Route

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, Radio, Trophy, Star, User, Settings, LogOut, ShieldCheck, LogIn, Handshake, Gavel } from 'lucide-react'
+import { BookOpen, Home, Radio, Trophy, Star, User, Settings, LogOut, ShieldCheck, LogIn, Handshake, Gavel } from 'lucide-react'
 import { useEffect } from 'react'
 import useUIStore from '../../store/useUIStore'
 import useAuthStore from '../../store/useAuthStore'
@@ -12,6 +12,7 @@ const NAV_FULL = [
   { to: '/live', icon: Radio, label: 'En Vivo', dot: true },
   { to: '/tennis', icon: Trophy, label: 'Tenis' },
   { to: '/favorites', icon: Star, label: 'Favoritos' },
+  { to: '/ayuda', icon: BookOpen, label: 'Ayuda' },
   { divider: true },
   { to: '/profile', icon: User, label: 'Mi Perfil' },
   { to: '/settings', icon: Settings, label: 'Configuración' },

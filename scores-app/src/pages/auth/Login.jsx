@@ -157,6 +157,13 @@ export default function Login() {
       <p className='text-center text-sm mt-7' style={{ color: 'var(--text-muted)' }}>
         ¿No tienes acceso o no registraste correo para recuperar tu contraseña? Contacta al administrador.
       </p>
+      <Link
+        to='/ayuda'
+        className='block text-center text-sm mt-3 font-medium'
+        style={{ color: 'var(--color-brand)' }}
+      >
+        ¿Cómo uso la app? Ver guía de miembros y jueces
+      </Link>
     </div>
   )
 }

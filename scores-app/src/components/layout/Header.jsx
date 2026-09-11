@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import {
   Bell,
+  BookOpen,
   Megaphone,
   CheckCheck,
   Gavel,
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { to: '/tennis', icon: Trophy, label: 'Tenis' },
   { to: '/sponsors', icon: Handshake, label: 'Patrocinadores' },
   { to: '/anuncios', icon: Megaphone, label: 'Avisos' },
+  { to: '/ayuda', icon: BookOpen, label: 'Ayuda' },
   { to: '/favorites', icon: Star, label: 'Favoritos' },
   { to: '/profile', icon: User, label: 'Mi perfil' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
