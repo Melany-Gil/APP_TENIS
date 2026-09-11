@@ -65,6 +65,8 @@ const MATCH_SELECT = `
     j2.apellido AS j2_apellido,
     j2.foto     AS j2_foto,
     e1.id     AS e1_id,
+    e1.jugador1_id AS e1_jugador1_id,
+    e1.jugador2_id AS e1_jugador2_id,
     e1.nombre AS e1_nombre,
     e2.id     AS e2_id,
     e2.nombre AS e2_nombre,
@@ -210,9 +212,11 @@ exports.getMyMatches = async (userId) => {
   const [rows] = await db.query(
     `${MATCH_SELECT}
      WHERE p.jugador1_id = ? OR p.jugador2_id = ?
+        OR e1.jugador1_id = ? OR e1.jugador2_id = ?
+        OR e2.jugador1_id = ? OR e2.jugador2_id = ?
      ORDER BY p.fecha_inicio IS NULL, p.fecha_inicio DESC,
               p.hora_inicio IS NULL, p.hora_inicio DESC, p.id DESC`,
-    [player.id, player.id]
+    Array(6).fill(player.id)
   )
 
   if (!rows.length) {
@@ -246,7 +250,8 @@ exports.getMyMatches = async (userId) => {
 
   const matches = rows.map((row) => {
     const match = { ...formatSummary(row), sets: setsByMatch.get(row.id) || [] }
-    const mySide = Number(row.j1_id) === Number(player.id) ? 'jugador1' : 'jugador2'
+    const mySide = [row.j1_id, row.e1_jugador1_id, row.e1_jugador2_id]
+      .some(id => Number(id) === Number(player.id)) ? 'jugador1' : 'jugador2'
     return {
       ...match,
       mi_lado: mySide,

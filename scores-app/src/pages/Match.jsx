@@ -194,6 +194,7 @@ export default function Match() {
           <h2 className='font-bold flex items-center gap-2 mb-4' style={{ color: 'var(--text-primary)' }}>
             <BarChart3 className='w-4 h-4' /> Estadísticas del partido
           </h2>
+          {isDoubles && <p className='text-xs mb-4' style={{ color: 'var(--text-muted)' }}>En dobles, estas estadísticas corresponden a cada pareja completa, no a cada jugador por separado.</p>}
           <MatchStats matchId={match.id} player1={p1.name} player2={p2.name} />
         </section>
       )}

@@ -20,6 +20,7 @@ const DirectorDashboard = lazy(() => import('../pages/judge/DirectorDashboard'))
 
 // ── App ───────────────────────────────────────────────────
 const Home = lazy(() => import('../pages/Home'))
+const PlayerDashboard = lazy(() => import('../pages/PlayerDashboard'))
 const Live = lazy(() => import('../pages/Live'))
 const Tennis = lazy(() => import('../pages/Tennis'))
 const Padel = lazy(() => import('../pages/Padel'))
@@ -79,7 +80,7 @@ export default function AppRouter() {
 
       {/* Consulta pública de marcadores */}
       <Route element={<AppLayout />}>
-        <Route path='/' element={<Home />} />
+        <Route path='/' element={isAuthenticated && user?.rol === 'miembro' ? <PlayerDashboard key={user.id} /> : <Home />} />
         <Route path='/live' element={<Live />} />
         <Route path='/tennis' element={<Tennis />} />
         <Route path='/sponsors' element={<Sponsors />} />

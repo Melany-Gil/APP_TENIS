@@ -203,7 +203,7 @@ function NavigationLinks({ isAdmin, isOfficial }) {
             <item.icon strokeWidth={isActive ? 2.4 : 1.9} aria-hidden='true' />
             {item.dot && <span className='top-navigation-live-dot' />}
           </span>
-          <span>{item.label}</span>
+          <span>{item.to === '/' && user?.rol === 'miembro' ? 'Mi panel' : item.label}</span>
         </>
       )}
     </NavLink>
