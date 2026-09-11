@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import useAuthStore from '../store/useAuthStore'
 import {
   Bell,
   Camera,
@@ -20,7 +21,8 @@ import {
 import { ArtCourt, ArtDirector, ArtFormat, ArtJudge, ArtLogin, ArtPanel, ArtScore } from '../components/help/HelpArt'
 
 export default function Ayuda() {
-  const [tab, setTab] = useState('miembro')
+  const userRol = useAuthStore((store) => store.user?.rol)
+  const [tab, setTab] = useState(['juez', 'juez_director'].includes(userRol) ? 'juez' : 'miembro')
   const isMember = tab === 'miembro'
 
   return (

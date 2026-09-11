@@ -21,6 +21,7 @@ const NAV_FULL = [
 const NAV_JUEZ = [
   { to: '/sponsors', icon: Handshake, label: 'Patrocinadores' },
   { to: '/juez', icon: Gavel, label: 'Juez' },
+  { to: '/ayuda', icon: BookOpen, label: 'Ayuda' },
   { divider: true },
   { to: '/profile', icon: User, label: 'Mi Perfil' },
 ]

@@ -53,6 +53,9 @@ export default function JudgeLayout() {
             <NavLink to='/juez' end className={({ isActive }) => `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`}>
               Mesa de juez
             </NavLink>
+            <NavLink to='/ayuda' className={({ isActive }) => `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`}>
+              Ayuda
+            </NavLink>
             <NavLink to='/juez/perfil' className={({ isActive }) => `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`}>
               Mi perfil
             </NavLink>

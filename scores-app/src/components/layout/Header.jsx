@@ -165,6 +165,7 @@ function NavigationLinks({ isAdmin, isOfficial }) {
   if (isJuez) {
     items = [
       ...NAV_ITEMS.filter((item) => ['/sponsors', '/profile'].includes(item.to)),
+      { to: '/ayuda', icon: BookOpen, label: 'Ayuda' },
       { to: '/juez', icon: Gavel, label: 'Juez' },
     ]
   } else if (isOfficial) {

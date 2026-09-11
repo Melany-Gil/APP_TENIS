@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Home, Radio, Trophy, Star, User, Gavel, Handshake } from 'lucide-react'
+import { BookOpen, Home, Radio, Trophy, Star, User, Gavel, Handshake } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import useAuthStore from '../../store/useAuthStore'
 
@@ -20,7 +20,7 @@ export default function BottomNavigation() {
   const isJuez = user?.rol === 'juez'
 
   const tabs = isJuez
-    ? [SPONSOR_TAB, OFFICIAL_EXTRA, { to: '/profile', icon: User, label: 'Perfil' }]
+    ? [SPONSOR_TAB, OFFICIAL_EXTRA, { to: '/ayuda', icon: BookOpen, label: 'Ayuda' }, { to: '/profile', icon: User, label: 'Perfil' }]
     : isOfficial
       ? [TABS[0], OFFICIAL_EXTRA, ...TABS.slice(1)]
       : TABS

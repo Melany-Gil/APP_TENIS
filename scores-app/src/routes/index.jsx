@@ -57,15 +57,15 @@ const JuezPartidos = lazy(() => import('../pages/judge/JuezPartidos'))
 export default function AppRouter() {
   const { user, isAuthenticated } = useAuthStore()
   const { pathname } = useLocation()
-  // Un juez estándar tiene solo /juez y /juez/perfil
-  if (isAuthenticated && user?.rol === 'juez' && !['/juez', '/juez/perfil'].includes(pathname)) {
+  // Un juez estándar tiene solo /juez, /juez/perfil y la ayuda
+  if (isAuthenticated && user?.rol === 'juez' && !['/juez', '/juez/perfil', '/ayuda'].includes(pathname)) {
     return <Navigate to={pathname === '/profile' ? '/juez/perfil' : '/juez'} replace />
   }
-  // Un juez director tiene acceso a su panel dedicado (/director), a la mesa (/juez) y a su perfil
+  // Un juez director tiene acceso a su panel dedicado (/director), a la mesa (/juez), a su perfil y a la ayuda
   if (
     isAuthenticated &&
     user?.rol === 'juez_director' &&
-    !['/director', '/juez', '/juez/perfil'].includes(pathname)
+    !['/director', '/juez', '/juez/perfil', '/ayuda'].includes(pathname)
   ) {
     return <Navigate to='/director' replace />
   }
