@@ -219,6 +219,10 @@ exports.updateMe = async (id, { nombre, apellido, telefono, email }) => {
 }
 
 exports.changePassword = async (id, currentPassword, newPassword) => {
+  if (typeof currentPassword !== 'string' || !currentPassword || typeof newPassword !== 'string' || newPassword.length < 8 || Buffer.byteLength(newPassword) > 72 || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+    throw { status: 400, message: 'Ingresa tu contraseña actual y una nueva de al menos 8 caracteres, una mayúscula y un número (máximo 72 bytes).' }
+  }
+  if (currentPassword === newPassword) throw { status: 400, message: 'La nueva contraseña debe ser diferente.' }
   const [rows] = await db.query('SELECT password FROM users WHERE id = ?', [id])
   if (!rows.length) throw { status: 404, message: 'Usuario no encontrado' }
 
@@ -226,7 +230,15 @@ exports.changePassword = async (id, currentPassword, newPassword) => {
   if (!match) throw { status: 400, message: 'La contraseña actual es incorrecta' }
 
   const hashed = await bcrypt.hash(newPassword, 12)
-  await db.query('UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?', [hashed, id])
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+    const [updated] = await conn.query('UPDATE users SET password = ?, session_version = session_version + 1, updated_at = NOW() WHERE id = ? AND password = ?', [hashed, id, rows[0].password])
+    if (!updated.affectedRows) throw { status: 409, message: 'La contraseña cambió durante la operación. Vuelve a ingresar.' }
+    await conn.query('UPDATE password_resets SET used = TRUE WHERE user_id = ? AND used = FALSE', [id])
+    await conn.commit()
+  } catch (err) { await conn.rollback(); throw err }
+  finally { conn.release() }
 
   return { message: 'Contraseña actualizada correctamente' }
 }

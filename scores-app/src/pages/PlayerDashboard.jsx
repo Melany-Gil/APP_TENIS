@@ -6,6 +6,7 @@ import { matchService } from '../services/matchService'
 import { useMatchRealtime } from '../hooks/useMatchRealtime'
 import MatchCard from '../components/match/MatchCard'
 import Avatar from '../components/ui/Avatar'
+import LatestAnnouncement from '../components/common/LatestAnnouncement'
 
 export default function PlayerDashboard() {
   const user = useAuthStore(state => state.user)
@@ -65,6 +66,7 @@ export default function PlayerDashboard() {
       </div>
       <Link to='/profile' className='btn-secondary w-full sm:w-auto justify-center px-4 py-2 rounded-xl inline-flex gap-2 text-sm'><UserRound size={16} /> Mi perfil</Link>
     </section>
+    <LatestAnnouncement />
     {loading ? <div className='skeleton h-48 rounded-xl' /> : unlinked ? <section className='card p-6'>
       <h2 className='font-bold'>Vincula tu cuenta con tu ficha de jugador</h2>
       <p className='text-sm mt-2'>Pide al administrador que vincule tu usuario al jugador correspondiente. Aquí aparecerán sus partidos y resultados; no necesitas crear otra cuenta.</p>

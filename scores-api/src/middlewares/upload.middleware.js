@@ -24,7 +24,7 @@ const storage = multer.diskStorage({
       ? 'avatars'
       : file.fieldname === 'foto'
         ? 'players'
-        : 'logos'
+        : file.fieldname === 'imagen' ? 'anuncios' : 'logos'
     const destination = path.join(UPLOAD_ROOT, subfolder)
     fs.mkdirSync(destination, { recursive: true })
     callback(null, destination)
@@ -82,5 +82,19 @@ exports.UPLOAD_ROOT = UPLOAD_ROOT
 exports.uploadAvatar = handleUpload('avatar')
 exports.uploadFoto = handleUpload('foto')
 exports.uploadLogo = handleUpload('logo')
+exports.uploadAnuncio = (req, res, next) => handleUpload('imagen')(req, res, async () => {
+  if (!req.file) return next()
+  const raw = req.file.path
+  const optimized = `${raw}.webp`
+  try {
+    await require('sharp')(raw, { limitInputPixels: 16000000 }).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toFile(optimized)
+    fs.unlinkSync(raw)
+    req.file.path = optimized
+    return next()
+  } catch {
+    for (const filename of [raw, optimized]) { try { fs.unlinkSync(filename) } catch {} }
+    return error(res, 'No se pudo procesar la imagen. Usa una imagen válida de hasta 16 megapíxeles.', 400)
+  }
+})
 exports.toPublicUploadPath = toPublicUploadPath
 exports.deleteUpload = deleteUpload

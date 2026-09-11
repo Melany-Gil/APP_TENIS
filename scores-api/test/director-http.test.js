@@ -31,6 +31,8 @@ test('HTTP: rol real protege supervisión y lista de jueces no expone datos priv
   try {
     for (const actualRole of ['juez', 'miembro', null]) {
       role = actualRole
+      const audit = await fetch(`${base}/partidos/10/auditoria`, { headers })
+      assert.equal(audit.status, actualRole ? 403 : 401)
       for (const action of ['reasignar-juez', 'cancelar', 'reactivar', 'sustitucion', 'correccion']) {
         const response = await fetch(`${base}/partidos/10/${action}`, { method: 'PUT', headers, body: JSON.stringify({ expected_control_version: 0 }) })
         assert.equal(response.status, actualRole ? 403 : 401)

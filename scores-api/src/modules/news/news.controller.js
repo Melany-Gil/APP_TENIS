@@ -1,5 +1,8 @@
 const newsService = require('./news.service')
 const { success, error } = require('../../utils/response')
+const { toPublicUploadPath, deleteUpload } = require('../../middlewares/upload.middleware')
+const payload = req => ({ titulo: req.body.titulo, contenido: req.body.contenido, tipo: req.body.tipo,
+  imagen_url: req.file ? toPublicUploadPath(req.file) : ['true', true].includes(req.body.remove_image) ? null : undefined })
 
 exports.getAll = async (req, res) => {
   try {
@@ -20,9 +23,18 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    return success(res, await newsService.create(req.body, req.user.id), 201)
+    return success(res, await newsService.create(payload(req), req.user.id), 201)
   } catch (err) {
-    return error(res, err.message || 'Error al crear anuncio', err.status || 500)
+    if (req.file) deleteUpload(toPublicUploadPath(req.file))
+    return error(res, err.status ? err.message : 'Error al crear anuncio', err.status || 500)
+  }
+}
+
+exports.update = async (req, res) => {
+  try { return success(res, await newsService.update(req.params.id, payload(req))) }
+  catch (err) {
+    if (req.file) deleteUpload(toPublicUploadPath(req.file))
+    return error(res, err.status ? err.message : 'Error al actualizar anuncio', err.status || 500)
   }
 }
 

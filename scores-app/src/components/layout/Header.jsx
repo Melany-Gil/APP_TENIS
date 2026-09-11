@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import {
   Bell,
+  Megaphone,
   CheckCheck,
   Gavel,
   Handshake,
@@ -17,7 +18,7 @@ import {
 import useAuthStore from '../../store/useAuthStore'
 import { cn } from '../../utils/cn'
 import ThemeToggle from '../common/ThemeToggle'
-import Avatar from '../ui/Avatar'
+import ProfileMenu from './ProfileMenu'
 
 const MOCK_NOTIFS = []
 
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { to: '/live', icon: Radio, label: 'En vivo', dot: true },
   { to: '/tennis', icon: Trophy, label: 'Tenis' },
   { to: '/sponsors', icon: Handshake, label: 'Patrocinadores' },
+  { to: '/anuncios', icon: Megaphone, label: 'Avisos' },
   { to: '/favorites', icon: Star, label: 'Favoritos' },
   { to: '/profile', icon: User, label: 'Mi perfil' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
@@ -139,18 +141,7 @@ export default function Header() {
           </div>
 
           {user ? (
-            <Link
-              to='/profile'
-              className='top-navigation-avatar'
-              aria-label={`Abrir perfil de ${user.nombre}`}
-            >
-              <Avatar
-                src={user.avatar}
-                name={`${user.nombre || ''} ${user.apellido || ''}`}
-                size='sm'
-                className='w-full h-full border-0'
-              />
-            </Link>
+            <ProfileMenu />
           ) : (
             <Link to='/login' className='top-navigation-login'>
               <LogIn className='w-4 h-4' />

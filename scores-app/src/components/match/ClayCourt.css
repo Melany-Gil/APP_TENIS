@@ -1,0 +1,10 @@
+.clay-court { display: block; width: 100%; max-height: 230px; }
+.clay-court-ball { transform: translate(65px, 150px); animation: clay-rally 7s ease-in-out infinite; animation-play-state: paused; }
+.clay-court-moving .clay-court-ball { animation-play-state: running; }
+@keyframes clay-rally {
+  0%, 100% { transform: translate(65px, 150px); }
+  25% { transform: translate(405px, 80px); }
+  50% { transform: translate(70px, 85px); }
+  75% { transform: translate(410px, 160px); }
+}
+@media (prefers-reduced-motion: reduce) { .clay-court-ball { animation: none; } }

@@ -35,6 +35,8 @@ export default function GestionAnuncios() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [image, setImage] = useState(null)
+  const [removeImage, setRemoveImage] = useState(false)
   const [filterTab, setFilterTab] = useState('todos')
   const { addToast } = useUIStore()
 
@@ -59,12 +61,14 @@ export default function GestionAnuncios() {
   }, [])
 
   const openCreate = () => {
+    setImage(null); setRemoveImage(false)
     reset({ tipo: 'noticia' })
     setEditing(null)
     setShowForm(true)
   }
 
   const openEdit = (anuncio) => {
+    setImage(null); setRemoveImage(false)
     setEditing(anuncio)
     reset({ titulo: anuncio.titulo, contenido: anuncio.contenido, tipo: anuncio.tipo })
     setShowForm(true)
@@ -72,14 +76,15 @@ export default function GestionAnuncios() {
 
   const onSubmit = async (data) => {
     try {
+      const payload = new FormData()
+      for (const key of ['titulo', 'contenido', 'tipo']) payload.append(key, data[key])
+      if (image) payload.append('imagen', image)
+      if (removeImage) payload.append('remove_image', 'true')
       if (editing) {
-        // El backend solo tiene create y delete, no update
-        // Borramos y recreamos como workaround
-        await newsService.remove(editing.id)
-        await newsService.create(data)
+        await newsService.update(editing.id, payload)
         addToast({ type: 'success', title: 'Anuncio actualizado' })
       } else {
-        await newsService.create(data)
+        await newsService.create(payload)
         addToast({ type: 'success', title: 'Anuncio creado' })
       }
       setShowForm(false)
@@ -171,6 +176,8 @@ export default function GestionAnuncios() {
               {errors.contenido && <p className='form-error'>{errors.contenido.message}</p>}
             </div>
 
+            <label className='block text-sm'>Imagen opcional (JPEG, PNG o WebP)<input key={editing?.id || 'new'} type='file' accept='image/jpeg,image/png,image/webp' className='block w-full mt-2' onChange={e => setImage(e.target.files?.[0] || null)} /></label>
+            {editing?.imagen_url && <label className='flex gap-2 text-sm'><input type='checkbox' checked={removeImage} onChange={e => setRemoveImage(e.target.checked)} />Quitar imagen actual</label>}
             <div className='flex gap-3'>
               <Button type='submit' loading={isSubmitting}>
                 {editing ? 'Guardar cambios' : 'Publicar anuncio'}

@@ -1,6 +1,7 @@
 import api from './api'
 
 export const userService = {
+  changePassword: (data) => api.put('/users/me/password', data),
   getAll: (params = {}) => api.get('/users', { params }),
   getJudges: () => api.get('/users/jueces'),
   create: (data) => api.post('/users', data),

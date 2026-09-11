@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import ChangePassword from '../components/profile/ChangePassword'
 import { Moon, Bell, Globe, Shield, ChevronRight, User, KeyRound } from 'lucide-react'
 import useUIStore from '../store/useUIStore'
 import useAuthStore from '../store/useAuthStore'
@@ -52,6 +54,7 @@ function SettingRow({ icon: Icon, label, description, children, last }) {
 }
 
 export default function Settings() {
+  const [passwordOpen, setPasswordOpen] = useState(false)
   const { darkMode, toggleDarkMode, language, setLanguage, notifications, setNotification } =
     useUIStore()
 
@@ -59,6 +62,7 @@ export default function Settings() {
 
   return (
     <div className='space-y-6 animate-fade-up pb-24'>
+      {passwordOpen && <ChangePassword onClose={() => setPasswordOpen(false)} />}
       <h1 className='text-xl font-bold' style={{ color: 'var(--text-primary)' }}>
         Configuración
       </h1>
@@ -81,7 +85,7 @@ export default function Settings() {
               <ChevronRight className='w-4 h-4 shrink-0' style={{ color: 'var(--text-muted)' }} />
             </SettingRow>
           </Link>
-          <Link to='/forgot-password'>
+          <button className='w-full text-left' onClick={() => setPasswordOpen(true)}>
             <SettingRow
               icon={KeyRound}
               label='Cambiar contraseña'
@@ -90,7 +94,7 @@ export default function Settings() {
             >
               <ChevronRight className='w-4 h-4 shrink-0' style={{ color: 'var(--text-muted)' }} />
             </SettingRow>
-          </Link>
+          </button>
         </div>
       </div>
 

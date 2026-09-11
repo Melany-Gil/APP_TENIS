@@ -495,5 +495,8 @@ exports.ensureSchema = async () => {
     CONSTRAINT fk_foto_partido FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
+  if (!(await columnExists('anuncios', 'imagen_url'))) {
+    await db.query('ALTER TABLE anuncios ADD COLUMN imagen_url VARCHAR(255) NULL')
+  }
   console.log('✅  Esquema de partidos y jueces actualizado')
 }

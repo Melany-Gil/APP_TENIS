@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, BarChart3, CalendarDays, Clock3, MapPin, MessageSquareText, Star } from 'lucide-react'
 import LiveBadge from '../components/match/LiveBadge'
 import MatchStats from '../components/match/MatchStats'
+import ClayCourt from '../components/match/ClayCourt'
 import MatchJudge from '../components/match/MatchJudge'
 import MatchPhoto from '../components/match/MatchPhoto'
 import MatchPhotoCapture from '../components/match/MatchPhotoCapture'
@@ -167,6 +168,7 @@ export default function Match() {
         </div>
       </div>
 
+      {match.deporte === 'tenis' && <div className='card p-4'><ClayCourt match={match} /></div>}
       {match.notas && (
         <div
           className='card p-4 flex items-start gap-3'

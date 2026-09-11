@@ -19,6 +19,7 @@ import {
   Radio,
 } from 'lucide-react'
 import { matchService } from '../../services/matchService'
+import MatchAuditButton from '../../components/match/MatchAuditButton'
 import { sedeService } from '../../services/sedeService'
 import { categoriaService } from '../../services/categoriaService'
 import { useMatchRealtime } from '../../hooks/useMatchRealtime'
@@ -636,6 +637,7 @@ export default function DirectorDashboard() {
                   </div>
                 </div>
 
+                <MatchAuditButton match={match} />
                 {/* Participantes */}
                 <div
                   className='p-3 rounded-xl space-y-1.5'

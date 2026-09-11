@@ -12,6 +12,7 @@ const pointReason = (result) => ({
 }[result] || 'punto_sin_detalle')
 
 export const matchService = {
+  getAudit: (id, after = 0) => api.get(`/partidos/${id}/auditoria`, { params: { after } }),
   getAll: (params = {}) => api.get('/partidos', { params }),
   getById: (id) => api.get(`/partidos/${id}`),
   getMyMatches: () => api.get('/partidos/mios'),

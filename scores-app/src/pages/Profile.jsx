@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import ChangePassword from '../components/profile/ChangePassword'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Bell,
@@ -35,6 +36,7 @@ export default function Profile() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [editing, setEditing] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [matches, setMatches] = useState(EMPTY_MATCHES)
@@ -266,9 +268,11 @@ export default function Profile() {
       </section>}
 
       <div className='card overflow-hidden'>
+        {passwordOpen && <ChangePassword onClose={() => setPasswordOpen(false)} />}
         {menu.map((item, index) => (
           <button
             key={item.label}
+            onClick={() => item.label === 'Cambiar contraseña' ? setPasswordOpen(true) : navigate('/settings')}
             className={cn(
               'w-full flex items-center gap-3 px-4 py-3.5 hover:bg-border-light transition-colors text-left',
               index < menu.length - 1 && 'border-b border-border-light'

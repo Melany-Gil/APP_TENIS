@@ -20,6 +20,7 @@ const DirectorDashboard = lazy(() => import('../pages/judge/DirectorDashboard'))
 
 // ── App ───────────────────────────────────────────────────
 const Home = lazy(() => import('../pages/Home'))
+const Anuncios = lazy(() => import('../pages/Anuncios'))
 const PlayerDashboard = lazy(() => import('../pages/PlayerDashboard'))
 const Live = lazy(() => import('../pages/Live'))
 const Tennis = lazy(() => import('../pages/Tennis'))
@@ -82,6 +83,7 @@ export default function AppRouter() {
       <Route element={<AppLayout />}>
         <Route path='/' element={isAuthenticated && user?.rol === 'miembro' ? <PlayerDashboard key={user.id} /> : <Home />} />
         <Route path='/live' element={<Live />} />
+        <Route path='/anuncios' element={<Anuncios />} />
         <Route path='/tennis' element={<Tennis />} />
         <Route path='/sponsors' element={<Sponsors />} />
         <Route path='/padel' element={<Padel />} />

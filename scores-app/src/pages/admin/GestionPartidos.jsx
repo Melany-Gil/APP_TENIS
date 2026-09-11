@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { Plus, Pencil, Trash2, X, Radio, Gavel, SlidersHorizontal, MapPin } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { matchService } from '../../services/matchService'
+import MatchAuditButton from '../../components/match/MatchAuditButton'
 import { playerService } from '../../services/playerService'
 import { teamService } from '../../services/teamService'
 import { userService } from '../../services/userService'
@@ -990,6 +991,7 @@ export default function GestionPartidos() {
                       </button>
                     </>
                   )}
+                  <MatchAuditButton match={p} />
                   <button
                     onClick={() => openEdit(p)}
                     className='btn-ghost p-2'

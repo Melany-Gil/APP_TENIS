@@ -9,6 +9,11 @@ router.get('/mios', requireAuth, controller.getMyMatches)
 router.get('/gestion/mis-partidos', requireAuth, requireOfficial, controller.getManaged)
 router.use('/:id/foto', require('./match-photo.routes'))
 // GET  /api/partidos/:id
+router.get('/:id/auditoria', requireAuth, requireDirector, async (req, res) => {
+  const { success, error } = require('../../utils/response')
+  try { return success(res, await require('./matchAudit.service').getAudit(req.params.id, req.query.after || 0)) }
+  catch (err) { return error(res, err.status ? err.message : 'No se pudo consultar la auditoría', err.status || 500) }
+})
 router.get('/:id/estadisticas', controller.getStats)
 router.get('/:id', controller.getById)
 router.get('/:id/control', requireAuth, requireOfficial, controller.getControl)
