@@ -161,7 +161,8 @@ exports.linkUser = async (id, userId) => {
   if (!users.length) throw { status: 404, message: 'Usuario no encontrado o inactivo' }
 
   try {
-    await db.query('UPDATE jugadores SET user_id = ? WHERE id = ?', [normalizedUserId, id])
+    const [result] = await db.query('UPDATE jugadores SET user_id = ? WHERE id = ? AND (user_id IS NULL OR user_id = ?)', [normalizedUserId, id, normalizedUserId])
+    if (!result.affectedRows) throw { status: 409, message: 'El jugador ya tiene otra cuenta. Desvincúlala explícitamente antes de reasignar.' }
   } catch (linkError) {
     if (linkError.code === 'ER_DUP_ENTRY') {
       throw { status: 409, message: 'Esa cuenta ya está vinculada a otro jugador' }

@@ -15,6 +15,21 @@ const loadService = (fakeDb) => {
   return require(servicePath)
 }
 
+test('crea miembro con solo nombres, celular y contraseña sin cédula/correo', async () => {
+  let insert
+  const service = loadService({ async query(sql, params) {
+    if (sql.includes('information_schema')) return [[{ total: 1 }]]
+    if (sql.startsWith('INSERT')) { insert = { sql, params }; return [{ insertId: 30 }] }
+    if (sql.includes('FROM users u')) return [[{ id: 30, nombre: 'Ana', apellido: 'Prueba', rol: 'miembro', activo: 1 }]]
+    return [[]]
+  } })
+  await service.create({ nombre: 'Ana', apellido: 'Prueba', telefono: '+57 3001234567', password: 'Secret123' })
+  assert.match(insert.sql, /telefono_acceso/)
+  assert.equal(insert.params[0], null)
+  assert.equal(insert.params[4], null)
+  assert.equal(insert.params.at(-1), '3001234567')
+})
+
 test('getById devuelve avatar y jugador vinculado sin exponer contraseña', async () => {
   const fakeDb = {
     async query() {
@@ -137,7 +152,7 @@ test('crear usuario rechaza un alias ya usado por otra cuenta', async () => {
   )
 })
 
-test('crear usuario funciona aunque la columna usuario aún no exista', async () => {
+test('crear cuenta por documento sin alias funciona aunque la columna usuario aún no exista', async () => {
   const calls = []
   const fakeDb = {
     async query(sql, params) {
@@ -151,7 +166,6 @@ test('crear usuario funciona aunque la columna usuario aún no exista', async ()
 
   await loadService(fakeDb).create({
     numero_documento: '55554444',
-    usuario: 'ignorado',
     nombre: 'Ana',
     apellido: 'Ruiz',
     email: 'ana@example.com',
@@ -208,4 +222,12 @@ test('editar alias rechaza documento de otra cuenta', async () => {
     assert.fail('No debe actualizar un alias en conflicto')
   } })
   await assert.rejects(service.updateUsuario(7, '12345'), error => error.status === 409)
+})
+test('no permite quitar el único usuario de acceso de un miembro sin otros datos', async () => {
+  const service = loadService({ async query(sql) {
+    if (sql.includes('information_schema')) return [[{ total: 1 }]]
+    if (sql.startsWith('SELECT id, rol')) return [[{ id: 7, rol: 'miembro', usuario: 'ana.garcia', numero_documento: null, email: null, telefono: null }]]
+    assert.fail('No debe escribir ni dejar la cuenta sin acceso')
+  } })
+  await assert.rejects(service.updateUsuario(7, ''), { status: 400 })
 })

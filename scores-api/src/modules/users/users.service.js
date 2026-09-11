@@ -1,9 +1,10 @@
 const db = require('../../config/db')
 const bcrypt = require('bcryptjs')
 const { validateIdentifierCrossing } = require('../../utils/loginIdentifiers')
+const { identity, assertPhoneAvailable } = require('../../utils/memberIdentity')
 
 const BASE_FIELDS =
-  'u.id, u.numero_documento, u.nombre, u.apellido, u.email, u.telefono, u.avatar, u.rol, u.activo, u.created_at'
+  'u.id, u.numero_documento, u.nombre, u.apellido, u.email, u.telefono, u.telefono_acceso, u.avatar, u.rol, u.activo, u.created_at'
 
 const normalizeUsuario = (value) => {
   const text = String(value ?? '').trim()
@@ -56,7 +57,7 @@ exports.getById = async (id) => {
   return formatUser(rows[0])
 }
 
-exports.create = async ({
+const createAccount = async ({
   numero_documento,
   usuario,
   nombre,
@@ -65,52 +66,84 @@ exports.create = async ({
   password,
   telefono,
   rol = 'miembro',
-}) => {
+}, executor = db, aliasReady) => {
   if (!['admin', 'juez_director', 'juez', 'miembro'].includes(rol)) {
     throw { status: 400, message: 'Rol inválido' }
   }
+  const details = identity({ numero_documento, email, telefono, usuario }, rol)
+  numero_documento = details.document
+  email = details.email
+  await assertPhoneAvailable(executor, details.phoneKey)
 
-  const aliasSupported = await hasUsuarioColumn()
+  const aliasSupported = aliasReady ?? await hasUsuarioColumn()
   const alias = aliasSupported ? normalizeUsuario(usuario) : null
-  if (aliasSupported) await validateIdentifierCrossing(db, { documento: numero_documento, usuario: alias })
+  if (!aliasSupported && usuario) throw { status: 503, message: 'El acceso por usuario se está preparando. Reintenta en unos minutos.' }
+  if (aliasSupported) await validateIdentifierCrossing(executor, { documento: numero_documento, usuario: alias })
 
-  const [existing] = await db.query(
+  const [existing] = await executor.query(
     'SELECT id FROM users WHERE numero_documento = ? OR email = ? LIMIT 1',
-    [numero_documento, email.toLowerCase()]
+    [numero_documento, email]
   )
   if (existing.length) {
     throw { status: 409, message: 'El documento o correo ya está registrado' }
   }
   if (alias) {
-    const [dupAlias] = await db.query('SELECT id FROM users WHERE usuario = ? LIMIT 1', [alias])
+    const [dupAlias] = await executor.query('SELECT id FROM users WHERE usuario = ? LIMIT 1', [alias])
     if (dupAlias.length) {
       throw { status: 409, message: 'Ese usuario ya está en uso por otra cuenta' }
     }
   }
 
   const hashedPassword = await bcrypt.hash(password, 12)
-  const columns = ['numero_documento', 'nombre', 'apellido', 'email', 'password', 'telefono', 'rol']
+  const columns = ['numero_documento', 'nombre', 'apellido', 'email', 'password', 'telefono', 'rol', 'telefono_acceso']
   const values = [
-    numero_documento.trim(),
+    numero_documento,
     nombre.trim(),
     apellido.trim(),
-    email.trim().toLowerCase(),
+    email,
     hashedPassword,
     telefono?.trim() || null,
     rol,
+    details.phoneKey,
   ]
   if (aliasSupported) {
     columns.splice(1, 0, 'usuario')
     values.splice(1, 0, alias)
   }
 
-  const [result] = await db.query(
+  let result
+  try { [result] = await executor.query(
     `INSERT INTO users (${columns.join(', ')}, activo)
      VALUES (${columns.map(() => '?').join(', ')}, TRUE)`,
     values
-  )
+  ) } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') throw { status: 409, message: 'El celular de acceso, documento, correo o usuario ya está registrado en otra cuenta' }
+    throw err
+  }
 
-  return exports.getById(result.insertId)
+  return result.insertId
+}
+
+exports.create = async (data) => {
+  const player = data.jugador
+  if (!player || player.modo === 'ninguno') return exports.getById(await createAccount(data))
+  if ((data.rol || 'miembro') !== 'miembro') throw { status: 400, message: 'La vinculación de jugador en este formulario es para miembros' }
+  if (!['existente', 'nuevo'].includes(player.modo)) throw { status: 400, message: 'Selecciona cómo vincular el jugador' }
+  const aliasReady = await hasUsuarioColumn()
+  const conn = await db.getConnection()
+  let userId
+  try {
+    await conn.beginTransaction()
+    const link = await require('./userPlayer').preparePlayer(conn, player, data)
+    userId = await createAccount(data, conn, aliasReady)
+    await link(userId)
+    await conn.commit()
+  } catch (err) {
+    await conn.rollback()
+    if (err.code === 'ER_DUP_ENTRY') throw { status: 409, message: 'El usuario o jugador ya está vinculado. Actualiza la lista y revisa los datos.' }
+    throw err
+  } finally { conn.release() }
+  return exports.getById(userId)
 }
 
 exports.updateUsuario = async (id, usuario) => {
@@ -121,10 +154,13 @@ exports.updateUsuario = async (id, usuario) => {
     }
   }
 
-  const [existing] = await db.query('SELECT id FROM users WHERE id = ?', [id])
+  const [existing] = await db.query('SELECT id, rol, numero_documento, email, telefono, usuario FROM users WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Usuario no encontrado' }
 
   const alias = normalizeUsuario(usuario)
+  if (existing[0].rol === 'miembro' && !alias && !existing[0].numero_documento) {
+    identity({ ...existing[0], usuario: alias }, 'miembro')
+  }
   await validateIdentifierCrossing(db, { usuario: alias, id })
   if (alias) {
     const [dup] = await db.query('SELECT id FROM users WHERE usuario = ? AND id != ? LIMIT 1', [
@@ -156,8 +192,11 @@ exports.updateRole = async (id, rol, requesterId) => {
 }
 
 exports.updateMe = async (id, { nombre, apellido, telefono, email }) => {
-  const [existing] = await db.query('SELECT id FROM users WHERE id = ?', [id])
+  const [existing] = await db.query('SELECT id, rol, numero_documento, email, telefono, usuario FROM users WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Usuario no encontrado' }
+  const current = existing[0]
+  const details = identity({ ...current, email: email === undefined ? current.email : email, telefono: telefono === undefined ? current.telefono : telefono }, current.rol)
+  await assertPhoneAvailable(db, details.phoneKey, id)
 
   if (email) {
     const [dup] = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, id])
@@ -169,10 +208,11 @@ exports.updateMe = async (id, { nombre, apellido, telefono, email }) => {
      SET nombre = COALESCE(?, nombre),
          apellido = COALESCE(?, apellido),
          telefono = ?,
-         email = COALESCE(?, email),
+         email = ?,
+         telefono_acceso = ?,
          updated_at = NOW()
      WHERE id = ?`,
-    [nombre || null, apellido || null, telefono || null, email || null, id]
+    [nombre || null, apellido || null, details.phone, details.email, details.phoneKey, id]
   )
 
   return exports.getById(id)
@@ -208,6 +248,7 @@ function formatUser(row) {
     apellido: row.apellido,
     email: row.email,
     telefono: row.telefono || null,
+    acceso_celular: Boolean(row.telefono_acceso),
     avatar: row.avatar || null,
     rol: row.rol,
     activo: Boolean(row.activo),

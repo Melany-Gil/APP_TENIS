@@ -1,14 +1,16 @@
-import { forwardRef } from 'react'
+import { forwardRef, useId } from 'react'
 import { cn } from '../../utils/cn'
 
 const Input = forwardRef(
   (
-    { label, error, hint, leftIcon, rightIcon, className = '', containerClassName = '', ...props },
+    { id, label, error, hint, leftIcon, rightIcon, className = '', containerClassName = '', ...props },
     ref
   ) => {
+    const generatedId = useId()
+    const inputId = id || generatedId
     return (
       <div className={cn('form-group', containerClassName)}>
-        {label && <label className='form-label'>{label}</label>}
+        {label && <label htmlFor={inputId} className='form-label'>{label}</label>}
 
         <div className='relative'>
           {leftIcon && (
@@ -21,6 +23,7 @@ const Input = forwardRef(
           )}
 
           <input
+            id={inputId}
             ref={ref}
             className={cn(
               'form-input',

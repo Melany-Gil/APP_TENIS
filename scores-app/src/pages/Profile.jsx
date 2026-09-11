@@ -177,7 +177,7 @@ export default function Profile() {
         <div className='flex-1 min-w-0'>
           <h2 className='text-base font-bold text-text-primary'>{fullName}</h2>
           <p className='text-sm text-text-secondary'>{user?.email}</p>
-          <p className='text-xs text-text-muted mt-0.5'>CC: {user?.numero_documento}</p>
+          <p className='text-xs text-text-muted mt-0.5'>{user?.numero_documento ? `CC: ${user.numero_documento}` : 'Sin documento registrado'}</p>
           {user?.jugador && (
             <p className='text-xs font-medium mt-1' style={{ color: 'var(--color-brand)' }}>
               Perfil de jugador: {user.jugador.nombre} {user.jugador.apellido}
@@ -218,15 +218,15 @@ export default function Profile() {
             required
           />
           <Input
-            label='Email'
+            label={user?.rol === 'miembro' ? 'Email (opcional)' : 'Email'}
             type='email'
             value={form.email}
             onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-            required
+            required={user?.rol !== 'miembro'}
             leftIcon={<Mail className='w-4 h-4' />}
           />
           <Input
-            label='Teléfono'
+            label={user?.rol === 'miembro' ? 'Celular de acceso' : 'Teléfono'}
             value={form.telefono}
             onChange={(event) => setForm((current) => ({ ...current, telefono: event.target.value }))}
           />

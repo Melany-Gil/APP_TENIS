@@ -13,7 +13,7 @@ router.put(
   [
     body('nombre').optional().trim().isLength({ min: 2, max: 100 }),
     body('apellido').optional().trim().isLength({ min: 2, max: 100 }),
-    body('email').optional().normalizeEmail().isEmail(),
+    body('email').optional({ values: 'falsy' }).trim().isEmail(),
     body('telefono').optional({ values: 'falsy' }).trim().isLength({ max: 20 }),
   ],
   validate,
@@ -33,7 +33,7 @@ router.post(
   requireAuth,
   requireAdmin,
   [
-    body('numero_documento').trim().isLength({ min: 5, max: 20 }),
+    body('numero_documento').optional({ values: 'falsy' }).trim().isLength({ min: 5, max: 20 }),
     body('usuario')
       .optional({ values: 'falsy' })
       .trim()
@@ -43,7 +43,7 @@ router.post(
       .withMessage('El usuario solo admite letras, números, punto, guion y guion bajo'),
     body('nombre').trim().isLength({ min: 2, max: 100 }),
     body('apellido').trim().isLength({ min: 2, max: 100 }),
-    body('email').normalizeEmail().isEmail(),
+    body('email').optional({ values: 'falsy' }).trim().isEmail(),
     body('password').isLength({ min: 8, max: 72 }).matches(/[A-Z]/).matches(/[0-9]/),
     body('rol').optional().isIn(['admin', 'juez_director', 'juez', 'miembro']),
     body('telefono').optional({ values: 'falsy' }).trim().isLength({ max: 20 }),
@@ -55,6 +55,8 @@ router.get('/:id', requireAuth, requireAdmin, controller.getById)
 router.put('/:id', requireAuth, requireAdmin, controller.update)
 router.put('/:id/estado', requireAuth, requireAdmin, controller.setActive)
 router.put('/:id/password', requireAuth, requireAdmin, controller.resetPassword)
+router.put('/:id/avatar', requireAuth, requireAdmin, uploadAvatar, controller.adminUploadAvatar)
+router.delete('/:id/avatar', requireAuth, requireAdmin, controller.adminDeleteAvatar)
 router.delete('/:id', requireAuth, requireAdmin, controller.remove)
 router.put(
   '/:id/rol',

@@ -78,6 +78,32 @@ const columnForeignKeyExists = async (tableName, columnName) => {
 
 
 exports.ensureSchema = async () => {
+  // Nullable identities preserve unknown data; never invent documents/emails.
+  if ((await getColumn('users', 'numero_documento'))?.isNullable === 'NO') {
+    await db.query('ALTER TABLE users MODIFY numero_documento VARCHAR(20) NULL')
+  }
+  if ((await getColumn('users', 'email'))?.isNullable === 'NO') {
+    await db.query('ALTER TABLE users MODIFY email VARCHAR(150) NULL')
+  }
+  if (!(await columnExists('users', 'telefono_acceso'))) {
+    await db.query('ALTER TABLE users ADD COLUMN telefono_acceso VARCHAR(10) NULL')
+  }
+  if (!(await uniqueColumnIndexExists('users', 'telefono_acceso'))) {
+    const { normalizePhone } = require('../utils/memberIdentity')
+    const [members] = await db.query("SELECT id, telefono FROM users WHERE rol = 'miembro'")
+    const phones = new Map()
+    for (const member of members) {
+      try {
+        const key = normalizePhone(member.telefono)
+        if (key) phones.set(key, [...(phones.get(key) || []), member.id])
+      } catch { /* Existing invalid contact data must not prevent startup. */ }
+    }
+    for (const [key, ids] of phones) {
+      // Shared numbers require an admin to resolve them; never pick an account.
+      if (ids.length === 1) await db.query('UPDATE users SET telefono_acceso = ? WHERE id = ?', [key, ids[0]])
+    }
+    await db.query('ALTER TABLE users ADD UNIQUE KEY uq_users_telefono_acceso (telefono_acceso)')
+  }
   if (!(await columnExists('users', 'session_version'))) {
     await db.query('ALTER TABLE users ADD COLUMN session_version INT UNSIGNED NOT NULL DEFAULT 0')
   }

@@ -10,7 +10,7 @@ import Input from '../../components/ui/Input'
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
-  const [accessType, setAccessType] = useState('documento')
+  const [accessType, setAccessType] = useState('usuario')
   const { login } = useAuthStore()
   const { addToast } = useUIStore()
   const navigate = useNavigate()
@@ -75,8 +75,8 @@ export default function Login() {
       <form onSubmit={handleSubmit(onSubmit)} className='flex flex-col gap-5'>
         <fieldset disabled={isSubmitting}>
           <legend className='form-label mb-2'>¿Cómo quieres ingresar?</legend>
-          <div className='flex gap-4'>
-            {[['documento', 'Con documento'], ['usuario', 'Con usuario (jueces / directores)']].map(([value, label]) => (
+          <div className='flex flex-col gap-3'>
+            {[['usuario', 'Con usuario'], ['documento', 'Con documento'], ['celular', 'Con celular (miembros)']].map(([value, label]) => (
               <label key={value} className='flex items-center gap-2 text-sm'>
                 <input type='radio' name='tipo_acceso' value={value} checked={accessType === value}
                   onChange={() => { setAccessType(value); resetField('identificador'); resetField('password') }} />
@@ -86,7 +86,7 @@ export default function Login() {
           </div>
         </fieldset>
         <div className='form-group'>
-          <label htmlFor='login-identifier' className='form-label'>{accessType === 'documento' ? 'Número de documento' : 'Usuario del juez o director'}</label>
+          <label htmlFor='login-identifier' className='form-label'>{accessType === 'celular' ? 'Número de celular' : accessType === 'documento' ? 'Número de documento' : 'Usuario de acceso'}</label>
           <div className='relative'>
             <UserRound
               className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none'
@@ -95,17 +95,18 @@ export default function Login() {
             <input
               id='login-identifier'
               autoComplete='username'
-              placeholder={accessType === 'documento' ? 'Tu documento' : 'Tu usuario asignado'}
+              inputMode={accessType === 'celular' ? 'tel' : 'text'}
+              placeholder={accessType === 'celular' ? 'Ej. 3001234567' : accessType === 'documento' ? 'Tu documento' : 'Tu usuario asignado'}
               className={`form-input pl-10 ${errors.identificador ? 'error' : ''}`}
               {...register('identificador', {
-                required: 'Ingresa tu documento o usuario',
+                required: 'Ingresa tu celular, documento o usuario según el acceso seleccionado',
                 setValueAs: (value) => (typeof value === 'string' ? value.trim() : value),
               })}
             />
           </div>
           {errors.identificador && <p className='form-error'>{errors.identificador.message}</p>}
           <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
-            Los jueces y directores también pueden entrar con el usuario asignado por el club.
+            {accessType === 'usuario' ? 'Usa el usuario y la contraseña asignados por el administrador. No necesitas correo, celular ni cédula.' : accessType === 'celular' ? 'Usa tu celular colombiano y la contraseña entregada por el administrador.' : 'Puedes ingresar con tu documento si ya está registrado en tu cuenta.'}
           </p>
         </div>
 
@@ -152,7 +153,7 @@ export default function Login() {
       </Link>
 
       <p className='text-center text-sm mt-7' style={{ color: 'var(--text-muted)' }}>
-        ¿No tienes acceso? Solicítalo a un administrador.
+        ¿No tienes acceso o no registraste correo para recuperar tu contraseña? Contacta al administrador.
       </p>
     </div>
   )

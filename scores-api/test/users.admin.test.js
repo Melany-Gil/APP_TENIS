@@ -14,6 +14,7 @@ const conn = {
     if (sql.includes('information_schema.KEY_COLUMN_USAGE')) return [[{ tabla: 'partidos', columna: 'juez_id' }, { tabla: 'jugadores', columna: 'user_id' }]]
     if (sql.includes('COUNT(*)')) return [[{ total: Object.entries(counts).find(([table]) => sql.includes('`' + table + '`'))?.[1] || 0 }]]
     if (sql.startsWith('SELECT id FROM users')) return [[]]
+    if (sql.startsWith('SELECT id, telefono FROM users')) return [[]]
     if (/^(UPDATE|DELETE)/.test(sql)) {
       if (duplicate) throw { code: 'ER_DUP_ENTRY' }
       return [{ affectedRows: 1 }]
@@ -24,7 +25,7 @@ const conn = {
 const dbPath = require.resolve('../src/config/db')
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: { getConnection: async () => conn } }
 const service = require('../src/modules/users/users.admin.service')
-test.beforeEach(() => { queries = []; target = { id: 2, rol: 'juez', activo: 1 }; admins = [{ id: 1 }]; counts = {}; duplicate = false })
+test.beforeEach(() => { queries = []; target = { id: 2, rol: 'juez', activo: 1, numero_documento: '12345', email: 'test@example.test' }; admins = [{ id: 1 }]; counts = {}; duplicate = false })
 const writes = () => queries.filter((q) => /^(UPDATE|DELETE)/.test(q.sql || ''))
 
 test('elimina una cuenta sin historial después de comprobar relaciones y autoría de fotos', async () => {
@@ -80,10 +81,19 @@ test('restablece contraseña con hash y revoca sesiones, sin devolverla', async 
   assert.doesNotMatch(JSON.stringify(result), /PruebaSegura|password/)
   assert.ok(writes().some((q) => q.sql.includes('UPDATE password_resets SET used')))
 })
-test('rechaza contraseñas débiles, demasiado largas y restablecimiento propio', async () => {
+test('rechaza contraseñas débiles o demasiado largas', async () => {
   for (const password of ['abc', 'nouppercase123', 'A'.repeat(73) + '1']) await assert.rejects(service.resetPassword(2, 1, password), { status: 400 })
-  await assert.rejects(service.resetPassword(1, 1, 'PruebaSegura123'), { status: 400 })
   assert.equal(writes().length, 0)
+})
+test('administrador puede restablecer su propia contraseña y revocar sus sesiones', async () => {
+  target = { id: 1, rol: 'admin', activo: 1 }
+  await service.resetPassword(1, 1, 'PruebaSegura123')
+  assert.match(writes()[0].sql, /session_version/)
+})
+test('edita miembro sin documento ni correo guardando NULL y celular normalizado', async () => {
+  target.rol = 'miembro'
+  await service.update(2, 1, { nombre: 'Ana', apellido: 'García', telefono: '+57 300 123 4567' })
+  assert.deepEqual(writes()[0].values.slice(2), [null, null, '+57 300 123 4567', null, '3001234567', 2])
 })
 test('edita identidad sin permitir asignación masiva de permisos', async () => {
   const input = { nombre: ' Ana ', apellido: 'García', numero_documento: '123456', email: 'ana@example.test', telefono: '', usuario: 'ana.g', rol: 'admin', activo: false }

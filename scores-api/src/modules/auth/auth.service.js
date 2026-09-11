@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken')
 const db = require('../../config/db')
 const mailer = require('../../config/mailer')
 const { generateOTP } = require('../../utils/otp')
+const { normalizePhone } = require('../../utils/memberIdentity')
 
 const signToken = (user) =>
   jwt.sign({ id: user.id, rol: user.rol || 'miembro', session_version: Number(user.session_version || 0) }, process.env.JWT_SECRET, {
@@ -48,11 +49,10 @@ const mailFromAddress = () => {
 }
 
 exports.login = async ({ identificador, numero_documento, password, tipo_acceso }) => {
-  if (tipo_acceso !== undefined && !['documento', 'usuario'].includes(tipo_acceso)) {
+  if (tipo_acceso !== undefined && !['documento', 'usuario', 'celular'].includes(tipo_acceso)) {
     throw { status: 400, message: 'Tipo de acceso inválido' }
   }
-  // Acepta el número de documento (cualquier usuario) o el alias "usuario"
-  // (solo cuentas con rol juez). Se conserva `numero_documento` por
+  // Acepta documento o alias único. Se conserva `numero_documento` por
   // compatibilidad con clientes antiguos.
   const credential = String(identificador ?? numero_documento ?? '').trim()
   if (!credential) {
@@ -60,15 +60,23 @@ exports.login = async ({ identificador, numero_documento, password, tipo_acceso 
   }
 
   let rows
+  if (tipo_acceso === 'celular') {
+    const phone = normalizePhone(credential)
+    ;[rows] = await db.query("SELECT * FROM users WHERE activo = TRUE AND rol = 'miembro' AND telefono_acceso = ? LIMIT 2", [phone])
+    if (rows.length !== 1 || typeof password !== 'string' || !(await bcrypt.compare(password, rows[0].password))) {
+      throw { status: 401, message: 'Celular o contraseña incorrectos. Si compartes celular o aún no tienes acceso, contacta al administrador.' }
+    }
+    return { token: signToken(rows[0]), user: publicUser(rows[0]) }
+  }
   try {
     if (tipo_acceso) {
-      const condition = tipo_acceso === 'usuario' ? "usuario = ? AND rol IN ('juez', 'juez_director')" : 'numero_documento = ?'
+      const condition = tipo_acceso === 'usuario' ? "usuario = ? AND rol IN ('miembro', 'juez', 'juez_director', 'admin')" : 'numero_documento = ?'
       ;[rows] = await db.query(`SELECT * FROM users WHERE activo = TRUE AND ${condition} LIMIT 1`, [credential])
     } else {
     ;[rows] = await db.query(
       `SELECT * FROM users
        WHERE activo = TRUE
-         AND (numero_documento = ? OR (usuario = ? AND rol IN ('juez', 'juez_director')))
+         AND (numero_documento = ? OR (usuario = ? AND rol IN ('miembro', 'juez', 'juez_director', 'admin')))
        ORDER BY (numero_documento = ?) DESC
        LIMIT 1`,
       [credential, credential, credential]

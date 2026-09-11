@@ -1,6 +1,7 @@
 const db = require('../../config/db')
 const bcrypt = require('bcryptjs')
 const { validateIdentifierCrossing } = require('../../utils/loginIdentifiers')
+const { identity, assertPhoneAvailable } = require('../../utils/memberIdentity')
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }) }
 const roles = ['admin', 'juez_director', 'juez', 'miembro']
@@ -13,7 +14,7 @@ async function mutate(id, actorId, action) {
     await conn.beginTransaction()
     const [admins] = await conn.query("SELECT id FROM users WHERE rol = 'admin' AND activo = TRUE ORDER BY id FOR UPDATE")
     if (!admins.some((u) => Number(u.id) === Number(actorId))) fail('Ya no tienes permisos de administrador', 403)
-    const [rows] = await conn.query('SELECT id, rol, activo FROM users WHERE id = ? FOR UPDATE', [id])
+    const [rows] = await conn.query('SELECT id, rol, activo, numero_documento, email, telefono, usuario FROM users WHERE id = ? FOR UPDATE', [id])
     if (!rows.length) fail('Usuario no encontrado', 404)
     const protectAccess = () => {
       if (Number(id) === Number(actorId)) fail('No puedes eliminar, desactivar ni cambiar el rol de tu propia cuenta')
@@ -24,28 +25,29 @@ async function mutate(id, actorId, action) {
     return { message: 'Usuario actualizado correctamente' }
   } catch (err) {
     await conn.rollback()
-    if (err.code === 'ER_DUP_ENTRY') fail('El documento, correo o usuario de acceso ya pertenece a otra cuenta', 409)
+    if (err.code === 'ER_DUP_ENTRY') fail('El celular de acceso, documento, correo o usuario ya pertenece a otra cuenta', 409)
     if (err.code === 'ER_ROW_IS_REFERENCED_2') fail('La cuenta tiene registros vinculados. Desactívala para conservar su historial.', 409)
     throw err
   } finally { conn.release() }
 }
 
-exports.update = (id, actorId, data) => mutate(id, actorId, async (conn) => {
+exports.update = (id, actorId, data) => mutate(id, actorId, async (conn, user) => {
   const fields = Object.fromEntries(['nombre', 'apellido', 'numero_documento', 'email', 'telefono', 'usuario'].map((key) => [key, String(data[key] ?? '').trim()]))
   if ([fields.nombre, fields.apellido].some((v) => v.length < 2 || v.length > 100)) fail('Nombres y apellidos deben tener entre 2 y 100 caracteres')
-  if (!/^\d{5,20}$/.test(fields.numero_documento)) fail('El documento debe tener entre 5 y 20 dígitos')
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email) || fields.email.length > 150) fail('Correo inválido (máximo 150 caracteres)')
-  if (fields.telefono.length > 20) fail('El teléfono admite hasta 20 caracteres')
+  const details = identity(fields, user.rol)
+  await assertPhoneAvailable(conn, details.phoneKey, id)
   if (fields.usuario && !/^[a-zA-Z0-9._-]{3,50}$/.test(fields.usuario)) fail('Usuario inválido: usa de 3 a 50 letras, números, puntos o guiones')
   await validateIdentifierCrossing(conn, { documento: fields.numero_documento, usuario: fields.usuario, id })
-  await conn.query('UPDATE users SET nombre = ?, apellido = ?, numero_documento = ?, email = ?, telefono = ?, usuario = ? WHERE id = ?', [fields.nombre, fields.apellido, fields.numero_documento, fields.email, fields.telefono || null, fields.usuario || null, id])
+  await conn.query('UPDATE users SET nombre = ?, apellido = ?, numero_documento = ?, email = ?, telefono = ?, usuario = ?, telefono_acceso = ? WHERE id = ?', [fields.nombre, fields.apellido, details.document, details.email, details.phone, fields.usuario || null, details.phoneKey, id])
 })
 
 exports.updateRole = (id, actorId, rol) => mutate(id, actorId, async (conn, user, protect) => {
   if (!roles.includes(rol)) fail('Rol inválido')
   if (rol === user.rol) return
   protect()
-  await conn.query('UPDATE users SET rol = ?, session_version = session_version + 1 WHERE id = ?', [rol, id])
+  const details = identity(user, rol)
+  await assertPhoneAvailable(conn, details.phoneKey, id)
+  await conn.query('UPDATE users SET rol = ?, telefono_acceso = ?, session_version = session_version + 1 WHERE id = ?', [rol, details.phoneKey, id])
 })
 
 exports.setActive = (id, actorId, activo) => mutate(id, actorId, async (conn, user, protect) => {
@@ -56,7 +58,6 @@ exports.setActive = (id, actorId, activo) => mutate(id, actorId, async (conn, us
 })
 
 exports.resetPassword = async (id, actorId, password) => {
-  if (Number(id) === Number(actorId)) fail('Para cambiar tu propia contraseña usa Mi perfil')
   if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password) > 72 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) fail('La contraseña debe tener al menos 8 caracteres, una mayúscula y un número, y no superar 72 bytes')
   const hash = await bcrypt.hash(password, 12)
   return mutate(id, actorId, async (conn) => {

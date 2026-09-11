@@ -9,6 +9,7 @@ import { formatDate } from '../../utils/formatDate'
 import Button from '../../components/ui/Button'
 import Avatar from '../../components/ui/Avatar'
 import UserEditor from '../../components/admin/UserEditor'
+import MemberPlayerFields from '../../components/admin/MemberPlayerFields'
 
 export default function GestionUsuarios() {
   const [usuarios, setUsuarios] = useState([])
@@ -22,14 +23,18 @@ export default function GestionUsuarios() {
   const [usuarioDraft, setUsuarioDraft] = useState('')
   const [savingUsuario, setSavingUsuario] = useState(false)
   const [createError, setCreateError] = useState(null)
+  const [playerLink, setPlayerLink] = useState({ modo: 'ninguno', deporte: 'tenis' })
   const { user: me } = useAuthStore()
   const { addToast } = useUIStore()
   const {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({ defaultValues: { rol: 'miembro' } })
+  const creatingMember = watch('rol') === 'miembro'
 
   const fetchAll = () => {
     setLoading(true)
@@ -47,9 +52,11 @@ export default function GestionUsuarios() {
   const createUser = async (data) => {
     setCreateError(null)
     try {
-      await userService.create({ ...data, usuario: data.usuario?.trim() || undefined })
+      if (data.rol === 'miembro' && playerLink.modo === 'existente' && !playerLink.id) throw new Error('Selecciona el jugador que corresponde a esta cuenta')
+      await userService.create({ ...data, usuario: data.usuario?.trim() || undefined, jugador: data.rol === 'miembro' ? playerLink : undefined })
       addToast({ type: 'success', title: 'Usuario creado correctamente' })
       reset({ rol: 'miembro' })
+      setPlayerLink({ modo: 'ninguno', deporte: 'tenis' })
       setShowCreate(false)
       fetchAll()
     } catch (err) {
@@ -202,12 +209,12 @@ export default function GestionUsuarios() {
               />
             </label>
             <label className='form-group'>
-              <span className='form-label'>Documento</span>
+              <span className='form-label'>Documento{creatingMember ? ' (opcional)' : ''}</span>
               <input
                 inputMode='numeric'
                 className={`form-input ${errors.numero_documento ? 'error' : ''}`}
                 {...register('numero_documento', {
-                  required: true,
+                  required: !creatingMember,
                   minLength: 5,
                   maxLength: 20,
                   pattern: /^\d+$/,
@@ -215,20 +222,25 @@ export default function GestionUsuarios() {
               />
             </label>
             <label className='form-group'>
-              <span className='form-label'>Correo</span>
+              <span className='form-label'>Correo{creatingMember ? ' (opcional)' : ''}</span>
               <input
                 type='email'
                 className={`form-input ${errors.email ? 'error' : ''}`}
-                {...register('email', { required: true })}
+                {...register('email', { required: !creatingMember })}
               />
             </label>
             <label className='form-group'>
-              <span className='form-label'>Usuario (opcional, para jueces)</span>
+              <span className='form-label'>Celular (opcional)</span>
+              <input type='tel' className='form-input' placeholder='3001234567' {...register('telefono', { maxLength: 20 })} />
+            </label>
+            <label className='form-group'>
+              <span className='form-label'>{creatingMember ? 'Usuario de acceso' : 'Usuario de acceso (opcional)'}</span>
               <input
                 autoComplete='off'
                 placeholder='ej. juan.perez'
                 className={`form-input ${errors.usuario ? 'error' : ''}`}
                 {...register('usuario', {
+                  required: creatingMember ? 'Asigna un usuario de acceso' : false,
                   minLength: { value: 3, message: 'Mínimo 3 caracteres' },
                   maxLength: { value: 50, message: 'Máximo 50 caracteres' },
                   pattern: {
@@ -239,7 +251,7 @@ export default function GestionUsuarios() {
               />
               {errors.usuario && <span className='form-error'>{errors.usuario.message}</span>}
               <span className='text-[11px]' style={{ color: 'var(--text-muted)' }}>
-                Si lo defines, el juez o director podrá iniciar sesión con este usuario o con su documento.
+                Debe ser único. La persona ingresará con este usuario y su contraseña; no necesita correo, cédula ni celular.
               </span>
             </label>
             <label className='form-group'>
@@ -265,6 +277,7 @@ export default function GestionUsuarios() {
               </select>
             </label>
           </div>
+          {creatingMember && <MemberPlayerFields value={playerLink} onChange={setPlayerLink} nombre={watch('nombre')} apellido={watch('apellido')} onSelectPlayer={(p) => { setValue('nombre', p.nombre, { shouldValidate: true }); setValue('apellido', p.apellido, { shouldValidate: true }) }} />}
           <div className='flex justify-end'>
             <Button type='submit' loading={isSubmitting}>
               Crear usuario
@@ -406,9 +419,11 @@ export default function GestionUsuarios() {
                   </p>
                 </div>
                 <p className='text-xs truncate' style={{ color: 'var(--text-muted)' }}>
-                  CC: {u.numero_documento} · {u.email}
+                  {u.numero_documento ? `CC: ${u.numero_documento}` : 'Sin cédula'} · {u.email || 'Sin correo'}
                 </p>
-                {['juez', 'juez_director'].includes(u.rol) &&
+                <p className='text-xs' style={{ color: 'var(--text-muted)' }}>Celular: {u.telefono || 'Sin registrar'}</p>
+                {u.rol === 'miembro' && !u.usuario && <p className='text-xs text-amber-600'>Asigna un usuario en «Editar datos» para habilitar ese acceso.</p>}
+                {['miembro', 'juez', 'juez_director', 'admin'].includes(u.rol) &&
                   (editingUsuarioId === u.id ? (
                     <div className='flex items-center gap-1 mt-0.5'>
                       <input
@@ -486,7 +501,8 @@ export default function GestionUsuarios() {
               </div>
               <div className='w-full flex flex-wrap gap-2 pt-2' aria-label={`Acciones de ${u.nombre} ${u.apellido}`}>
                 <Button size='sm' variant='secondary' disabled={actionBusy} onClick={() => setEditor({ user: u, mode: 'edit' })}>Editar datos</Button>
-                <Button size='sm' variant='secondary' disabled={actionBusy || u.id === me?.id} onClick={() => setEditor({ user: u, mode: 'password' })}>Restablecer contraseña</Button>
+                <Button size='sm' variant='secondary' disabled={actionBusy} onClick={() => setEditor({ user: u, mode: 'password' })}>Restablecer contraseña</Button>
+                <Button size='sm' variant='secondary' disabled={actionBusy} onClick={() => setEditor({ user: u, mode: 'photo' })}>Foto de perfil</Button>
                 <Button size='sm' variant='secondary' disabled={actionBusy || u.id === me?.id} onClick={() => changeAccess(u)}>{u.activo ? 'Desactivar' : 'Reactivar'}</Button>
                 <Button size='sm' variant='danger' disabled={actionBusy || u.id === me?.id} onClick={() => changeAccess(u, true)}>Eliminar</Button>
               </div>
@@ -496,7 +512,7 @@ export default function GestionUsuarios() {
       </div>
 
       <p className='text-xs text-center' style={{ color: 'var(--text-muted)' }}>
-        Desactivar conserva el historial. Eliminar es definitivo y solo se permite sin registros vinculados. Gestiona tu propia contraseña desde Mi perfil.
+        Desactivar conserva el historial. Eliminar es definitivo y solo se permite sin registros vinculados. Restablecer una contraseña cierra las sesiones de esa cuenta.
       </p>
       {editor && <UserEditor {...editor} onClose={() => setEditor(null)} onSaved={() => { addToast({ type: 'success', title: 'Cambios guardados' }); fetchAll() }} />}
     </div>

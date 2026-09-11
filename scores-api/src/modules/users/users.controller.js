@@ -99,6 +99,29 @@ exports.deleteAvatar = async (req, res) => {
   }
 }
 
+// Admin operates on the selected account, never by impersonating its session.
+exports.adminUploadAvatar = async (req, res) => {
+  if (!req.file) return error(res, 'No se envió ninguna imagen', 400)
+  const avatarPath = toPublicUploadPath(req.file)
+  try {
+    const previous = await service.getById(req.params.id)
+    const updated = await service.updateAvatar(req.params.id, avatarPath)
+    deleteUpload(previous.avatar)
+    return success(res, updated)
+  } catch (err) {
+    deleteUpload(avatarPath)
+    return error(res, err.status ? err.message : 'No se pudo guardar la foto', err.status || 500)
+  }
+}
+exports.adminDeleteAvatar = async (req, res) => {
+  try {
+    const previous = await service.getById(req.params.id)
+    const updated = await service.updateAvatar(req.params.id, null)
+    deleteUpload(previous.avatar)
+    return success(res, updated)
+  } catch (err) { return error(res, err.status ? err.message : 'No se pudo quitar la foto', err.status || 500) }
+}
+
 // PUT /api/users/me/password — usuario autenticado
 exports.changePassword = async (req, res) => {
   try {
