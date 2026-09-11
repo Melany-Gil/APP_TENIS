@@ -107,13 +107,27 @@ export function ArtJudge() {
   )
 }
 
-export function ArtCoin() {
+export function ArtServe() {
   return (
-    <div className='help-art help-center' aria-hidden='true'>
-      <div className='help-coin'>
-        <span>C</span>
+    <div className='help-art' aria-hidden='true'>
+      <div className='help-dir'>
+        <span className='help-dir-item ok'>Servidor inicial: Tú</span>
+        <span className='help-dir-item'>Cambiar saque al rival</span>
       </div>
-      <p className='help-caption'>Cara o sello · quien gana elige si saca o recibe</p>
+      <p className='help-caption'>Viene definido en el partido · corrígelo solo si es necesario</p>
+    </div>
+  )
+}
+
+export function ArtFormat() {
+  return (
+    <div className='help-art' aria-hidden='true'>
+      <div className='help-dir'>
+        <span className='help-dir-item'>Mejor de 3 sets</span>
+        <span className='help-dir-item'>Ventaja o punto decisivo</span>
+        <span className='help-dir-item'>Tie-break a 7</span>
+      </div>
+      <p className='help-caption'>El formato lo define el torneo y se conserva · no se edita desde la mesa</p>
     </div>
   )
 }

@@ -17,7 +17,7 @@ import {
   UserRound,
   WifiOff,
 } from 'lucide-react'
-import { ArtCoin, ArtCourt, ArtDirector, ArtJudge, ArtLogin, ArtPanel, ArtScore } from '../components/help/HelpArt'
+import { ArtCourt, ArtDirector, ArtFormat, ArtJudge, ArtLogin, ArtPanel, ArtScore } from '../components/help/HelpArt'
 
 export default function Ayuda() {
   const [tab, setTab] = useState('miembro')
@@ -263,7 +263,7 @@ function JudgeGuide() {
       <QuickNav items={[
         { href: '#j-ingreso', label: '1 · Ingresar como juez' },
         { href: '#j-mesa', label: '2 · Mesa de partidos' },
-        { href: '#j-saque', label: '3 · Sorteo de saque' },
+        { href: '#j-saque', label: '3 · Saque e inicio' },
         { href: '#j-control', label: '4 · Control punto a punto' },
         { href: '#j-foto', label: '5 · Fotos y cierre' },
         { href: '#j-offline', label: '6 · Sin conexión' },
@@ -299,11 +299,12 @@ function JudgeGuide() {
           tip='Solo el juez asignado y los administradores pueden modificar el tanteo de un partido.'
         >
           <p>
-            La mesa lista <strong>tus encuentros</strong> con día, hora, cancha, categoría y modalidad. Desde cada tarjeta
-            abres el <strong>control de cancha</strong>, y también puedes <strong>crear y editar tus encuentros</strong>.
+            La mesa lista <strong>tus partidos asignados</strong> con día, hora, cancha, categoría y modalidad. Toca uno
+            para abrir su <strong>control de cancha</strong>.
           </p>
           <p>
-            Usa el buscador por jugadores, juez o cancha. Si un partido no es tuyo, no podrás anotar en él.
+            Desde <strong>Ajustes</strong> puedes corregir el sacador y los nombres que se muestran en pantalla (solo la
+            etiqueta, no sustituye al jugador). Si un partido no es tuyo, no podrás anotar en él.
           </p>
         </Step>
       </div>
@@ -312,16 +313,17 @@ function JudgeGuide() {
         <Step
           n='3'
           icon={CircleDot}
-          title='Antes del primer punto: sorteo y saque'
-          art={<ArtCoin />}
-          tip='Confirma el formato del partido (mejor de 1/3/5, ventaja o punto decisivo, tiebreak) antes de iniciar.'
+          title='Antes del primer punto: saque, formato e inicio'
+          art={<><ArtServe /><div className='mt-3'><ArtFormat /></div></>}
+          tip='El formato lo define el torneo al crear el partido y se conserva: desde la mesa no se edita.'
         >
           <p>
-            Define quién saca primero con el <strong>sorteo de moneda</strong> o fijando el sacador manualmente.
-            En dobles, cada pareja indica quién saca primero.
+            Quién saca primero ya viene definido en el partido como <strong>servidor inicial</strong>. Verifícalo y, solo
+            si es necesario, corrígelo con <strong>“Cambiar saque”</strong> en Ajustes. El saque cambia solo game a game.
           </p>
           <p>
-            Luego <strong>inicia</strong> el partido: el cronómetro y el marcador en vivo empiezan a correr para todo el club.
+            Cuando todo esté listo toca <strong>Iniciar partido</strong>: el cronómetro y el marcador en vivo empiezan a
+            correr para todo el club. Si necesitas detener, usa <strong>Pausar</strong> y luego <strong>Reanudar</strong>.
           </p>
         </Step>
       </div>
@@ -335,9 +337,10 @@ function JudgeGuide() {
           tip='Si te equivocas, usa Deshacer: anula la última acción sin borrarla del historial de auditoría.'
         >
           <p>
-            Toca <strong>Punto</strong> del ganador e indica el <strong>motivo</strong>: ace, tiro ganador, error
-            forzado o no forzado, doble falta, penalización o infracción. Marca <strong>primera falta</strong> y
-            <strong> let</strong> cuando corresponda, y cambia el sacador al terminar cada game.
+            En modo <strong>rápido</strong> el punto se suma sin clasificar el motivo; activa el
+            <strong> detalle</strong> para indicar cómo terminó: ace, tiro ganador, error
+            forzado o no forzado, doble falta, penalización o infracción. Marca <strong>primera falta</strong>
+            (sin punto) y <strong>let</strong> (se repite el saque) cuando corresponda.
           </p>
           <p className='flex flex-wrap gap-2'>
             <span className='badge-brand'>Ace solo al sacador</span>
