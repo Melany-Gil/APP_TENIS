@@ -1,11 +1,42 @@
-.clay-court-stage { perspective: 900px; padding: 12px 8px 20px; }
-.clay-court { display: block; width: 100%; max-height: 250px; overflow: visible; transform: rotateX(22deg) rotateZ(-1deg); filter: drop-shadow(0 12px 8px rgba(51, 29, 17, .22)); }
-.clay-court-ball { transform: translate(65px, 150px); animation: clay-rally 7s ease-in-out infinite; animation-play-state: paused; }
-.clay-court-moving .clay-court-ball { animation-play-state: running; }
+.clay-court-stage { padding: 4px 0 8px; }
+.clay-court { display: block; width: 100%; max-height: 270px; border-radius: 18px; }
+.clay-court-ball { transform: translate(62px, 150px); animation: clay-rally 8s linear infinite; }
+.clay-ball-height { animation: clay-bounce 2s ease-in-out infinite; }
+.clay-ball-shadow { transform-origin: 2px 5px; animation: clay-shadow 2s ease-in-out infinite; }
+.clay-player-left { transform: translate(49px, 150px); animation: clay-left 8s ease-in-out infinite; }
+.clay-player-right { transform: translate(431px, 110px); animation: clay-right 8s ease-in-out infinite; }
+.clay-partner { animation: clay-ready 4s ease-in-out infinite; }
+.clay-partner-right { animation-direction: reverse; }
+.clay-court g, .clay-ball-shadow { animation-play-state: paused; }
+.clay-court-moving g, .clay-court-moving .clay-ball-shadow { animation-play-state: running; }
 @keyframes clay-rally {
-  0%, 100% { transform: translate(65px, 150px); }
-  25% { transform: translate(405px, 80px); }
-  50% { transform: translate(70px, 85px); }
-  75% { transform: translate(410px, 160px); }
+  0%, 100% { transform: translate(62px, 150px); }
+  25% { transform: translate(418px, 80px); }
+  50% { transform: translate(62px, 85px); }
+  75% { transform: translate(418px, 160px); }
 }
-@media (prefers-reduced-motion: reduce) { .clay-court-ball { animation: none; } }
+@keyframes clay-bounce {
+  0%, 100% { transform: translateY(-2px) scale(1); }
+  38% { transform: translateY(-15px) scale(1.2); }
+  72% { transform: translateY(0) scale(.95); }
+  85% { transform: translateY(-5px) scale(1.04); }
+}
+@keyframes clay-shadow {
+  0%, 72%, 100% { opacity: .32; transform: scale(1); }
+  38% { opacity: .12; transform: scale(1.7); }
+  85% { opacity: .23; transform: scale(1.2); }
+}
+@keyframes clay-left {
+  0%, 100% { transform: translate(49px, 150px); }
+  25% { transform: translate(49px, 113px); }
+  48%, 52% { transform: translate(49px, 85px); }
+  75% { transform: translate(49px, 118px); }
+}
+@keyframes clay-right {
+  0%, 100% { transform: translate(431px, 110px); }
+  23%, 27% { transform: translate(431px, 80px); }
+  50% { transform: translate(431px, 115px); }
+  73%, 77% { transform: translate(431px, 160px); }
+}
+@keyframes clay-ready { 0%, 100% { transform: translateY(-7px); } 50% { transform: translateY(7px); } }
+@media (prefers-reduced-motion: reduce) { .clay-court g, .clay-ball-shadow { animation: none; } }

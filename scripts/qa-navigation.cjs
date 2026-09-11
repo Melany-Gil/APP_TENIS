@@ -13,7 +13,7 @@ const base = 'http://127.0.0.1:4175'
         const url = new URL(route.request().url())
         if (url.pathname.startsWith('/api/')) {
           let data = []
-          if (url.pathname === '/api/partidos/10') data = { id: 10, deporte: 'tenis', modalidad: 'individual', estado: 'programado', jugador1: { nombre: 'Ana', apellido: 'Pérez' }, jugador2: { nombre: 'Luis', apellido: 'García' }, sets: [] }
+          if (url.pathname === '/api/partidos/10') data = { id: 10, deporte: 'tenis', modalidad: 'individual', estado: 'en_vivo', jugador1: { nombre: 'Ana', apellido: 'Pérez' }, jugador2: { nombre: 'Luis', apellido: 'García' }, sets: [] }
           if (url.pathname.endsWith('/foto')) data = null
           return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data }) })
         }
@@ -28,6 +28,18 @@ const base = 'http://127.0.0.1:4175'
         return nav.top >= primary.bottom - 1 && links.every(r => r.left >= 0 && r.right <= innerWidth && r.bottom <= nav.bottom + 1) && document.documentElement.scrollWidth <= innerWidth
       })
       assert.equal(valid, true, `Nav visible sin solaparse: ${width}`)
+      await page.locator('.clay-court').scrollIntoViewIfNeeded()
+      await page.locator('.clay-court-moving').waitFor()
+      const motion = () => page.evaluate(() => ['.clay-court-ball', '.clay-player-left'].map(s => getComputedStyle(document.querySelector(s)).transform))
+      const before = await motion()
+      await page.waitForTimeout(450)
+      const after = await motion()
+      assert.notEqual(before[0], after[0], 'La pelota se mueve')
+      assert.notEqual(before[1], after[1], 'El jugador se mueve')
+      await page.getByRole('button', { name: 'Pausar animación' }).click()
+      assert.equal(await page.locator('.clay-court-ball').evaluate(e => getComputedStyle(e).animationPlayState), 'paused')
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      assert.equal(await page.locator('.clay-player-left').evaluate(e => getComputedStyle(e).animationName), 'none')
       await page.screenshot({ path: require('node:path').join(require('node:os').tmpdir(), `nav-court-${width}.png`), fullPage: true })
       assert.deepEqual(errors, [])
       await page.close()
