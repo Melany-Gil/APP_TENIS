@@ -1,0 +1,310 @@
+.help-guide {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: 28px;
+  padding-bottom: 32px;
+}
+.help-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.help-orbit-ball {
+  width: clamp(120px, 16vw, 210px);
+  aspect-ratio: 1;
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.16;
+  background: radial-gradient(circle at 30% 24%, #ffffd4, #e4ec6b 32%, #acb83a 72%, #526e32);
+  box-shadow:
+    0 0 65px 18px #dae58455,
+    inset -14px -18px 28px #344d2644;
+  overflow: hidden;
+  animation: help-orbit 42s ease-in-out infinite;
+}
+.help-orbit-ball::before,
+.help-orbit-ball::after {
+  content: '';
+  position: absolute;
+  width: 90%;
+  height: 125%;
+  border: 3px solid #ffffe5;
+  border-radius: 50%;
+  top: -12%;
+  left: -60%;
+  transform: rotate(-28deg);
+}
+.help-orbit-ball::after {
+  left: 63%;
+}
+.help-hero {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 25px;
+  padding: clamp(26px, 4vw, 52px);
+  border-radius: 30px;
+  background: linear-gradient(125deg, #103d30, #1f5a45);
+  color: #f7f4e7;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 16px 45px #103d301c;
+}
+.help-eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.17em;
+  color: #dfe5b0;
+}
+.help-hero h1 {
+  font-size: clamp(36px, 5vw, 64px);
+  font-weight: 850;
+  line-height: 1.03;
+  letter-spacing: -0.055em;
+  margin: 22px 0;
+}
+.help-hero h1 em {
+  font-style: normal;
+  color: #e5eaa5;
+}
+.help-hero-description {
+  color: #e1e9df;
+  font-size: 14px;
+  line-height: 1.8;
+  max-width: 390px;
+}
+.help-guide-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 26px;
+}
+.help-guide-selector button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #c9d9b75c;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 44px;
+}
+.help-guide-selector button[aria-pressed='true'] {
+  background: #edf0d2;
+  color: #174332;
+  border-color: #edf0d2;
+}
+.help-motion-toggle {
+  margin-top: 18px;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  color: #e1e9df;
+  padding-block: 8px;
+}
+.help-hero-art {
+  align-self: center;
+  padding: 16px;
+  transform: rotate(-7deg);
+}
+.help-hero-art p {
+  margin-top: 24px;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: #d6ddbe;
+}
+.help-hero-art strong {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  color: #f8f1db;
+}
+.help-hero-court {
+  position: relative;
+  height: 185px;
+  border: 14px solid #a85435;
+  border-radius: 19px;
+  background: linear-gradient(140deg, #d68a59, #b75a35);
+  box-shadow: 0 20px 30px #032c3450;
+}
+.help-hero-court::before {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  border: 1px solid #fff7dbb3;
+  background: linear-gradient(
+    90deg,
+    transparent 49.5%,
+    #fffae6cc 49.5%,
+    #fffae6cc 50.5%,
+    transparent 50.5%
+  );
+}
+.help-hero-court::after {
+  content: '';
+  position: absolute;
+  inset: 36px 52px;
+  border: 1px solid #fff7dbb3;
+}
+.help-hero-court span {
+  position: absolute;
+  left: 49%;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  background: #fffbdfaa;
+}
+.help-hero-court i {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 20%, #ffffe5, #dde66a 55%, #859b28);
+  box-shadow: 4px 7px 3px #422d333d;
+  animation: help-rally 5s ease-in-out infinite;
+}
+.help-intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.help-section-tag {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  color: var(--color-brand);
+}
+.help-step {
+  border-radius: 24px;
+  border-top: 3px solid var(--club-clay);
+  background: var(--bg-card);
+  box-shadow: 0 8px 22px #123c2a07;
+}
+.help-step h2 {
+  letter-spacing: -0.025em;
+}
+.help-step .badge-brand { white-space: normal; max-width: 100%; }
+.help-step .badge-brand svg { flex-shrink: 0; }
+.help-step { min-width: 0; overflow-wrap: anywhere; }
+.help-step .form-win {
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--color-brand-dim);
+  color: var(--color-brand);
+}
+.help-step .help-art {
+  background: linear-gradient(120deg, var(--bg-input), var(--bg-hover));
+  border-radius: 18px;
+  padding: 20px;
+}
+.help-guide [id] {
+  scroll-margin-top: 220px;
+}
+.help-index {
+  border-radius: 22px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+.help-index a {
+  background: var(--bg-hover);
+  border: 0;
+  border-radius: 12px;
+}
+.help-faq {
+  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+}
+.help-faq details {
+  border-top: 1px solid var(--border-color);
+  padding: 14px 0;
+}
+.help-faq summary {
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 14px;
+  padding: 5px 0;
+}
+.help-faq details p {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  margin-top: 10px;
+}
+.help-guide button:focus-visible,
+.help-guide a:focus-visible,
+.help-guide summary:focus-visible {
+  outline: 3px solid var(--club-clay);
+  outline-offset: 4px;
+}
+.help-motion-paused *,
+.help-step[data-visible='false'] * {
+  animation-play-state: paused !important;
+}
+@keyframes help-orbit {
+  0%,
+  100% {
+    transform: translate(4vw, 16vh) rotate(0deg);
+  }
+  25% {
+    transform: translate(68vw, 60vh) rotate(70deg);
+  }
+  50% {
+    transform: translate(15vw, 76vh) rotate(140deg);
+  }
+  75% {
+    transform: translate(70vw, 12vh) rotate(225deg);
+  }
+}
+@keyframes help-rally {
+  0%,
+  100% {
+    transform: translate(24px, 35px);
+  }
+  50% {
+    transform: translate(170px, 110px) scale(0.85);
+  }
+}
+@media (max-width: 700px) {
+  .help-hero {
+    grid-template-columns: 1fr;
+  }
+  .help-hero-art {
+    display: none;
+  }
+  .help-guide {
+    gap: 20px;
+  }
+  .help-faq {
+    padding: 20px;
+  }
+  .help-guide .help-row {
+    grid-template-columns: 1fr;
+  }
+  .help-step .help-art {
+    padding: 12px;
+  }
+  .help-orbit-ball {
+    opacity: 0.12;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .help-guide *,
+  .help-guide *::before,
+  .help-guide *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto;
+  }
+  .help-orbit-ball {
+    transform: translate(65vw, 35vh);
+  }
+}

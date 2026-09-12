@@ -1,4 +1,5 @@
 import './HelpArt.css'
+import ClayCourt from '../match/ClayCourt'
 
 /* Ilustraciones animadas solo con CSS/SVG y variables del tema.
    Respetan prefers-reduced-motion (ver HelpArt.css). */
@@ -10,7 +11,10 @@ export function ArtLogin() {
         <p className='help-phone-title'>Bienvenido</p>
         <div className='help-field'>
           <span className='help-field-dot' />
-          <span className='help-typing'>ana.garcia<span className='help-caret' /></span>
+          <span className='help-typing'>
+            ana.garcia
+            <span className='help-caret' />
+          </span>
         </div>
         <div className='help-field'>
           <span className='help-field-dot' />
@@ -32,7 +36,10 @@ export function ArtPanel() {
         <span>Cancha 2</span>
       </div>
       <div className='help-mini live'>
-        <span className='help-mini-tag live'><i className='live-dot' />En vivo</span>
+        <span className='help-mini-tag live'>
+          <i className='live-dot' />
+          En vivo
+        </span>
         <strong>6-4 · 3-2</strong>
         <span>Saca: tú</span>
       </div>
@@ -65,7 +72,7 @@ export function ArtScore() {
           <span className='help-set'>/</span>
           <strong className='help-point'>30</strong>
         </div>
-        <div className='help-break'>BREAK POINT</div>
+        <div className='help-break'>EJEMPLO · PUNTO ACTUAL</div>
       </div>
     </div>
   )
@@ -73,17 +80,8 @@ export function ArtScore() {
 
 export function ArtCourt() {
   return (
-    <div className='help-art' aria-hidden='true'>
-      <svg className='help-court' viewBox='0 0 300 150'>
-        <rect x='8' y='8' width='284' height='134' rx='10' className='help-court-bg' />
-        <rect x='30' y='25' width='240' height='100' className='help-court-lines' />
-        <line x1='150' y1='25' x2='150' y2='125' className='help-court-lines' />
-        <line x1='30' y1='55' x2='270' y2='55' className='help-court-lines' />
-        <line x1='30' y1='95' x2='270' y2='95' className='help-court-lines' />
-        <line x1='150' y1='70' x2='150' y2='80' className='help-court-net' />
-        <circle r='7' className='help-ball' />
-      </svg>
-      <p className='help-caption'>Cancha ilustrativa · se pausa sola fuera de pantalla</p>
+    <div className='help-art'>
+      <ClayCourt match={{ estado: 'en_vivo', modalidad: 'dobles' }} />
     </div>
   )
 }
@@ -127,7 +125,9 @@ export function ArtFormat() {
         <span className='help-dir-item'>Ventaja o punto decisivo</span>
         <span className='help-dir-item'>Tie-break a 7</span>
       </div>
-      <p className='help-caption'>El formato lo define el torneo y se conserva · no se edita desde la mesa</p>
+      <p className='help-caption'>
+        Ejemplos de reglas · consulta siempre el formato configurado de tu partido
+      </p>
     </div>
   )
 }
