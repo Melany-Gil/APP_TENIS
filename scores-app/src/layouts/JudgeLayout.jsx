@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import ContentLoader from '../components/ui/ContentLoader'
 import ToastContainer from '../components/ui/Toast'
 import ThemeToggle from '../components/common/ThemeToggle'
+import NotificationBell from '../components/common/NotificationBell'
 import useAuthStore from '../store/useAuthStore'
 import { authService } from '../services/authService'
 
@@ -43,8 +44,8 @@ export default function JudgeLayout() {
             </span>
           </span>
         </Link>
-        <div className='ml-auto flex items-center gap-1'>
-          <nav aria-label='Navegación oficial' className='flex items-center gap-1'>
+        <div className='ml-auto flex flex-wrap items-center justify-end gap-1'>
+          <nav aria-label='Navegación oficial' className='flex flex-wrap items-center gap-1'>
             {['admin', 'juez_director'].includes(user?.rol) && (
               <NavLink to='/director' className={({ isActive }) => `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`}>
                 Director
@@ -56,6 +57,7 @@ export default function JudgeLayout() {
             <NavLink to='/ayuda' className={({ isActive }) => `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`}>
               Ayuda
             </NavLink>
+            <NavLink to='/soporte' className='btn-ghost text-xs px-2 py-2'>Soporte</NavLink>
             <NavLink to='/juez/perfil' className={({ isActive }) => `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`}>
               Mi perfil
             </NavLink>
@@ -66,6 +68,7 @@ export default function JudgeLayout() {
             </Link>
           )}
           <ThemeToggle />
+          <NotificationBell />
           <button onClick={signOut} className='btn-ghost p-2' aria-label='Cerrar sesión'>
             <LogOut className='w-5 h-5' />
           </button>

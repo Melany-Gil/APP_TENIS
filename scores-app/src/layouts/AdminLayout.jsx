@@ -17,6 +17,7 @@ import useAuthStore from '../store/useAuthStore'
 import { authService } from '../services/authService'
 import { useHealthCheck } from '../hooks/useHealthCheck'
 import ThemeToggle from '../components/common/ThemeToggle'
+import NotificationBell from '../components/common/NotificationBell'
 import ContentLoader from '../components/ui/ContentLoader'
 import SponsorDock from '../components/sponsors/SponsorDock'
 import { cn } from '../utils/cn'
@@ -28,6 +29,7 @@ const NAV = [
   { to: '/admin/torneos', icon: Trophy, label: 'Torneos' },
   { to: '/admin/partidos', icon: CalendarDays, label: 'Partidos' },
   { to: '/admin/anuncios', icon: Megaphone, label: 'Anuncios' },
+  { to: '/admin/tickets', icon: Megaphone, label: 'Tickets' },
   { to: '/admin/sedes', icon: MapPin, label: 'Sedes' },
   { to: '/admin/categorias', icon: Tag, label: 'Categorías' },
   { to: '/admin/usuarios', icon: UserCog, label: 'Usuarios' },
@@ -37,14 +39,14 @@ export default function AdminLayout() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
 
-  // Verifica conexión con el backend; si cae 3 veces seguidas, cierra sesión
+  // Comprueba disponibilidad sin cerrar sesión por caídas temporales de red.
   useHealthCheck()
 
   return (
     <div className='min-h-screen flex flex-col' style={{ backgroundColor: 'var(--bg-primary)' }}>
       {/* Header admin */}
       <header
-        className='app-header flex items-center h-16 px-4 sm:px-6 gap-4 shrink-0'
+        className='app-header flex flex-wrap items-center min-h-16 py-2 px-3 sm:px-6 gap-2 sm:gap-4 shrink-0'
         style={{
           backgroundColor: 'var(--bg-sidebar)',
         }}
@@ -68,6 +70,7 @@ export default function AdminLayout() {
 
         <div className='ml-auto flex items-center gap-2'>
           <ThemeToggle />
+          <NotificationBell />
           <span className='text-xs hidden sm:block' style={{ color: 'var(--text-muted)' }}>
             {user?.nombre} {user?.apellido}
           </span>

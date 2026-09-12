@@ -34,6 +34,7 @@ const Settings = lazy(() => import('../pages/Settings'))
 const Sponsors = lazy(() => import('../pages/Sponsors'))
 const Pantalla = lazy(() => import('../pages/Pantalla'))
 const Ayuda = lazy(() => import('../pages/Ayuda'))
+const Support = lazy(() => import('../pages/Support'))
 
 // ── Admin ─────────────────────────────────────────────────
 const Dashboard = lazy(() => import('../pages/admin/Dashboard'))
@@ -58,14 +59,14 @@ export default function AppRouter() {
   const { user, isAuthenticated } = useAuthStore()
   const { pathname } = useLocation()
   // Un juez estándar tiene solo /juez, /juez/perfil y la ayuda
-  if (isAuthenticated && user?.rol === 'juez' && !['/juez', '/juez/perfil', '/ayuda'].includes(pathname)) {
+  if (isAuthenticated && user?.rol === 'juez' && !['/juez', '/juez/perfil', '/ayuda', '/soporte'].includes(pathname)) {
     return <Navigate to={pathname === '/profile' ? '/juez/perfil' : '/juez'} replace />
   }
   // Un juez director tiene acceso a su panel dedicado (/director), a la mesa (/juez), a su perfil y a la ayuda
   if (
     isAuthenticated &&
     user?.rol === 'juez_director' &&
-    !['/director', '/juez', '/juez/perfil', '/ayuda'].includes(pathname)
+    !['/director', '/juez', '/juez/perfil', '/ayuda', '/soporte'].includes(pathname)
   ) {
     return <Navigate to='/director' replace />
   }
@@ -79,6 +80,9 @@ export default function AppRouter() {
       </Route>
 
       <Route path='/pantalla' element={<Suspense fallback={<div className='fixed inset-0 bg-[#07110d]' />}><Pantalla /></Suspense>} />
+      <Route element={['juez', 'juez_director'].includes(user?.rol) ? <JudgeLayout /> : <AppLayout />}>
+        <Route path='/ayuda' element={<Ayuda />} />
+      </Route>
 
       {/* Consulta pública de marcadores */}
       <Route element={<AppLayout />}>
@@ -89,7 +93,6 @@ export default function AppRouter() {
         <Route path='/sponsors' element={<Sponsors />} />
         <Route path='/padel' element={<Padel />} />
         <Route path='/match/:id' element={<Match />} />
-        <Route path='/ayuda' element={<Ayuda />} />
         <Route path='/player/:id' element={<Player />} />
         <Route path='/team/:id' element={<Team />} />
         <Route
@@ -142,6 +145,7 @@ export default function AppRouter() {
         }
       >
         <Route path='/juez' element={<JuezPartidos />} />
+        <Route path='/soporte' element={<Support />} />
         <Route path='/juez/perfil' element={<Profile />} />
         <Route path='/juez/partido/:id' element={<Navigate to='/juez' replace />} />
       </Route>
@@ -162,6 +166,7 @@ export default function AppRouter() {
         <Route path='/admin/torneos' element={<GestionTorneos />} />
         <Route path='/admin/partidos' element={<GestionPartidos />} />
         <Route path='/admin/anuncios' element={<GestionAnuncios />} />
+        <Route path='/admin/tickets' element={<Support />} />
         <Route path='/admin/sedes' element={<GestionSedes />} />
         <Route path='/admin/categorias' element={<GestionCategorias />} />
         <Route path='/admin/usuarios' element={<GestionUsuarios />} />

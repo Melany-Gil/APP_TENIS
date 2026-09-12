@@ -76,6 +76,9 @@ app.use('/api/categorias', categoriasRoutes)
 app.use('/api/sedes', sedesRoutes)
 app.use('/api/users', usersRoutes)
 app.use('/api/countries', countriesRoutes)
+app.use('/api/tickets', require('./src/modules/support/support.routes'))
+app.use('/api/notificaciones', require('./src/modules/support/notifications.routes'))
+app.use('/api/push', require('./src/modules/support/push.routes'))
 
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -148,7 +151,9 @@ const port = process.env.PORT || 3001
 let schemaPromise = null
 app.ensureSchemaOnce = () => {
   if (!schemaPromise) {
-    schemaPromise = readiness.start().catch((error) => {
+    schemaPromise = readiness.start().then(() => {
+      require('./src/modules/support/push.service').start()
+    }).catch((error) => {
       console.error('❌  No fue posible actualizar el esquema:', error.message)
       throw error
     })

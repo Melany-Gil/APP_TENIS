@@ -88,7 +88,7 @@ exports.remove = (id, actorId) => mutate(id, actorId, async (conn, user, protect
   const reasons = []
   for (const { tabla, columna } of links) {
     // These are personal preferences/recovery codes, not sporting history.
-    if (columna === 'user_id' && ['favoritos', 'password_resets'].includes(tabla)) continue
+    if (columna === 'user_id' && ['favoritos', 'password_resets', 'notificaciones', 'push_suscripciones'].includes(tabla)) continue
     if (!/^[a-zA-Z0-9_]+$/.test(tabla) || !/^[a-zA-Z0-9_]+$/.test(columna)) fail('No se pudo comprobar el historial de la cuenta', 500)
     const [[row]] = await conn.query(`SELECT COUNT(*) AS total FROM \`${tabla}\` WHERE \`${columna}\` = ?`, [id])
     const label = tabla === 'partidos' && columna === 'created_by' ? 'partidos creados' : labels[tabla] || 'registros relacionados'

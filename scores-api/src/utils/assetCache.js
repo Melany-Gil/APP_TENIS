@@ -4,7 +4,7 @@ const path = require('path')
 // names across releases and must be revalidated instead of cached for a year.
 exports.setAssetCacheHeaders = (res, filePath) => {
   const file = path.basename(filePath)
-  if (file.endsWith('.html')) {
+  if (file.endsWith('.html') || file === 'push-sw.js') {
     res.setHeader('Cache-Control', 'no-store')
   } else if (/[\\/]assets[\\/]/.test(filePath) && /-[A-Za-z0-9_-]{8,}\.(js|css)$/.test(file)) {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')

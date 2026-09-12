@@ -519,5 +519,6 @@ exports.ensureSchema = async () => {
   if (!(await columnExists('anuncios', 'imagen_url'))) {
     await db.query('ALTER TABLE anuncios ADD COLUMN imagen_url VARCHAR(255) NULL')
   }
+  await require('../modules/support/schema').ensureSupportSchema(db)
   console.log('✅  Esquema de partidos y jueces actualizado')
 }

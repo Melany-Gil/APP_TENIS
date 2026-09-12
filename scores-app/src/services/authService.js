@@ -1,4 +1,5 @@
 import api from './api'
+import { disablePush } from './pushService'
 
 export const authService = {
   login: ({ identificador, password, tipo_acceso }) => api.post('/auth/login', { identificador, password, tipo_acceso }),
@@ -13,5 +14,9 @@ export const authService = {
   resetPassword: ({ email, otp_code, password }) =>
     api.post('/auth/reset-password', { email, otp_code, password }),
 
-  logout: () => api.post('/auth/logout'),
+  logout: async () => {
+    // Local unsubscribe also runs if the server is temporarily offline.
+    await disablePush().catch(() => {})
+    return api.post('/auth/logout')
+  },
 }
