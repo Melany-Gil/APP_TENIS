@@ -10,8 +10,10 @@ import { usePlayers } from '../hooks/usePlayers'
 import { useDebounce } from '../hooks/useDebounce'
 import { categoriaService } from '../services/categoriaService'
 import { formatDate } from '../utils/formatDate'
+import TournamentDirectory from '../components/tournament/TournamentDirectory'
 
 const VIEW_TABS = [
+  { value: 'tournaments', label: 'Torneos' },
   { value: 'results', label: 'Resultados' },
   { value: 'upcoming', label: 'Próximos' },
   { value: 'players', label: 'Jugadores' },
@@ -110,6 +112,7 @@ export default function Tennis() {
         Tenis
       </h1>
       <Tabs tabs={VIEW_TABS} activeTab={view} onChange={setView} />
+      {view === 'tournaments' && <TournamentDirectory/>}
 
       {view === 'results' && (
         <div className='space-y-6'>

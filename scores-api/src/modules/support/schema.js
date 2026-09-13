@@ -23,6 +23,7 @@ exports.ensureSupportSchema = async (db) => {
     UNIQUE KEY uq_notificacion_evento (user_id, clave), KEY idx_notificacion_usuario (user_id, id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+  const notificationIdType=await require('./legacy-notifications').prepareNotifications(db)
   await db.query(`CREATE TABLE IF NOT EXISTS push_suscripciones (
     id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, endpoint_hash CHAR(64) NOT NULL UNIQUE,
     endpoint VARCHAR(2048) NOT NULL, p256dh VARCHAR(100) NOT NULL, auth VARCHAR(32) NOT NULL,
@@ -30,7 +31,7 @@ exports.ensureSupportSchema = async (db) => {
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
   await db.query(`CREATE TABLE IF NOT EXISTS push_entregas (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, notificacion_id BIGINT NOT NULL, suscripcion_id INT NOT NULL,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY, notificacion_id ${notificationIdType} NOT NULL, suscripcion_id INT NOT NULL,
     attempts INT NOT NULL DEFAULT 0, done BOOLEAN NOT NULL DEFAULT FALSE, lease CHAR(36) NULL,
     available_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_push_delivery (notificacion_id,suscripcion_id), KEY idx_push_pending (done,available_at),

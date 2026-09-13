@@ -10,7 +10,8 @@ const SELECT = `
     t.id, t.nombre, t.deporte, t.categoria_id, t.modalidad, t.sistema,
     t.fecha_inicio, t.fecha_fin, t.estado,
     c.nombre AS categoria_nombre,
-    (SELECT COUNT(*) FROM partidos p WHERE p.torneo_id = t.id) AS partidos_count
+    (SELECT COUNT(*) FROM partidos p WHERE p.torneo_id = t.id) AS partidos_count,
+    (SELECT COUNT(*) FROM inscripciones i WHERE i.torneo_id=t.id AND i.estado<>'eliminado') AS inscripciones_count
   FROM torneos t
   LEFT JOIN categorias c ON c.id = t.categoria_id
 `
@@ -78,6 +79,8 @@ exports.update = async (id, body) => {
     existing[0].modalidad !== tournament.modalidad
 
   if (structureChanged) {
+    const [[enrolled]]=await db.query("SELECT COUNT(*) AS total FROM inscripciones WHERE torneo_id=? AND estado<>'eliminado'",[id])
+    if(Number(enrolled.total)>0)throw {status:409,message:'No puedes cambiar deporte, categoría o modalidad mientras haya inscripciones. Revisa los participantes primero.'}
     const [[usage]] = await db.query('SELECT COUNT(*) AS total FROM partidos WHERE torneo_id = ?', [
       id,
     ])
@@ -213,5 +216,6 @@ function formatTournament(row) {
     fecha_fin: row.fecha_fin || null,
     estado: row.estado,
     partidos_count: Number(row.partidos_count || 0),
+    inscripciones_count: Number(row.inscripciones_count || 0),
   }
 }

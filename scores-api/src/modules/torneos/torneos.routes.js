@@ -33,8 +33,12 @@ const torneoRules = [
 ]
 
 // ── Rutas públicas (auth) ───────────────────────────────────────────────────────
-router.get('/', requireAuth, controller.getAll)
-router.get('/:id', requireAuth, controller.getById)
+router.get('/', controller.getAll)
+router.get('/:id', controller.getById)
+router.get('/:torneo_id/posiciones', require('../posiciones/posiciones.controller').getByTorneo)
+router.get('/:id/inscripciones', require('./inscripciones.controller').getByTorneo)
+router.post('/:id/inscripciones', requireAuth, requireAdmin, require('./inscripciones.controller').inscribirBulk)
+router.delete('/:id/inscripciones/:equipo_id', requireAuth, requireAdmin, require('./inscripciones.controller').removeInscripcion)
 
 // ── Rutas admin ─────────────────────────────────────────────────────────────────
 router.post('/', requireAuth, requireAdmin, torneoRules, validate, controller.create)

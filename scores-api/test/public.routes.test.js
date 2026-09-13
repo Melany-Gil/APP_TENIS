@@ -22,6 +22,7 @@ const {
 } = require('../src/middlewares/auth.middleware')
 
 const routes = {
+  torneos: require('../src/modules/torneos/torneos.routes'),
   categorias: require('../src/modules/categorias/categorias.routes'),
   equipos: require('../src/modules/equipos/equipos.routes'),
   jugadores: require('../src/modules/jugadores/jugadores.routes'),
@@ -40,6 +41,10 @@ const handlersFor = (router, method, path) => {
 
 test('las consultas necesarias para ver marcadores no exigen autenticación', () => {
   const publicReads = [
+    [routes.torneos, '/'],
+    [routes.torneos, '/:id'],
+    [routes.torneos, '/:id/inscripciones'],
+    [routes.torneos, '/:torneo_id/posiciones'],
     [routes.categorias, '/'],
     [routes.equipos, '/'],
     [routes.equipos, '/:id'],
@@ -59,6 +64,8 @@ test('las consultas necesarias para ver marcadores no exigen autenticación', ()
 
 test('las operaciones de administración siguen protegidas', () => {
   const protectedWrites = [
+    [routes.torneos, 'post', '/:id/inscripciones', requireAdmin],
+    [routes.torneos, 'delete', '/:id/inscripciones/:equipo_id', requireAdmin],
     [routes.categorias, 'post', '/', requireAdmin],
     [routes.equipos, 'post', '/', requireAdmin],
     [routes.jugadores, 'post', '/', requireAdmin],

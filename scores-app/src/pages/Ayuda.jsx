@@ -329,6 +329,7 @@ function MemberGuide() {
             <strong>pantalla (/pantalla)</strong> muestra la jornada en grande para el televisor del
             club.
           </p>
+          <p><strong>Tenis → Torneos:</strong> abre un torneo para consultar partidos, parejas inscritas y posiciones por grupo. Las inscripciones las gestiona administración; las tablas no anuncian clasificados automáticamente.</p>
         </Step>
       </div>
 

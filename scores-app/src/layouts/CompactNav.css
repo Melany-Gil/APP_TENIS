@@ -1,0 +1,23 @@
+.judge-mobile-nav {
+  display: none;
+}
+.judge-menu-links nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.judge-menu-links nav a {
+  padding: 14px 10px;
+  min-height: 44px;
+  background: var(--bg-hover);
+  border-radius: 12px;
+  font-size: 14px;
+}
+@media (max-width: 767px) {
+  .judge-desktop-nav {
+    display: none;
+  }
+  .judge-mobile-nav {
+    display: inline-flex;
+  }
+}

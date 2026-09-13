@@ -77,6 +77,7 @@ test('crear torneo guarda modalidad, sistema y categoría', async () => {
     'fecha_fin',
     'estado',
     'partidos_count',
+    'inscripciones_count',
   ])
 })
 

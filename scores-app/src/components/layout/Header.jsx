@@ -1,4 +1,8 @@
+import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { Menu } from 'lucide-react'
+import ActionDialog from '../common/ActionDialog'
+import { MotionToggle } from '../common/TennisAtmosphere'
 import {
   BookOpen,
   Megaphone,
@@ -33,6 +37,7 @@ const NAV_ITEMS = [
 ]
 
 export default function Header() {
+  const [menuOpen, setMenuOpen] = useState(false)
   const { user } = useAuthStore()
   const isAdmin = user?.rol === 'admin'
   const isOfficial = user?.rol === 'admin' || user?.rol === 'juez'
@@ -68,7 +73,6 @@ export default function Header() {
 
           <NotificationBell />
 
-
           {user ? (
             <ProfileMenu />
           ) : (
@@ -77,14 +81,36 @@ export default function Header() {
               <span>Ingresar</span>
             </Link>
           )}
+          <button
+            className='top-navigation-mobile btn-ghost p-2'
+            aria-label='Abrir menú de navegación'
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(true)}
+          >
+            <Menu size={22} />
+          </button>
         </div>
       </div>
-
+      {menuOpen && (
+        <ActionDialog title='Explora el club' onClose={() => setMenuOpen(false)}>
+          <nav
+            className='mobile-navigation-grid'
+            aria-label='Navegación móvil'
+            onClick={(e) => {
+              if (e.target.closest('a')) setMenuOpen(false)
+            }}
+          >
+            <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} />
+          </nav>
+          <MotionToggle />
+        </ActionDialog>
+      )}
       <nav
         className='top-navigation-links top-navigation-links-organized'
         aria-label='Navegación principal'
       >
-            <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} />
+        <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} />
+        <MotionToggle />
       </nav>
     </header>
   )

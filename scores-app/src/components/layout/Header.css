@@ -24,20 +24,18 @@
   min-height: 40px;
 }
 .top-navigation + .app-main { padding-top: 0; }
-@media (max-width: 640px) {
+.top-navigation-mobile { display:none; }
+.mobile-navigation-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.mobile-navigation-grid .top-navigation-link {white-space:normal;min-height:48px;padding:10px;font-size:13px;}
+@media (max-width: 767px) {
+  .top-navigation .top-navigation-primary {min-height:60px;flex-wrap:nowrap;padding:6px 12px;gap:6px;}
+  .top-navigation .top-navigation-brands {gap:6px;flex-shrink:1;min-width:0;}
+  .top-navigation .top-navigation-club-logo {width:34px;height:40px;}
+  .top-navigation .top-navigation-partner-logo {width:76px;max-height:40px;}
+  .top-navigation .top-navigation-actions {gap:2px;flex-shrink:0;}
+  .top-navigation .top-navigation-brand-divider {display:none;}
+  .top-navigation .top-navigation-mobile {display:inline-flex;}
   .top-navigation .top-navigation-links-organized {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding: 6px 10px 8px;
+    display:none;
   }
-  .top-navigation .top-navigation-links-organized .top-navigation-link {
-    font-size: 12px;
-    min-height: 34px;
-    padding: 7px 8px;
-    gap: 6px;
-    border-radius: 10px;
-  }
-}
-@media (max-width: 440px) {
-  .top-navigation .top-navigation-links-organized { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -362,7 +362,8 @@ export default function GestionTorneos() {
                     )}
                   </div>
                 </div>
-                <div className='flex items-center gap-2 shrink-0'>
+                <div className='flex flex-wrap items-center gap-2 shrink-0'>
+                  <Link to={`/torneo/${tournament.id}`} className='btn-secondary px-3 py-2 text-xs'>Detalle e inscripciones</Link>
                   <span
                     className='text-xs font-semibold px-3'
                     style={{ color: 'var(--text-muted)' }}

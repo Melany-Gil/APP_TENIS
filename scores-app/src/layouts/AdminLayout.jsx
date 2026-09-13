@@ -21,6 +21,7 @@ import NotificationBell from '../components/common/NotificationBell'
 import ContentLoader from '../components/ui/ContentLoader'
 import SponsorDock from '../components/sponsors/SponsorDock'
 import { cn } from '../utils/cn'
+import TennisAtmosphere, {MotionToggle} from '../components/common/TennisAtmosphere'
 
 const NAV = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
@@ -43,7 +44,8 @@ export default function AdminLayout() {
   useHealthCheck()
 
   return (
-    <div className='min-h-screen flex flex-col' style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <div className='min-h-screen flex flex-col tennis-scene' style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <TennisAtmosphere/>
       {/* Header admin */}
       <header
         className='app-header flex flex-wrap items-center min-h-16 py-2 px-3 sm:px-6 gap-2 sm:gap-4 shrink-0'
@@ -121,6 +123,7 @@ export default function AdminLayout() {
 
       {/* Contenido — Suspense local, el header/nav de arriba nunca se desmontan */}
       <main className='flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-7 sm:py-9'>
+        <div className='flex justify-end mb-2'><MotionToggle/></div>
         <Suspense fallback={<ContentLoader />}>
           <Outlet />
         </Suspense>

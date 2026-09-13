@@ -1,0 +1,63 @@
+.tennis-scene {
+  position: relative;
+  isolation: isolate;
+}
+.tennis-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tennis-atmosphere-ball {
+  position: absolute;
+  width: clamp(120px, 16vw, 210px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0.12;
+  background: radial-gradient(circle at 30% 24%, #ffffd4, #e4ec6b 32%, #acb83a 72%, #526e32);
+  box-shadow:
+    0 0 65px 18px #dae58455,
+    inset -14px -18px 28px #344d2644;
+  overflow: hidden;
+  animation: tennis-ambient 42s ease-in-out infinite;
+}
+.tennis-atmosphere-ball::before,
+.tennis-atmosphere-ball::after {
+  content: '';
+  position: absolute;
+  width: 90%;
+  height: 125%;
+  border: 3px solid #ffffe5;
+  border-radius: 50%;
+  top: -12%;
+  left: -60%;
+  transform: rotate(-28deg);
+}
+.tennis-atmosphere-ball::after {
+  left: 63%;
+}
+.tennis-atmosphere.is-paused * {
+  animation-play-state: paused !important;
+}
+@keyframes tennis-ambient {
+  0%,
+  100% {
+    transform: translate(4vw, 16vh) rotate(0deg);
+  }
+  25% {
+    transform: translate(68vw, 60vh) rotate(70deg);
+  }
+  50% {
+    transform: translate(15vw, 76vh) rotate(140deg);
+  }
+  75% {
+    transform: translate(70vw, 12vh) rotate(225deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tennis-atmosphere-ball {
+    animation: none;
+    transform: translate(65vw, 35vh);
+  }
+}

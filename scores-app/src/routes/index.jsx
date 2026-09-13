@@ -24,6 +24,7 @@ const Anuncios = lazy(() => import('../pages/Anuncios'))
 const PlayerDashboard = lazy(() => import('../pages/PlayerDashboard'))
 const Live = lazy(() => import('../pages/Live'))
 const Tennis = lazy(() => import('../pages/Tennis'))
+const TournamentDetail = lazy(() => import('../pages/TournamentDetail'))
 const Padel = lazy(() => import('../pages/Padel'))
 const Match = lazy(() => import('../pages/Match'))
 const Player = lazy(() => import('../pages/Player'))
@@ -90,6 +91,7 @@ export default function AppRouter() {
         <Route path='/live' element={<Live />} />
         <Route path='/anuncios' element={<Anuncios />} />
         <Route path='/tennis' element={<Tennis />} />
+        <Route path='/torneo/:id' element={<TournamentDetail />} />
         <Route path='/sponsors' element={<Sponsors />} />
         <Route path='/padel' element={<Padel />} />
         <Route path='/match/:id' element={<Match />} />

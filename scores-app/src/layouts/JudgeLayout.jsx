@@ -1,5 +1,7 @@
-import { Suspense } from 'react'
-import { LogOut } from 'lucide-react'
+import ActionDialog from '../components/common/ActionDialog'
+import './CompactNav.css'
+import { Suspense, useState } from 'react'
+import { LogOut, Menu } from 'lucide-react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import ContentLoader from '../components/ui/ContentLoader'
 import ToastContainer from '../components/ui/Toast'
@@ -10,6 +12,49 @@ import { authService } from '../services/authService'
 
 export default function JudgeLayout() {
   const { user, logout } = useAuthStore()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const officialNav = (
+    <nav aria-label='Navegación oficial' className='flex flex-wrap items-center gap-1'>
+      {['admin', 'juez_director'].includes(user?.rol) && (
+        <NavLink
+          to='/director'
+          className={({ isActive }) =>
+            `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`
+          }
+        >
+          Director
+        </NavLink>
+      )}
+      <NavLink
+        to='/juez'
+        end
+        className={({ isActive }) =>
+          `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`
+        }
+      >
+        Mesa de juez
+      </NavLink>
+      <NavLink
+        to='/ayuda'
+        className={({ isActive }) =>
+          `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`
+        }
+      >
+        Ayuda
+      </NavLink>
+      <NavLink to='/soporte' className='btn-ghost text-xs px-2 py-2'>
+        Soporte
+      </NavLink>
+      <NavLink
+        to='/juez/perfil'
+        className={({ isActive }) =>
+          `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`
+        }
+      >
+        Mi perfil
+      </NavLink>
+    </nav>
+  )
   const navigate = useNavigate()
   // A temporary courtside network loss must not log the judge out. The scoring
   // session handles reconnection; real 401 responses still expire the session.
@@ -26,15 +71,28 @@ export default function JudgeLayout() {
         className='app-header sticky top-0 z-40 min-h-14 px-2 sm:px-5 py-1 flex flex-wrap items-center gap-1'
         style={{ backgroundColor: 'var(--bg-sidebar)' }}
       >
-        <Link to={['admin', 'juez_director'].includes(user?.rol) ? '/director' : '/juez'} className='flex items-center gap-2 min-w-0'>
-          <img src='/branding/subcomite-tenis-club-union.png' alt='Subcomité de Tenis Club Unión' className='w-10 h-10 object-contain shrink-0' />
+        <Link
+          to={['admin', 'juez_director'].includes(user?.rol) ? '/director' : '/juez'}
+          className='flex items-center gap-2 min-w-0'
+        >
+          <img
+            src='/branding/subcomite-tenis-club-union.png'
+            alt='Subcomité de Tenis Club Unión'
+            className='w-10 h-10 object-contain shrink-0'
+          />
           <span className='min-w-0 hidden sm:block'>
             <span className='flex items-center gap-1.5'>
-              <strong className='block text-sm leading-tight' style={{ color: 'var(--text-primary)' }}>
+              <strong
+                className='block text-sm leading-tight'
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {user?.rol === 'juez_director' ? 'Juez Director' : 'Control de cancha'}
               </strong>
               {user?.rol === 'juez_director' && (
-                <span className='text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider' style={{ backgroundColor: 'rgba(234, 179, 8, 0.2)', color: 'var(--color-brand)' }}>
+                <span
+                  className='text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider'
+                  style={{ backgroundColor: 'rgba(234, 179, 8, 0.2)', color: 'var(--color-brand)' }}
+                >
                   Director
                 </span>
               )}
@@ -45,23 +103,28 @@ export default function JudgeLayout() {
           </span>
         </Link>
         <div className='ml-auto flex flex-wrap items-center justify-end gap-1'>
-          <nav aria-label='Navegación oficial' className='flex flex-wrap items-center gap-1'>
-            {['admin', 'juez_director'].includes(user?.rol) && (
-              <NavLink to='/director' className={({ isActive }) => `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`}>
-                Director
-              </NavLink>
-            )}
-            <NavLink to='/juez' end className={({ isActive }) => `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`}>
-              Mesa de juez
-            </NavLink>
-            <NavLink to='/ayuda' className={({ isActive }) => `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`}>
-              Ayuda
-            </NavLink>
-            <NavLink to='/soporte' className='btn-ghost text-xs px-2 py-2'>Soporte</NavLink>
-            <NavLink to='/juez/perfil' className={({ isActive }) => `btn-ghost text-xs px-2 py-2 ${isActive ? 'font-bold underline' : ''}`}>
-              Mi perfil
-            </NavLink>
-          </nav>
+          <div className='judge-desktop-nav'>{officialNav}</div>
+          <button
+            className='judge-mobile-nav btn-ghost p-2'
+            aria-label='Abrir menú del juez'
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(true)}
+          >
+            <Menu size={22} />
+          </button>
+          {menuOpen && (
+            <ActionDialog title='Control de cancha' onClose={() => setMenuOpen(false)}>
+              <div
+                className='judge-menu-links'
+                onClick={(e) => {
+                  if (e.target.closest('a')) setMenuOpen(false)
+                }}
+              >
+                {officialNav}
+              </div>
+            </ActionDialog>
+          )}
+
           {user?.rol === 'admin' && (
             <Link to='/admin' className='btn-ghost text-xs px-3 py-2 hidden sm:flex'>
               Administración
