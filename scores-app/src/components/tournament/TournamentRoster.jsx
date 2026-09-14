@@ -29,9 +29,9 @@ export default function TournamentRoster({
     [ordinal, setOrdinal] = useState('1')
   const [savedCategories,setSavedCategories] = useState({})
   const letters = (n) => { let label='';for(;n>0;n=Math.floor((n-1)/26))label=String.fromCharCode(65+(n-1)%26)+label;return label }
-  const prefix = (prefixMode === 'GRUPO' ? 'GRUPO' : customPrefix.trim().replace(/\\s+/g,' ').toUpperCase())
+  const prefix = (prefixMode === 'GRUPO' ? 'GRUPO' : customPrefix.trim().replace(/\s+/g,' ').toUpperCase())
   const newName = prefix + ' ' + (numbering === 'numbers' ? ordinal : letters(Number(ordinal)))
-  const validPrefix = /^[\\p{L}][\\p{L} -]{0,11}$/u.test(prefix)
+  const validPrefix = /^\p{L}[\p{L} -]{0,11}$/u.test(prefix)
   useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
