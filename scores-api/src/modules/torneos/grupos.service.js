@@ -1,4 +1,11 @@
 const db = require('../../config/db')
+exports.validNewName = (name) => {
+  const match = /^([\p{L}][\p{L} -]{0,11}) ([1-9]\d{0,2}|[A-Z]{1,2})$/u.exec(name)
+  if (!match) return false
+  const suffix = match[2]
+  const index = /^\d+$/.test(suffix) ? Number(suffix) : [...suffix].reduce((n,c)=>n*26+c.charCodeAt(0)-64,0)
+  return index >= 1 && index <= 200
+}
 const { createHash } = require('node:crypto')
 const revision = (groups, pairs) =>
   createHash('sha256')
@@ -121,7 +128,7 @@ exports.save = async (id, groups, expectedVersion) => {
     if (normalized.some((g) => !cats.some((c) => Number(c.id) === g.categoria_id)))
       fail('Categoría ajena al deporte', 400)
     const [enrolled] = await conn.query(
-      "SELECT i.equipo_id FROM inscripciones i JOIN equipos_padel e ON e.id=i.equipo_id WHERE i.torneo_id=? AND i.estado<>'eliminado' AND e.activo=1 AND e.deporte=? FOR UPDATE",
+      "SELECT i.equipo_id,e.categoria_id FROM inscripciones i JOIN equipos_padel e ON e.id=i.equipo_id WHERE i.torneo_id=? AND i.estado<>'eliminado' AND e.activo=1 AND e.deporte=? FOR UPDATE",
       [id, t.deporte]
     )
     if ([...teams].some((team) => !enrolled.some((e) => Number(e.equipo_id) === team)))
@@ -138,6 +145,14 @@ exports.save = async (id, groups, expectedVersion) => {
       fail('La distribución cambió. Actualiza la página y revisa los grupos antes de guardar.')
     const before = new Map(old.map((p) => [Number(p.equipo_id), p])),
       after = new Map()
+    for (const g of normalized) {
+      if (!oldGroups.some(o=>key(o.categoria_id,o.nombre)===key(g.categoria_id,g.nombre)) && !exports.validNewName(g.nombre))
+        fail('Usa un prefijo de hasta 12 letras y un número o letra de grupo válido (ej.: GRUPO 1 o ZONA A).',400)
+      for (const team of g.equipo_ids) {
+        const category = before.get(team)?.categoria_id ?? enrolled.find(e=>Number(e.equipo_id)===team)?.categoria_id
+        if (Number(category)!==g.categoria_id) fail(`La pareja #${team} pertenece a otra categoría. Solo puedes asignarle un grupo de su categoría.`,400)
+      }
+    }
     normalized.forEach((g) =>
       g.equipo_ids.forEach((e) => after.set(e, { categoria_id: g.categoria_id, grupo: g.nombre }))
     )

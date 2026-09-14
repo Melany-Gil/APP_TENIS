@@ -23,7 +23,15 @@ export default function TournamentRoster({
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(true),
     [newCat, setNewCat] = useState(''),
-    [newName, setNewName] = useState('')
+    [prefixMode, setPrefixMode] = useState('GRUPO'),
+    [customPrefix, setCustomPrefix] = useState(''),
+    [numbering, setNumbering] = useState('numbers'),
+    [ordinal, setOrdinal] = useState('1')
+  const [savedCategories,setSavedCategories] = useState({})
+  const letters = (n) => { let label='';for(;n>0;n=Math.floor((n-1)/26))label=String.fromCharCode(65+(n-1)%26)+label;return label }
+  const prefix = (prefixMode === 'GRUPO' ? 'GRUPO' : customPrefix.trim().replace(/\\s+/g,' ').toUpperCase())
+  const newName = prefix + ' ' + (numbering === 'numbers' ? ordinal : letters(Number(ordinal)))
+  const validPrefix = /^[\\p{L}][\\p{L} -]{0,11}$/u.test(prefix)
   useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
@@ -39,6 +47,7 @@ export default function TournamentRoster({
       .then(([g, c]) => {
         if (active) {
           setGroups(g.data.grupos)
+          setSavedCategories(Object.fromEntries((g.data.parejas || []).map(p=>[p.equipo_id,Number(p.categoria_id)])))
           setVersion(g.data.version)
           setIssues(g.data.incidencias)
           setCategories(c.data.filter((x) => [tournament.deporte, 'ambos'].includes(x.deporte)))
@@ -75,7 +84,10 @@ export default function TournamentRoster({
     `${p.nombre} ${p.jugador1?.nombre || ''} ${p.jugador1?.apellido || ''} ${p.jugador2?.nombre || ''} ${p.jugador2?.apellido || ''}`
       .toLowerCase()
       .includes(search.toLowerCase())
+  const categoryFor = (p) => savedCategories[p.equipo_id] ?? Number(p.categoria_id)
   const move = (id, value) => {
+    const team = teams.find(p=>Number(p.equipo_id)===Number(id))
+    if(value!=='' && (!team || Number(groups[Number(value)]?.categoria_id)!==categoryFor(team))){setError('Selecciona un grupo de la categoría de esta pareja.');return}
     setGroups((old) =>
       old.map((g, i) => ({
         ...g,
@@ -93,6 +105,7 @@ export default function TournamentRoster({
     try {
       const r = await tournamentService.saveGroups(tournament.id, groups, version)
       setGroups(r.data.grupos)
+      setSavedCategories(Object.fromEntries((r.data.parejas || []).map(p=>[p.equipo_id,Number(p.categoria_id)])))
       setVersion(r.data.version)
       setIssues(r.data.incidencias)
       setDirty(false)
@@ -167,7 +180,7 @@ export default function TournamentRoster({
             onChange={(e) => move(p.equipo_id, e.target.value)}
           >
             <option value=''>Sin grupo asignado</option>
-            {groups.map((g, i) => (
+            {groups.map((g,i)=>({g,i})).filter(({g})=>Number(g.categoria_id)===categoryFor(p)).map(({g,i}) => (
               <option key={i} value={i}>
                 {catName(g.categoria_id)} · {g.nombre}
               </option>
@@ -279,17 +292,22 @@ export default function TournamentRoster({
                 </option>
               ))}
             </select>
-            <input
-              aria-label='Nombre del nuevo grupo'
-              className='form-input'
-              maxLength={20}
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder='Grupo 1'
-            />
+            <select aria-label='Prefijo del grupo' className='form-input' value={prefixMode} onChange={e=>setPrefixMode(e.target.value)}>
+              <option value='GRUPO'>GRUPO</option><option value='custom'>Otra palabra…</option>
+            </select>
+            {prefixMode==='custom' && <label className='text-xs'>Prefijo personalizado (solo letras)
+              <input aria-label='Prefijo personalizado' className='form-input' maxLength={12} value={customPrefix} onChange={e=>setCustomPrefix(e.target.value)} placeholder='Ej.: ZONA' />
+            </label>}
+            <select aria-label='Sistema de numeración' className='form-input' value={numbering} onChange={e=>setNumbering(e.target.value)}>
+              <option value='numbers'>Números: 1, 2, 3…</option><option value='letters'>Letras: A, B, C…</option>
+            </select>
+            <select aria-label='Identificador del grupo' className='form-input' value={ordinal} onChange={e=>setOrdinal(e.target.value)}>
+              {Array.from({length:200},(_,i)=>i+1).map(n=><option key={n} value={n}>{numbering==='numbers'?n:letters(n)}</option>)}
+            </select>
+            <p className='text-sm self-center' aria-live='polite'>Nombre: <strong>{validPrefix?newName:'Introduce un prefijo válido'}</strong></p>
             <button
               className='btn-secondary'
-              disabled={busy || !newCat || !newName.trim()}
+              disabled={busy || !newCat || !validPrefix || newName.length>20}
               onClick={() => {
                 const name = newName.trim().replace(/\s+/g, ' ')
                 if (
@@ -307,7 +325,8 @@ export default function TournamentRoster({
                   { categoria_id: Number(newCat), nombre: name, equipo_ids: [] },
                 ])
                 setDirty(true)
-                setNewName('')
+                setOrdinal(String(Math.min(200,Number(ordinal)+1)))
+                setError('')
               }}
             >
               Añadir grupo
