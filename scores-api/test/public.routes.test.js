@@ -44,6 +44,7 @@ test('las consultas necesarias para ver marcadores no exigen autenticación', ()
     [routes.torneos, '/'],
     [routes.torneos, '/:id'],
     [routes.torneos, '/:id/inscripciones'],
+    [routes.torneos, '/:id/grupos'],
     [routes.torneos, '/:torneo_id/posiciones'],
     [routes.categorias, '/'],
     [routes.equipos, '/'],
@@ -65,13 +66,19 @@ test('las consultas necesarias para ver marcadores no exigen autenticación', ()
 test('las operaciones de administración siguen protegidas', () => {
   const protectedWrites = [
     [routes.torneos, 'post', '/:id/inscripciones', requireAdmin],
+    [routes.torneos, 'put', '/:id/grupos', requireAdmin],
     [routes.torneos, 'delete', '/:id/inscripciones/:equipo_id', requireAdmin],
     [routes.categorias, 'post', '/', requireAdmin],
     [routes.equipos, 'post', '/', requireAdmin],
     [routes.jugadores, 'post', '/', requireAdmin],
     [routes.partidos, 'post', '/', requireOfficial],
     [routes.partidos, 'put', '/:id/marcador', requireScorer],
-    ...['correccion', 'sustitucion', 'reasignar-juez', 'cancelar', 'reactivar'].map((action) => [routes.partidos, 'put', `/:id/${action}`, requireDirector]),
+    ...['correccion', 'sustitucion', 'reasignar-juez', 'cancelar', 'reactivar'].map((action) => [
+      routes.partidos,
+      'put',
+      `/:id/${action}`,
+      requireDirector,
+    ]),
     [routes.partidos, 'post', '/:id/iniciar', requireOfficial],
     [routes.partidos, 'put', '/:id/pausa', requireOfficial],
     [routes.partidos, 'put', '/:id/saque', requireOfficial],

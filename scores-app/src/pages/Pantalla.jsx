@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Maximize2, Radio, Trophy } from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Maximize2,
+  Radio,
+  Trophy,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import MatchStats from '../components/match/MatchStats'
 import MatchJudge from '../components/match/MatchJudge'
@@ -9,7 +17,7 @@ import { useMatchRealtime } from '../hooks/useMatchRealtime'
 import { useMatchTimer } from '../hooks/useMatchTimer'
 import { matchService } from '../services/matchService'
 import { getParticipantName } from '../utils/matchParticipants'
-import Avatar from '../components/ui/Avatar'
+import ParticipantAvatar from '../components/ui/ParticipantAvatar'
 
 const REFRESH_MS = 30000
 const SCREEN_SPONSOR = SPONSORS.find((sponsor) => sponsor.name === 'Induleche')
@@ -53,7 +61,9 @@ export default function Pantalla() {
         const live = liveResponse.data || []
         const finishedAll = finishedResponse.data || []
         const finishedToday = finishedAll.filter((match) => {
-          const finDate = match.en_vivo?.finalizado_at ? getLocalDate(new Date(match.en_vivo.finalizado_at)) : null
+          const finDate = match.en_vivo?.finalizado_at
+            ? getLocalDate(new Date(match.en_vivo.finalizado_at))
+            : null
           return match.fecha_inicio === today || finDate === today
         })
         const finishedToShow = finishedToday.length > 0 ? finishedToday : finishedAll.slice(0, 10)
@@ -62,8 +72,15 @@ export default function Pantalla() {
         const combined = [...live, ...finishedToShow]
         setMatches(Array.from(new Map(combined.map((match) => [Number(match.id), match])).values()))
       })
-      .catch(() => setLoadError('No se pudo actualizar. Se conserva el último marcador recibido; reintentando automáticamente.'))
-      .finally(() => { requestActive.current = false; setLoading(false) })
+      .catch(() =>
+        setLoadError(
+          'No se pudo actualizar. Se conserva el último marcador recibido; reintentando automáticamente.'
+        )
+      )
+      .finally(() => {
+        requestActive.current = false
+        setLoading(false)
+      })
   }, [])
 
   useEffect(() => {
@@ -88,8 +105,19 @@ export default function Pantalla() {
   const finishedMatches = matches.filter((match) => match.estado === 'finalizado')
 
   return (
-    <main className='min-h-screen w-full text-white pb-4 sm:pb-6 relative touch-pan-y' style={{ background: 'radial-gradient(circle at top left, #174b34 0, #0d251b 34%, #07110d 76%)' }}>
-      <header className='sticky top-0 z-30 h-[72px] shrink-0 flex items-center justify-between gap-4 px-4 sm:px-7 py-3 backdrop-blur-xl' style={{ backgroundColor: 'rgba(7,17,13,.95)', borderBottom: '1px solid rgba(139,203,96,.2)' }}>
+    <main
+      className='min-h-screen w-full text-white pb-4 sm:pb-6 relative touch-pan-y'
+      style={{
+        background: 'radial-gradient(circle at top left, #174b34 0, #0d251b 34%, #07110d 76%)',
+      }}
+    >
+      <header
+        className='sticky top-0 z-30 h-[72px] shrink-0 flex items-center justify-between gap-4 px-4 sm:px-7 py-3 backdrop-blur-xl'
+        style={{
+          backgroundColor: 'rgba(7,17,13,.95)',
+          borderBottom: '1px solid rgba(139,203,96,.2)',
+        }}
+      >
         <div className='flex items-center gap-2 sm:gap-3 min-w-0'>
           <Link
             to='/'
@@ -98,15 +126,29 @@ export default function Pantalla() {
           >
             <ArrowLeft className='w-5 h-5' />
           </Link>
-          <img src='/branding/subcomite-tenis-club-union.png' alt='Subcomité de Tenis Club Unión' className='w-12 h-12 object-contain shrink-0' />
+          <img
+            src='/branding/subcomite-tenis-club-union.png'
+            alt='Subcomité de Tenis Club Unión'
+            className='w-12 h-12 object-contain shrink-0'
+          />
           <div className='min-w-0'>
             <p className='font-black truncate'>Marcadores Club Unión</p>
             <p className='text-xs text-white/55'>Subcomité de Tenis · Bucaramanga</p>
           </div>
         </div>
         <div className='flex items-center gap-4 shrink-0'>
-          <a href='https://www.instagram.com/legal.branding' target='_blank' rel='noreferrer' className='hidden sm:block' aria-label='Instagram de Legal Branding'>
-            <img src='/branding/legal-branding.png' alt='Legal Branding' className='h-10 w-auto object-contain brightness-0 invert opacity-80' />
+          <a
+            href='https://www.instagram.com/legal.branding'
+            target='_blank'
+            rel='noreferrer'
+            className='hidden sm:block'
+            aria-label='Instagram de Legal Branding'
+          >
+            <img
+              src='/branding/legal-branding.png'
+              alt='Legal Branding'
+              className='h-10 w-auto object-contain brightness-0 invert opacity-80'
+            />
           </a>
           <ScreenClock />
         </div>
@@ -128,7 +170,12 @@ export default function Pantalla() {
               boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
             }}
           >
-            <div className='absolute inset-0 pointer-events-none' style={{ background: `linear-gradient(135deg, ${sponsor.accent}18 0%, transparent 45%, ${sponsor.accent}08 100%)` }} />
+            <div
+              className='absolute inset-0 pointer-events-none'
+              style={{
+                background: `linear-gradient(135deg, ${sponsor.accent}18 0%, transparent 45%, ${sponsor.accent}08 100%)`,
+              }}
+            />
             <div className='relative flex items-center justify-center gap-3 sm:gap-4 px-3 py-2 sm:py-2.5'>
               <a
                 href='https://www.instagram.com/induleche/?hl=es'
@@ -163,7 +210,14 @@ export default function Pantalla() {
                     {sponsor.name}
                   </p>
                   <div className='mt-0.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 font-semibold text-white/80 group-hover:text-white transition-all w-fit text-[10px] xs:text-[10.5px] sm:text-[11.5px]'>
-                    <svg className='w-3 h-3 shrink-0' fill='currentColor' viewBox='0 0 24 24' style={{ color: sponsor.accent }}><path d='M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z' /></svg>
+                    <svg
+                      className='w-3 h-3 shrink-0'
+                      fill='currentColor'
+                      viewBox='0 0 24 24'
+                      style={{ color: sponsor.accent }}
+                    >
+                      <path d='M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z' />
+                    </svg>
                     <span>@induleche</span>
                   </div>
                 </div>
@@ -180,9 +234,24 @@ export default function Pantalla() {
               backdropFilter: 'blur(20px)',
             }}
           >
-            <div className='absolute inset-0 pointer-events-none' style={{ background: `linear-gradient(135deg, ${sponsor.accent}18 0%, transparent 45%, ${sponsor.accent}08 100%)` }} />
-            <div className='absolute top-0 left-0 right-0 h-[2px]' style={{ background: `linear-gradient(90deg, transparent 5%, ${sponsor.accent}90, ${sponsor.accent}50, transparent 95%)` }} />
-            <div className='absolute bottom-0 left-8 right-8 h-px opacity-20' style={{ background: `linear-gradient(90deg, transparent, ${sponsor.accent}40, transparent)` }} />
+            <div
+              className='absolute inset-0 pointer-events-none'
+              style={{
+                background: `linear-gradient(135deg, ${sponsor.accent}18 0%, transparent 45%, ${sponsor.accent}08 100%)`,
+              }}
+            />
+            <div
+              className='absolute top-0 left-0 right-0 h-[2px]'
+              style={{
+                background: `linear-gradient(90deg, transparent 5%, ${sponsor.accent}90, ${sponsor.accent}50, transparent 95%)`,
+              }}
+            />
+            <div
+              className='absolute bottom-0 left-8 right-8 h-px opacity-20'
+              style={{
+                background: `linear-gradient(90deg, transparent, ${sponsor.accent}40, transparent)`,
+              }}
+            />
 
             <div className='relative flex flex-col md:grid md:grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-4 md:gap-6 px-3 py-3 sm:px-6 sm:py-3.5 md:px-8 md:py-4'>
               {/* Izquierda: Branding Hero de Induleche con logo grande y ancho */}
@@ -219,9 +288,26 @@ export default function Pantalla() {
                     {sponsor.name}
                   </p>
                   <div className='mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 font-semibold text-white/80 group-hover:text-white transition-all w-fit shadow-sm text-[10.5px] xs:text-[11px] sm:text-[12px]'>
-                    <svg className='w-3 h-3 shrink-0' fill='currentColor' viewBox='0 0 24 24' style={{ color: sponsor.accent }}><path d='M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z' /></svg>
+                    <svg
+                      className='w-3 h-3 shrink-0'
+                      fill='currentColor'
+                      viewBox='0 0 24 24'
+                      style={{ color: sponsor.accent }}
+                    >
+                      <path d='M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z' />
+                    </svg>
                     <span>@induleche</span>
-                    <svg className='w-3 h-3 text-white/40 group-hover:translate-x-0.5 transition-transform' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round' viewBox='0 0 24 24'><path d='M5 12h14M12 5l7 7-7 7' /></svg>
+                    <svg
+                      className='w-3 h-3 text-white/40 group-hover:translate-x-0.5 transition-transform'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeWidth='2.5'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      viewBox='0 0 24 24'
+                    >
+                      <path d='M5 12h14M12 5l7 7-7 7' />
+                    </svg>
                   </div>
                 </div>
               </a>
@@ -238,11 +324,24 @@ export default function Pantalla() {
           </div>
 
           <section className='p-4 sm:p-7'>
-            {loadError && <p role='status' className='text-sm text-amber-200 mb-3'>{loadError}</p>}
+            {loadError && (
+              <p role='status' className='text-sm text-amber-200 mb-3'>
+                {loadError}
+              </p>
+            )}
             <div className='flex items-center justify-between gap-3 mb-2'>
               <div className='flex items-center gap-2 min-w-0'>
-                {focusedMatch ? <Trophy className='w-5 h-5 text-lime-300 shrink-0' /> : <span className='relative flex w-3 h-3 shrink-0'><span className='absolute inset-0 rounded-full bg-orange-500 animate-ping' /><span className='relative w-3 h-3 rounded-full bg-orange-500' /></span>}
-                <h1 className='font-black text-xl truncate'>{focusedMatch ? 'Detalle del partido' : 'Jornada de hoy'}</h1>
+                {focusedMatch ? (
+                  <Trophy className='w-5 h-5 text-lime-300 shrink-0' />
+                ) : (
+                  <span className='relative flex w-3 h-3 shrink-0'>
+                    <span className='absolute inset-0 rounded-full bg-orange-500 animate-ping' />
+                    <span className='relative w-3 h-3 rounded-full bg-orange-500' />
+                  </span>
+                )}
+                <h1 className='font-black text-xl truncate'>
+                  {focusedMatch ? 'Detalle del partido' : 'Jornada de hoy'}
+                </h1>
               </div>
               {focusedMatch && (
                 <button
@@ -256,7 +355,11 @@ export default function Pantalla() {
             </div>
 
             {loading ? (
-              <div className='grid md:grid-cols-2 gap-4'>{[1, 2].map((item) => <div key={item} className='h-56 rounded-3xl bg-white/5 animate-pulse' />)}</div>
+              <div className='grid md:grid-cols-2 gap-4'>
+                {[1, 2].map((item) => (
+                  <div key={item} className='h-56 rounded-3xl bg-white/5 animate-pulse' />
+                ))}
+              </div>
             ) : focusedMatch ? (
               <ScreenMatch match={focusedMatch} featured onBack={() => setFocusedMatchId(null)} />
             ) : (
@@ -285,25 +388,74 @@ export default function Pantalla() {
             className='lg:hidden mx-3 mb-4 rounded-2xl overflow-hidden relative block group'
             style={{ border: `1px solid ${sponsor.accent}30` }}
           >
-            <div className='absolute inset-0 pointer-events-none' style={{ background: `linear-gradient(135deg, ${sponsor.accent}20 0%, transparent 50%, ${sponsor.accent}10 100%)` }} />
-            <div className='absolute top-0 left-0 right-0 h-[3px]' style={{ background: `linear-gradient(90deg, transparent 5%, ${sponsor.accent}80, ${sponsor.accent}50, transparent 95%)` }} />
-            <div className='absolute bottom-0 left-0 right-0 h-[2px]' style={{ background: `linear-gradient(90deg, transparent 5%, ${sponsor.accent}40, transparent 95%)` }} />
-            <div key={`mobile-${sponsor.image}`} className='relative flex flex-col items-center text-center px-4 py-5 animate-fade-up'>
-              <p className='text-[9px] uppercase tracking-[.22em] font-extrabold mb-3' style={{ color: `${sponsor.accent}bb` }}>Patrocinador oficial</p>
+            <div
+              className='absolute inset-0 pointer-events-none'
+              style={{
+                background: `linear-gradient(135deg, ${sponsor.accent}20 0%, transparent 50%, ${sponsor.accent}10 100%)`,
+              }}
+            />
+            <div
+              className='absolute top-0 left-0 right-0 h-[3px]'
+              style={{
+                background: `linear-gradient(90deg, transparent 5%, ${sponsor.accent}80, ${sponsor.accent}50, transparent 95%)`,
+              }}
+            />
+            <div
+              className='absolute bottom-0 left-0 right-0 h-[2px]'
+              style={{
+                background: `linear-gradient(90deg, transparent 5%, ${sponsor.accent}40, transparent 95%)`,
+              }}
+            />
+            <div
+              key={`mobile-${sponsor.image}`}
+              className='relative flex flex-col items-center text-center px-4 py-5 animate-fade-up'
+            >
+              <p
+                className='text-[9px] uppercase tracking-[.22em] font-extrabold mb-3'
+                style={{ color: `${sponsor.accent}bb` }}
+              >
+                Patrocinador oficial
+              </p>
               <div className='relative mb-3'>
-                <div className='absolute -inset-2 rounded-3xl opacity-35 blur-xl' style={{ background: sponsor.accent }} />
-                <div className='relative h-[64px] sm:h-[76px] aspect-video max-w-[150px] rounded-2xl bg-white p-1 flex items-center justify-center overflow-hidden shadow-xl' style={{ boxShadow: `0 8px 32px ${sponsor.accent}50` }}>
-                  <img src={sponsor.image} alt={sponsor.name} className='w-full h-full object-contain rounded-xl max-h-full' />
+                <div
+                  className='absolute -inset-2 rounded-3xl opacity-35 blur-xl'
+                  style={{ background: sponsor.accent }}
+                />
+                <div
+                  className='relative h-[64px] sm:h-[76px] aspect-video max-w-[150px] rounded-2xl bg-white p-1 flex items-center justify-center overflow-hidden shadow-xl'
+                  style={{ boxShadow: `0 8px 32px ${sponsor.accent}50` }}
+                >
+                  <img
+                    src={sponsor.image}
+                    alt={sponsor.name}
+                    className='w-full h-full object-contain rounded-xl max-h-full'
+                  />
                 </div>
               </div>
               <p className='font-black text-lg tracking-tight'>{sponsor.name}</p>
               <div
                 className='mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold group-hover:scale-105 transition-transform'
-                style={{ background: `${sponsor.accent}cc`, color: '#fff', boxShadow: `0 4px 16px ${sponsor.accent}40` }}
+                style={{
+                  background: `${sponsor.accent}cc`,
+                  color: '#fff',
+                  boxShadow: `0 4px 16px ${sponsor.accent}40`,
+                }}
               >
-                <svg className='w-3.5 h-3.5' fill='currentColor' viewBox='0 0 24 24'><path d='M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z' /></svg>
+                <svg className='w-3.5 h-3.5' fill='currentColor' viewBox='0 0 24 24'>
+                  <path d='M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z' />
+                </svg>
                 Ver en Instagram
-                <svg className='w-3 h-3' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round' viewBox='0 0 24 24'><path d='M5 12h14M12 5l7 7-7 7' /></svg>
+                <svg
+                  className='w-3 h-3'
+                  fill='none'
+                  stroke='currentColor'
+                  strokeWidth='2.5'
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  viewBox='0 0 24 24'
+                >
+                  <path d='M5 12h14M12 5l7 7-7 7' />
+                </svg>
               </div>
             </div>
           </a>
@@ -314,16 +466,35 @@ export default function Pantalla() {
           target='_blank'
           rel='noreferrer'
           className='hidden lg:flex flex-col items-center justify-center p-6 text-center group transition-colors hover:bg-white/[.05] sticky top-[73px] self-start h-[calc(100vh-73px)]'
-          style={{ backgroundColor: 'rgba(255,255,255,.035)', borderLeft: '1px solid rgba(255,255,255,.08)' }}
+          style={{
+            backgroundColor: 'rgba(255,255,255,.035)',
+            borderLeft: '1px solid rgba(255,255,255,.08)',
+          }}
         >
-          <p className='uppercase tracking-[.22em] text-[10px] text-white/45 mb-6'>Patrocinador oficial</p>
+          <p className='uppercase tracking-[.22em] text-[10px] text-white/45 mb-6'>
+            Patrocinador oficial
+          </p>
           <div key={sponsor.image} className='w-full animate-fade-up'>
-            <div className='aspect-square rounded-3xl bg-white p-3 flex items-center justify-center shadow-2xl group-hover:scale-[1.03] transition-transform' style={{ boxShadow: `0 0 44px ${sponsor.accent}55` }}>
-              <img src={sponsor.image} alt={sponsor.name} className='w-full h-full object-contain rounded-2xl' />
+            <div
+              className='aspect-square rounded-3xl bg-white p-3 flex items-center justify-center shadow-2xl group-hover:scale-[1.03] transition-transform'
+              style={{ boxShadow: `0 0 44px ${sponsor.accent}55` }}
+            >
+              <img
+                src={sponsor.image}
+                alt={sponsor.name}
+                className='w-full h-full object-contain rounded-2xl'
+              />
             </div>
             <p className='font-black mt-5 text-lg'>{sponsor.name}</p>
             <p className='mt-2 text-[10px] text-white/40 font-semibold flex items-center justify-center gap-1.5 group-hover:text-white/60 transition-colors'>
-              <svg className='w-3 h-3' fill='currentColor' viewBox='0 0 24 24' style={{ color: `${sponsor.accent}99` }}><path d='M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z' /></svg>
+              <svg
+                className='w-3 h-3'
+                fill='currentColor'
+                viewBox='0 0 24 24'
+                style={{ color: `${sponsor.accent}99` }}
+              >
+                <path d='M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z' />
+              </svg>
               @induleche
             </p>
           </div>
@@ -339,10 +510,21 @@ function ScreenClock() {
     const timer = setInterval(() => setClock(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
-  return <div className='text-right font-mono'>
-    <p className='text-sm sm:text-2xl font-black tabular-nums'>{clock.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</p>
-    <p className='hidden sm:block text-[11px] text-white/50 capitalize'>{clock.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-  </div>
+  return (
+    <div className='text-right font-mono'>
+      <p className='text-sm sm:text-2xl font-black tabular-nums'>
+        {clock.toLocaleTimeString('es-CO', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        })}
+      </p>
+      <p className='hidden sm:block text-[11px] text-white/50 capitalize'>
+        {clock.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+      </p>
+    </div>
+  )
 }
 
 function MatchGroup({ title, matches, emptyText, onFocus, live = false }) {
@@ -350,12 +532,17 @@ function MatchGroup({ title, matches, emptyText, onFocus, live = false }) {
     <section>
       <div className='mb-4 flex items-center gap-2'>
         {live ? (
-          <span className='relative flex w-2.5 h-2.5 shrink-0'><span className='absolute inset-0 rounded-full bg-orange-500 animate-ping' /><span className='relative w-2.5 h-2.5 rounded-full bg-orange-500' /></span>
+          <span className='relative flex w-2.5 h-2.5 shrink-0'>
+            <span className='absolute inset-0 rounded-full bg-orange-500 animate-ping' />
+            <span className='relative w-2.5 h-2.5 rounded-full bg-orange-500' />
+          </span>
         ) : (
           <Trophy className='w-4 h-4 text-amber-300' />
         )}
         <h2 className='font-black text-lg'>{title}</h2>
-        <span className='rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold'>{matches.length}</span>
+        <span className='rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold'>
+          {matches.length}
+        </span>
       </div>
       {matches.length ? (
         <div className='grid md:grid-cols-2 gap-4'>
@@ -364,7 +551,9 @@ function MatchGroup({ title, matches, emptyText, onFocus, live = false }) {
           ))}
         </div>
       ) : (
-        <div className='rounded-2xl border border-white/10 bg-white/[.035] px-5 py-6 text-sm text-white/45'>{emptyText}</div>
+        <div className='rounded-2xl border border-white/10 bg-white/[.035] px-5 py-6 text-sm text-white/45'>
+          {emptyText}
+        </div>
       )}
     </section>
   )
@@ -380,36 +569,71 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
   const isFinished = match.estado === 'finalizado'
 
   return (
-    <article className={`rounded-3xl overflow-hidden border border-white/10 bg-black/20 shadow-2xl ${featured ? 'min-h-[55vh] flex flex-col justify-center' : ''}`}>
+    <article
+      className={`rounded-3xl overflow-hidden border border-white/10 bg-black/20 shadow-2xl ${featured ? 'min-h-[55vh] flex flex-col justify-center' : ''}`}
+    >
       <div className='h-1' style={{ background: 'linear-gradient(90deg,#8bcb60,#c65d32)' }} />
       <div className={featured ? 'p-5 sm:p-8 lg:p-10' : 'p-4 sm:p-5'}>
         <div className='flex flex-col items-start justify-between gap-3 mb-4 sm:flex-row sm:items-center'>
           <div>
             <p className='text-xs uppercase tracking-wider font-bold text-lime-300'>
-              {match.torneo?.nombre ? `${match.torneo.nombre} · ` : ''}{match.categoria?.nombre || 'Tenis'}
+              {match.torneo?.nombre ? `${match.torneo.nombre} · ` : ''}
+              {match.categoria?.nombre || 'Tenis'}
             </p>
-            <p className='text-xs text-white/45 mt-1'>{match.cancha?.nombre || 'Cancha por confirmar'}</p>
+            <p className='text-xs text-white/45 mt-1'>
+              {match.cancha?.nombre || 'Cancha por confirmar'}
+            </p>
             <MatchJudge match={match} dark className='mt-2' />
           </div>
           <div className='flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end'>
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-mono font-bold ${isFinished ? 'bg-amber-300/15 text-amber-200' : 'bg-white/10'}`}>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-mono font-bold ${isFinished ? 'bg-amber-300/15 text-amber-200' : 'bg-white/10'}`}
+            >
               {isFinished ? <Trophy className='w-3 h-3' /> : <Clock3 className='w-3 h-3' />}
-              {isFinished ? `FINALIZADO · ${formatted}` : `${formatted}${isPaused ? ' · PAUSA' : ''}`}
+              {isFinished
+                ? `FINALIZADO · ${formatted}`
+                : `${formatted}${isPaused ? ' · PAUSA' : ''}`}
             </span>
             {onFocus && (
-              <button type='button' onClick={onFocus} className='h-9 rounded-full bg-white/10 hover:bg-white/15 inline-flex items-center justify-center gap-2 px-3 transition-colors' aria-label='Ver este partido a detalle'>
+              <button
+                type='button'
+                onClick={onFocus}
+                className='h-9 rounded-full bg-white/10 hover:bg-white/15 inline-flex items-center justify-center gap-2 px-3 transition-colors'
+                aria-label='Ver este partido a detalle'
+              >
                 <Maximize2 className='w-4 h-4' />
                 <span className='text-xs font-bold'>Ver a detalle</span>
               </button>
             )}
           </div>
         </div>
-        <ScreenPlayer name={p1} photo={match.jugador1?.foto} side='jugador1' index={0} marker={marker} visibleSets={visibleSets} featured={featured} />
+        <ScreenPlayer
+          team={match.equipo1}
+          name={p1}
+          photo={match.jugador1?.foto}
+          side='jugador1'
+          index={0}
+          marker={marker}
+          visibleSets={visibleSets}
+          featured={featured}
+        />
         <div className='h-px bg-white/10 my-2' />
-        <ScreenPlayer name={p2} photo={match.jugador2?.foto} side='jugador2' index={1} marker={marker} visibleSets={visibleSets} featured={featured} />
+        <ScreenPlayer
+          team={match.equipo2}
+          name={p2}
+          photo={match.jugador2?.foto}
+          side='jugador2'
+          index={1}
+          marker={marker}
+          visibleSets={visibleSets}
+          featured={featured}
+        />
         {marker?.breakpoint && !isFinished && (
           <div className='mt-2 text-center'>
-            <span className='inline-block rounded-full px-3 py-1 text-xs font-bold' style={{ backgroundColor: 'rgba(239,68,68,0.2)', color: '#fca5a5' }}>
+            <span
+              className='inline-block rounded-full px-3 py-1 text-xs font-bold'
+              style={{ backgroundColor: 'rgba(239,68,68,0.2)', color: '#fca5a5' }}
+            >
               {marker.breakpoint.count === 2 ? '2 BREAK POINTS' : 'BREAK POINT'}
             </span>
           </div>
@@ -431,21 +655,41 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
             >
               <div className='mb-4 flex items-center justify-between gap-3'>
                 <div>
-                  <p className='text-[10px] font-bold uppercase tracking-[.18em] text-white/40'>Comparativo</p>
-                  <h2 className='mt-1 text-lg font-black text-white'>Estadísticas de los jugadores</h2>
+                  <p className='text-[10px] font-bold uppercase tracking-[.18em] text-white/40'>
+                    Comparativo
+                  </p>
+                  <h2 className='mt-1 text-lg font-black text-white'>
+                    Estadísticas de los jugadores
+                  </h2>
                 </div>
-                <span className='rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/55'>En tiempo real</span>
+                <span className='rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/55'>
+                  En tiempo real
+                </span>
               </div>
               <MatchPhoto key={match.id} matchId={match.id} dark />
               <MatchStats matchId={match.id} player1={p1} player2={p2} />
             </section>
             <div className='mt-5 pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-sm text-white/55'>
               <div className='flex flex-wrap gap-x-5 gap-y-2'>
-                <span><strong className='text-white/80'>Formato:</strong> mejor de {match.formato?.mejor_de_sets || 3} sets</span>
-                <span><strong className='text-white/80'>Modalidad:</strong> {match.modalidad === 'dobles' ? 'Dobles' : 'Individual'}</span>
-                {match.notas && <span><strong className='text-white/80'>Nota:</strong> {match.notas}</span>}
+                <span>
+                  <strong className='text-white/80'>Formato:</strong> mejor de{' '}
+                  {match.formato?.mejor_de_sets || 3} sets
+                </span>
+                <span>
+                  <strong className='text-white/80'>Modalidad:</strong>{' '}
+                  {match.modalidad === 'dobles' ? 'Dobles' : 'Individual'}
+                </span>
+                {match.notas && (
+                  <span>
+                    <strong className='text-white/80'>Nota:</strong> {match.notas}
+                  </span>
+                )}
               </div>
-              <button type='button' onClick={onBack} className='inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/15 px-4 py-2 font-bold text-white transition-colors'>
+              <button
+                type='button'
+                onClick={onBack}
+                className='inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/15 px-4 py-2 font-bold text-white transition-colors'
+              >
                 <ArrowLeft className='w-4 h-4' /> Regresar a partidos
               </button>
             </div>
@@ -456,13 +700,25 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
   )
 }
 
-function ScreenPlayer({ name, photo, side, index, marker, visibleSets, featured }) {
+function ScreenPlayer({ name, photo, team, side, index, marker, visibleSets, featured }) {
   return (
-    <div className='grid items-center gap-1 sm:gap-2 py-2 [--screen-set:24px] sm:[--screen-set:36px] [--screen-point:36px] sm:[--screen-point:48px]' style={{ gridTemplateColumns: `minmax(0,1fr) repeat(${visibleSets},var(--screen-set)) var(--screen-point)` }}>
+    <div
+      className='grid items-center gap-1 sm:gap-2 py-2 [--screen-set:24px] sm:[--screen-set:36px] [--screen-point:36px] sm:[--screen-point:48px]'
+      style={{
+        gridTemplateColumns: `minmax(0,1fr) repeat(${visibleSets},var(--screen-set)) var(--screen-point)`,
+      }}
+    >
       <div className='flex items-center gap-2 min-w-0'>
-        <span className='w-2.5 h-2.5 rounded-full shrink-0' style={{ backgroundColor: marker?.server === side ? '#c65d32' : 'transparent' }} />
-        <Avatar src={photo} name={name} size='xs' className='border-white/15 hidden sm:inline-flex' />
-        <strong className={`break-words min-w-0 ${featured ? 'text-sm sm:text-xl' : 'text-xs sm:text-base'}`}>{name}</strong>
+        <span
+          className='w-2.5 h-2.5 rounded-full shrink-0'
+          style={{ backgroundColor: marker?.server === side ? '#c65d32' : 'transparent' }}
+        />
+        <ParticipantAvatar team={team} player={{ foto: photo }} name={name} size='xs' />
+        <strong
+          className={`break-words min-w-0 ${featured ? 'text-sm sm:text-xl' : 'text-xs sm:text-base'}`}
+        >
+          {name}
+        </strong>
         {marker?.winner === side && <Trophy className='w-4 h-4 text-amber-400 shrink-0' />}
       </div>
       {Array.from({ length: visibleSets }, (_, setIndex) => (
@@ -470,7 +726,11 @@ function ScreenPlayer({ name, photo, side, index, marker, visibleSets, featured 
           {marker?.sets?.[setIndex]?.games?.[index] ?? '/'}
         </strong>
       ))}
-      <strong className={`text-center rounded-xl py-2 bg-lime-300/15 text-lime-200 ${featured ? 'text-2xl sm:text-3xl' : 'text-lg'}`}>{marker?.displayPoints?.[index] ?? '0'}</strong>
+      <strong
+        className={`text-center rounded-xl py-2 bg-lime-300/15 text-lime-200 ${featured ? 'text-2xl sm:text-3xl' : 'text-lg'}`}
+      >
+        {marker?.displayPoints?.[index] ?? '0'}
+      </strong>
     </div>
   )
 }
@@ -484,7 +744,8 @@ function MiniSponsorsCarousel({ sponsors = [] }) {
   useEffect(() => {
     const query = window.matchMedia('(prefers-reduced-motion: reduce)')
     const update = () => setReducedMotion(query.matches)
-    update(); query.addEventListener('change', update)
+    update()
+    query.addEventListener('change', update)
     return () => query.removeEventListener('change', update)
   }, [])
   const pointerStartX = useRef(null)
@@ -513,7 +774,7 @@ function MiniSponsorsCarousel({ sponsors = [] }) {
       globalCarouselIndex = next
       setActiveIndex(next)
     },
-    [total],
+    [total]
   )
 
   useEffect(() => {
@@ -578,7 +839,10 @@ function MiniSponsorsCarousel({ sponsors = [] }) {
           <span className='px-1.5 py-0.5 rounded-full bg-white/10 text-[8px] uppercase tracking-[.2em] font-extrabold text-white/60 shrink-0'>
             Aliado
           </span>
-          <span className='text-[11px] xs:text-xs font-bold text-white truncate max-w-[130px] xs:max-w-[150px] sm:max-w-[170px]' key={activeSponsor?.name}>
+          <span
+            className='text-[11px] xs:text-xs font-bold text-white truncate max-w-[130px] xs:max-w-[150px] sm:max-w-[170px]'
+            key={activeSponsor?.name}
+          >
             {activeSponsor?.name}
           </span>
         </div>
@@ -644,7 +908,9 @@ function MiniSponsorsCarousel({ sponsors = [] }) {
                   boxShadow: isActive
                     ? `0 6px 20px -3px ${item.accent || '#000'}60, 0 3px 10px rgba(0,0,0,0.3)`
                     : '0 2px 8px rgba(0,0,0,0.25)',
-                  border: isActive ? `1.5px solid ${item.accent || '#ffffff'}aa` : '1px solid rgba(255,255,255,0.2)',
+                  border: isActive
+                    ? `1.5px solid ${item.accent || '#ffffff'}aa`
+                    : '1px solid rgba(255,255,255,0.2)',
                 }}
                 aria-label={item.name}
               >

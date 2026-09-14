@@ -76,8 +76,16 @@ const columnForeignKeyExists = async (tableName, columnName) => {
   return Number(rows[0].total) > 0
 }
 
-
 exports.ensureSchema = async () => {
+  // Independent tournament membership: never infer or populate it from old matches.
+  await db.query(`CREATE TABLE IF NOT EXISTS torneo_grupos (
+    torneo_id INT NOT NULL, categoria_id INT NOT NULL, nombre VARCHAR(20) NOT NULL,
+    PRIMARY KEY (torneo_id,categoria_id,nombre)
+  ) ENGINE=InnoDB`)
+  await db.query(`CREATE TABLE IF NOT EXISTS torneo_grupo_parejas (
+    torneo_id INT NOT NULL, equipo_id INT NOT NULL, categoria_id INT NOT NULL, grupo VARCHAR(20) NOT NULL,
+    PRIMARY KEY (torneo_id,equipo_id), KEY idx_grupo (torneo_id,categoria_id,grupo)
+  ) ENGINE=InnoDB`)
   // Nullable identities preserve unknown data; never invent documents/emails.
   if ((await getColumn('users', 'numero_documento'))?.isNullable === 'NO') {
     await db.query('ALTER TABLE users MODIFY numero_documento VARCHAR(20) NULL')
@@ -90,19 +98,24 @@ exports.ensureSchema = async () => {
   }
   if (!(await uniqueColumnIndexExists('users', 'telefono_acceso'))) {
     const { normalizePhone } = require('../utils/memberIdentity')
-    const [members] = await db.query("SELECT id, telefono FROM users WHERE rol IN ('miembro', 'admin')")
+    const [members] = await db.query(
+      "SELECT id, telefono FROM users WHERE rol IN ('miembro', 'admin')"
+    )
     const phones = new Map()
     for (const member of members) {
       try {
         const key = normalizePhone(member.telefono)
         if (key) phones.set(key, [...(phones.get(key) || []), member.id])
-      } catch { /* Existing invalid contact data must not prevent startup. */ }
+      } catch {
+        /* Existing invalid contact data must not prevent startup. */
+      }
     }
     // No se cruza aquí con documento/usuario: esos choques se bloquean al
     // crear/editar y se resuelven desde Administración sin adivinar cuentas.
     for (const [key, ids] of phones) {
       // Shared numbers require an admin to resolve them; never pick an account.
-      if (ids.length === 1) await db.query('UPDATE users SET telefono_acceso = ? WHERE id = ?', [key, ids[0]])
+      if (ids.length === 1)
+        await db.query('UPDATE users SET telefono_acceso = ? WHERE id = ?', [key, ids[0]])
     }
     await db.query('ALTER TABLE users ADD UNIQUE KEY uq_users_telefono_acceso (telefono_acceso)')
   }
@@ -110,10 +123,16 @@ exports.ensureSchema = async () => {
   // inicializa números históricos válidos y no repetidos sin tocar los ya asignados.
   try {
     const { normalizePhone: normalizeAdminPhone } = require('../utils/memberIdentity')
-    const [admins] = await db.query("SELECT id, telefono, telefono_acceso FROM users WHERE rol = 'admin' AND telefono_acceso IS NULL AND telefono IS NOT NULL")
+    const [admins] = await db.query(
+      "SELECT id, telefono, telefono_acceso FROM users WHERE rol = 'admin' AND telefono_acceso IS NULL AND telefono IS NOT NULL"
+    )
     for (const admin of admins) {
       let key = null
-      try { key = normalizeAdminPhone(admin.telefono) } catch { continue }
+      try {
+        key = normalizeAdminPhone(admin.telefono)
+      } catch {
+        continue
+      }
       if (!key) continue
       try {
         await db.query('UPDATE users SET telefono_acceso = ? WHERE id = ?', [key, admin.id])
@@ -458,7 +477,9 @@ exports.ensureSchema = async () => {
   }
 
   if (!(await columnExists('partidos', 'control_version'))) {
-    await db.query('ALTER TABLE partidos ADD COLUMN control_version INT UNSIGNED NOT NULL DEFAULT 0')
+    await db.query(
+      'ALTER TABLE partidos ADD COLUMN control_version INT UNSIGNED NOT NULL DEFAULT 0'
+    )
   }
   await db.query(`CREATE TABLE IF NOT EXISTS auditoria_control_partido (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -502,7 +523,9 @@ exports.ensureSchema = async () => {
 
   // Additive delivery key: a retried point cannot be counted twice.
   if (!(await columnExists('eventos_partido', 'client_action_id'))) {
-    await db.query('ALTER TABLE eventos_partido ADD COLUMN client_action_id CHAR(36) NULL, ADD UNIQUE KEY uq_event_client_action (client_action_id)')
+    await db.query(
+      'ALTER TABLE eventos_partido ADD COLUMN client_action_id CHAR(36) NULL, ADD UNIQUE KEY uq_event_client_action (client_action_id)'
+    )
   }
 
   // Never run historical data-cleanup jobs during application startup.

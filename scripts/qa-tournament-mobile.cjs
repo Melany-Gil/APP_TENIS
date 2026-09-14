@@ -48,6 +48,8 @@ const base = "http://127.0.0.1:4175";
           if (url.pathname === "/api/torneos/8") data = tournament;
           if (url.pathname.endsWith("/inscripciones"))
             data = { total_parejas: 0, categorias: [], inscripciones_raw: [] };
+          if (url.pathname.endsWith("/grupos"))
+            data = { grupos: [], parejas: [], incidencias: [], version: 'test' };
           if (url.pathname.endsWith("/posiciones"))
             data = {
               nombres_grupos: ["Quinta · A"],
@@ -111,7 +113,7 @@ const base = "http://127.0.0.1:4175";
       await page
         .getByRole("button", { name: "Posiciones", exact: true })
         .click();
-      await page.getByRole("cell", { name: "2", exact: true }).waitFor();
+      await page.locator('strong').filter({ hasText: /^2$/ }).first().waitFor();
       assert.equal(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,

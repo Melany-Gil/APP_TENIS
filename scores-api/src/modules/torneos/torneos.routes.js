@@ -35,10 +35,42 @@ const torneoRules = [
 // ── Rutas públicas (auth) ───────────────────────────────────────────────────────
 router.get('/', controller.getAll)
 router.get('/:id', controller.getById)
+const groups = require('./grupos.service')
+const groupAction = (action) => async (req, res) => {
+  try {
+    if (!/^[1-9]\d*$/.test(req.params.id))
+      return res.status(400).json({ ok: false, message: 'Torneo inválido' })
+    res.json({ ok: true, data: await action(req) })
+  } catch (e) {
+    res
+      .status(e.status || 500)
+      .json({ ok: false, message: e.status ? e.message : 'No se pudieron procesar los grupos' })
+  }
+}
+router.get(
+  '/:id/grupos',
+  groupAction((req) => groups.get(Number(req.params.id)))
+)
+router.put(
+  '/:id/grupos',
+  requireAuth,
+  requireAdmin,
+  groupAction((req) => groups.save(Number(req.params.id), req.body.grupos, req.body.version))
+)
 router.get('/:torneo_id/posiciones', require('../posiciones/posiciones.controller').getByTorneo)
 router.get('/:id/inscripciones', require('./inscripciones.controller').getByTorneo)
-router.post('/:id/inscripciones', requireAuth, requireAdmin, require('./inscripciones.controller').inscribirBulk)
-router.delete('/:id/inscripciones/:equipo_id', requireAuth, requireAdmin, require('./inscripciones.controller').removeInscripcion)
+router.post(
+  '/:id/inscripciones',
+  requireAuth,
+  requireAdmin,
+  require('./inscripciones.controller').inscribirBulk
+)
+router.delete(
+  '/:id/inscripciones/:equipo_id',
+  requireAuth,
+  requireAdmin,
+  require('./inscripciones.controller').removeInscripcion
+)
 
 // ── Rutas admin ─────────────────────────────────────────────────────────────────
 router.post('/', requireAuth, requireAdmin, torneoRules, validate, controller.create)

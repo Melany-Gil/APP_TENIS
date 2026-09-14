@@ -9,7 +9,7 @@ import { cn } from '../../utils/cn'
 import { useLoginRequired } from '../../hooks/useLoginRequired'
 import { getParticipantName } from '../../utils/matchParticipants'
 import { useMatchTimer } from '../../hooks/useMatchTimer'
-import Avatar from '../ui/Avatar'
+import ParticipantAvatar from '../ui/ParticipantAvatar'
 
 export default function MatchCard({ match }) {
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
@@ -38,7 +38,10 @@ export default function MatchCard({ match }) {
               {match.categoria?.nombre || 'Sin categoría'}
             </span>
             {match.torneo?.nombre && (
-              <span className='text-[10px] font-semibold truncate' style={{ color: 'var(--text-muted)' }}>
+              <span
+                className='text-[10px] font-semibold truncate'
+                style={{ color: 'var(--text-muted)' }}
+              >
                 {match.torneo.nombre}
               </span>
             )}
@@ -48,7 +51,10 @@ export default function MatchCard({ match }) {
               <span className='flex items-center gap-1.5'>
                 <LiveBadge />
                 {match.en_vivo?.iniciado_at && (
-                  <span className='flex items-center gap-1 text-[10px] tabular-nums' style={{ color: 'var(--text-muted)' }}>
+                  <span
+                    className='flex items-center gap-1 text-[10px] tabular-nums'
+                    style={{ color: 'var(--text-muted)' }}
+                  >
                     <Clock3 className='h-3 w-3' /> {timer.formatted}
                   </span>
                 )}
@@ -89,6 +95,7 @@ export default function MatchCard({ match }) {
           <PlayerRow
             name={p1Name}
             photo={match.jugador1?.foto}
+            team={match.equipo1}
             sets={p1Sets}
             points={match.marcador_actual?.displayPoints?.[0]}
             isServing={match.marcador_actual?.server === 'jugador1'}
@@ -98,6 +105,7 @@ export default function MatchCard({ match }) {
           <PlayerRow
             name={p2Name}
             photo={match.jugador2?.foto}
+            team={match.equipo2}
             sets={p2Sets}
             points={match.marcador_actual?.displayPoints?.[1]}
             isServing={match.marcador_actual?.server === 'jugador2'}
@@ -107,7 +115,10 @@ export default function MatchCard({ match }) {
         </div>
 
         {match.cancha && (
-          <div className='px-4 py-2 text-[11px] flex items-center gap-1.5' style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)' }}>
+          <div
+            className='px-4 py-2 text-[11px] flex items-center gap-1.5'
+            style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)' }}
+          >
             <MapPin className='w-3 h-3' /> {match.cancha.nombre}
             {match.cancha.superficie ? ` · ${match.cancha.superficie}` : ''}
           </div>
@@ -132,13 +143,16 @@ export default function MatchCard({ match }) {
   )
 }
 
-function PlayerRow({ name, photo, sets, points, isServing, isWinner, isLive }) {
+function PlayerRow({ name, photo, team, sets, points, isServing, isWinner, isLive }) {
   return (
     <div className='flex items-center gap-2'>
       {isServing && isLive && (
-        <span className='w-2 h-2 rounded-full shrink-0' style={{ backgroundColor: 'var(--club-clay)' }} />
+        <span
+          className='w-2 h-2 rounded-full shrink-0'
+          style={{ backgroundColor: 'var(--club-clay)' }}
+        />
       )}
-      <Avatar src={photo} name={name} size='xs' />
+      <ParticipantAvatar team={team} player={{ foto: photo }} name={name} size='xs' />
       <span
         className={cn('flex-1 text-sm truncate')}
         style={{

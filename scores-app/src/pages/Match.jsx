@@ -1,5 +1,13 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, BarChart3, CalendarDays, Clock3, MapPin, MessageSquareText, Star } from 'lucide-react'
+import {
+  ArrowLeft,
+  BarChart3,
+  CalendarDays,
+  Clock3,
+  MapPin,
+  MessageSquareText,
+  Star,
+} from 'lucide-react'
 import LiveBadge from '../components/match/LiveBadge'
 import MatchStats from '../components/match/MatchStats'
 import ClayCourt from '../components/match/ClayCourt'
@@ -15,10 +23,10 @@ import { cn } from '../utils/cn'
 import { useLoginRequired } from '../hooks/useLoginRequired'
 import { getParticipantName } from '../utils/matchParticipants'
 import { useMatchTimer } from '../hooks/useMatchTimer'
-import Avatar from '../components/ui/Avatar'
+import ParticipantAvatar from '../components/ui/ParticipantAvatar'
 
 export default function Match() {
-  const user = useAuthStore(store => store.user)
+  const user = useAuthStore((store) => store.user)
   const { id } = useParams()
   const { match, loading } = useMatch(id)
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
@@ -51,14 +59,14 @@ export default function Match() {
   const isFav = isPartidoFavorite(match.id)
 
   const p1 = isDoubles
-    ? { name: getParticipantName(match, 1) }
+    ? { name: getParticipantName(match, 1), team: match.equipo1 }
     : {
         name: getParticipantName(match, 1),
         ranking: match.jugador1?.ranking,
         photo: match.jugador1?.foto,
       }
   const p2 = isDoubles
-    ? { name: getParticipantName(match, 2) }
+    ? { name: getParticipantName(match, 2), team: match.equipo2 }
     : {
         name: getParticipantName(match, 2),
         ranking: match.jugador2?.ranking,
@@ -107,7 +115,10 @@ export default function Match() {
           {match.categoria?.nombre && <span className='badge-brand'>{match.categoria.nombre}</span>}
           {match.torneo?.nombre && <span className='font-semibold'>{match.torneo.nombre}</span>}
           {match.cancha?.nombre && (
-            <span className='inline-flex items-center gap-1'><MapPin className='w-3 h-3' />{match.cancha.nombre}</span>
+            <span className='inline-flex items-center gap-1'>
+              <MapPin className='w-3 h-3' />
+              {match.cancha.nombre}
+            </span>
           )}
         </div>
 
@@ -128,8 +139,15 @@ export default function Match() {
               <div className='flex items-center gap-2'>
                 <LiveBadge />
                 {match.en_vivo && (
-                  <span className='inline-flex items-center gap-1 rounded-full px-2 py-1 font-mono text-xs' style={{ backgroundColor: 'var(--bg-hover)', color: isPaused ? 'var(--club-clay)' : 'var(--text-secondary)' }}>
-                    <Clock3 className='w-3 h-3' /> {elapsed}{isPaused ? ' · PAUSADO' : ''}
+                  <span
+                    className='inline-flex items-center gap-1 rounded-full px-2 py-1 font-mono text-xs'
+                    style={{
+                      backgroundColor: 'var(--bg-hover)',
+                      color: isPaused ? 'var(--club-clay)' : 'var(--text-secondary)',
+                    }}
+                  >
+                    <Clock3 className='w-3 h-3' /> {elapsed}
+                    {isPaused ? ' · PAUSADO' : ''}
                   </span>
                 )}
               </div>
@@ -168,7 +186,11 @@ export default function Match() {
         </div>
       </div>
 
-      {match.deporte === 'tenis' && <div className='card p-4'><ClayCourt match={match} /></div>}
+      {match.deporte === 'tenis' && (
+        <div className='card p-4'>
+          <ClayCourt match={match} />
+        </div>
+      )}
       {match.notas && (
         <div
           className='card p-4 flex items-start gap-3'
@@ -189,14 +211,29 @@ export default function Match() {
         </div>
       )}
 
-      {user?.rol === 'admin' && <MatchPhotoCapture key={`photo:${user.id}:${match.id}`} matchId={match.id} userId={user.id} finished={match.estado === 'finalizado'} />}
+      {user?.rol === 'admin' && (
+        <MatchPhotoCapture
+          key={`photo:${user.id}:${match.id}`}
+          matchId={match.id}
+          userId={user.id}
+          finished={match.estado === 'finalizado'}
+        />
+      )}
       <MatchPhoto key={match.id} matchId={match.id} />
       {(isLive || match.estado === 'finalizado') && match.deporte === 'tenis' && (
         <section className='card p-4 sm:p-5'>
-          <h2 className='font-bold flex items-center gap-2 mb-4' style={{ color: 'var(--text-primary)' }}>
+          <h2
+            className='font-bold flex items-center gap-2 mb-4'
+            style={{ color: 'var(--text-primary)' }}
+          >
             <BarChart3 className='w-4 h-4' /> Estadísticas del partido
           </h2>
-          {isDoubles && <p className='text-xs mb-4' style={{ color: 'var(--text-muted)' }}>En dobles, estas estadísticas corresponden a cada pareja completa, no a cada jugador por separado.</p>}
+          {isDoubles && (
+            <p className='text-xs mb-4' style={{ color: 'var(--text-muted)' }}>
+              En dobles, estas estadísticas corresponden a cada pareja completa, no a cada jugador
+              por separado.
+            </p>
+          )}
           <MatchStats matchId={match.id} player1={p1.name} player2={p2.name} />
         </section>
       )}
@@ -209,9 +246,17 @@ function ScoreRow({ player, sets, points, isServing, isWinner, isLive }) {
     <div className='flex items-center gap-3'>
       <div className='flex items-center gap-2 flex-1 min-w-0'>
         {isServing && isLive && (
-          <span className='w-2.5 h-2.5 rounded-full shrink-0' style={{ backgroundColor: 'var(--club-clay)' }} />
+          <span
+            className='w-2.5 h-2.5 rounded-full shrink-0'
+            style={{ backgroundColor: 'var(--club-clay)' }}
+          />
         )}
-        <Avatar src={player.photo} name={player.name} size='sm' />
+        <ParticipantAvatar
+          team={player.team}
+          player={{ foto: player.photo }}
+          name={player.name}
+          size='sm'
+        />
         <div>
           <p
             className='font-semibold'

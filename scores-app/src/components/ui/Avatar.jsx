@@ -1,4 +1,5 @@
 import { cn } from '../../utils/cn'
+import { useState } from 'react'
 import { getMediaUrl } from '../../utils/getMediaUrl'
 
 const SIZES = {
@@ -19,14 +20,15 @@ const initialsFor = (name) => String(name || 'U')
 
 export default function Avatar({ src, name, size = 'md', className }) {
   const resolvedSrc = getMediaUrl(src)
+  const [failedSrc, setFailedSrc] = useState(null)
   const sharedClassName = cn(
     'rounded-full border object-cover shrink-0',
     SIZES[size] || SIZES.md,
     className
   )
 
-  if (resolvedSrc) {
-    return <img src={resolvedSrc} alt={name ? `Foto de ${name}` : 'Foto de perfil'} className={sharedClassName} loading='lazy' decoding='async' />
+  if (resolvedSrc && failedSrc !== resolvedSrc) {
+    return <img src={resolvedSrc} onError={() => setFailedSrc(resolvedSrc)} alt={name ? `Foto de ${name}` : 'Foto de perfil'} className={sharedClassName} loading='lazy' decoding='async' />
   }
 
   return (

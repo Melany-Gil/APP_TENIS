@@ -200,6 +200,10 @@ exports.removeInscripcion = async (torneoId, equipoId) => {
         409,
         'No puedes retirar esta pareja: tiene partidos programados, en juego o finalizados en este torneo. Revisa sus partidos para conservar el historial.'
       )
+    await conn.query('DELETE FROM torneo_grupo_parejas WHERE torneo_id=? AND equipo_id=?', [
+      torneoId,
+      equipoId,
+    ])
     const [result] = await conn.query(
       'DELETE FROM inscripciones WHERE torneo_id=? AND equipo_id=?',
       [torneoId, equipoId]

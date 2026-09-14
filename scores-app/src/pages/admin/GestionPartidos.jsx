@@ -76,12 +76,40 @@ export default function GestionPartidos() {
     selectedTournament?.categoria?.id || watch('categoria_id') || ''
   )
   const selectedModality = selectedTournament?.modalidad || watch('modalidad') || 'individual'
+  const [distribution, setDistribution] = useState(null),
+    [groupError, setGroupError] = useState('')
+  useEffect(() => {
+    let active = true
+    setDistribution(null)
+    setGroupError('')
+    if (
+      selectedTournamentId &&
+      selectedTournament?.sistema === 'grupos_eliminacion' &&
+      selectedModality === 'dobles'
+    )
+      tournamentService
+        .getGroups(selectedTournamentId)
+        .then((r) => {
+          if (active) setDistribution(r.data)
+        })
+        .catch((e) => {
+          if (active) setGroupError(e.message || 'No se pudieron cargar los grupos')
+        })
+    return () => {
+      active = false
+    }
+  }, [selectedTournamentId, selectedTournament?.sistema, selectedModality])
+  const selectedGroup = watch('grupo') || ''
+  const useGroups =
+    selectedTournament?.sistema === 'grupos_eliminacion' && selectedModality === 'dobles'
   const selectedPhase = watch('fase') || 'grupos'
   const participant1Mode = watch('participante1_tipo') || 'fijo'
   const participant2Mode = watch('participante2_tipo') || 'fijo'
   const sourceMatches = partidos.filter(
     (partido) =>
-      selectedTournamentId && String(partido.torneo?.id || '') === selectedTournamentId &&
+      !(useGroups && selectedPhase === 'grupos') &&
+      selectedTournamentId &&
+      String(partido.torneo?.id || '') === selectedTournamentId &&
       String(partido.categoria?.id || '') === selectedCategoryId &&
       (!editing || partido.id < editing.id)
   )
@@ -94,7 +122,14 @@ export default function GestionPartidos() {
   const equiposDisponibles = equipos.filter(
     (equipo) =>
       equipo.deporte === selectedDeporte &&
-      String(equipo.categoria?.id || '') === selectedCategoryId
+      (useGroups
+        ? distribution?.parejas.some(
+            (p) =>
+              Number(p.equipo_id) === Number(equipo.id) &&
+              String(p.categoria_id) === selectedCategoryId &&
+              (selectedPhase !== 'grupos' || p.grupo === selectedGroup)
+          )
+        : String(equipo.categoria?.id || '') === selectedCategoryId)
   )
   const [marcadorParticipante1, marcadorParticipante2] = getParticipantNames(showMarcador)
 
@@ -113,7 +148,11 @@ export default function GestionPartidos() {
         setPartidos(p.data || [])
         setJugadores(j.data || [])
         setEquipos(e.data || [])
-        setJueces((u.data || []).filter((usuario) => ['juez', 'juez_director', 'admin'].includes(usuario.rol)))
+        setJueces(
+          (u.data || []).filter((usuario) =>
+            ['juez', 'juez_director', 'admin'].includes(usuario.rol)
+          )
+        )
         setTorneos(
           (tournaments.data || []).filter((tournament) => tournament.estado !== 'cancelado')
         )
@@ -176,7 +215,8 @@ export default function GestionPartidos() {
     reset({
       torneo_id: partido.torneo?.id || '',
       deporte: partido.deporte || 'tenis',
-      modalidad: partido.modalidad || (partido.equipo1?.id || partido.equipo2?.id ? 'dobles' : 'individual'),
+      modalidad:
+        partido.modalidad || (partido.equipo1?.id || partido.equipo2?.id ? 'dobles' : 'individual'),
       categoria_id: partido.categoria?.id || '',
       estado: partido.estado,
       fecha_inicio: partido.fecha_inicio ? partido.fecha_inicio.slice(0, 10) : '',
@@ -411,14 +451,20 @@ export default function GestionPartidos() {
               <>
                 <div className='form-group'>
                   <label className='form-label'>Deporte *</label>
-                  <select className='form-input' {...register('deporte', { required: 'Requerido' })}>
+                  <select
+                    className='form-input'
+                    {...register('deporte', { required: 'Requerido' })}
+                  >
                     <option value='tenis'>Tenis</option>
                     <option value='padel'>Pádel</option>
                   </select>
                 </div>
                 <div className='form-group'>
                   <label className='form-label'>Modalidad *</label>
-                  <select className='form-input' {...register('modalidad', { required: 'Requerido' })}>
+                  <select
+                    className='form-input'
+                    {...register('modalidad', { required: 'Requerido' })}
+                  >
                     <option value='individual'>Individual</option>
                     <option value='dobles'>Dobles</option>
                   </select>
@@ -436,7 +482,9 @@ export default function GestionPartidos() {
                       </option>
                     ))}
                   </select>
-                  {errors.categoria_id && <p className='form-error'>{errors.categoria_id.message}</p>}
+                  {errors.categoria_id && (
+                    <p className='form-error'>{errors.categoria_id.message}</p>
+                  )}
                 </div>
               </>
             )}
@@ -485,12 +533,34 @@ export default function GestionPartidos() {
             )}
 
             {selectedTournament?.sistema === 'grupos_eliminacion' && selectedPhase === 'grupos' && (
-              <Input
-                label='Grupo'
-                placeholder='Ej.: Grupo A'
-                maxLength={20}
-                {...register('grupo')}
-              />
+              <div>
+                <label className='form-label'>Grupo *</label>
+                {useGroups ? (
+                  <>
+                    <select
+                      className='form-input'
+                      {...register('grupo', { required: 'Selecciona un grupo' })}
+                    >
+                      <option value=''>Selecciona un grupo…</option>
+                      {(distribution?.grupos || [])
+                        .filter((g) => String(g.categoria_id) === selectedCategoryId)
+                        .map((g) => (
+                          <option key={g.nombre} value={g.nombre}>
+                            {g.nombre} · {g.equipo_ids.length} parejas
+                          </option>
+                        ))}
+                    </select>
+                    <p className='text-xs mt-1'>
+                      {groupError || 'Solo podrás seleccionar parejas de esta categoría y grupo.'}{' '}
+                      <Link className='underline' to={'/torneo/' + selectedTournamentId}>
+                        Organizar grupos
+                      </Link>
+                    </p>
+                  </>
+                ) : (
+                  <Input maxLength={20} {...register('grupo')} />
+                )}
+              </div>
             )}
 
             {selectedTournament && selectedTournament.sistema !== 'todos_contra_todos' && (
@@ -516,7 +586,12 @@ export default function GestionPartidos() {
                 <option value=''>Sin asignar</option>
                 {jueces.map((juez) => (
                   <option key={juez.id} value={juez.id}>
-                    {juez.nombre} {juez.apellido} {juez.rol === 'juez_director' ? '(director)' : juez.rol === 'admin' ? '(admin)' : ''}
+                    {juez.nombre} {juez.apellido}{' '}
+                    {juez.rol === 'juez_director'
+                      ? '(director)'
+                      : juez.rol === 'admin'
+                        ? '(admin)'
+                        : ''}
                   </option>
                 ))}
               </select>
@@ -561,8 +636,14 @@ export default function GestionPartidos() {
                   }}
                   className='flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all'
                   style={{
-                    backgroundColor: watch('set_decisivo') === 'match_tiebreak' ? 'var(--color-brand-dim)' : 'var(--bg-primary)',
-                    color: watch('set_decisivo') === 'match_tiebreak' ? 'var(--color-brand)' : 'var(--text-muted)',
+                    backgroundColor:
+                      watch('set_decisivo') === 'match_tiebreak'
+                        ? 'var(--color-brand-dim)'
+                        : 'var(--bg-primary)',
+                    color:
+                      watch('set_decisivo') === 'match_tiebreak'
+                        ? 'var(--color-brand)'
+                        : 'var(--text-muted)',
                     border: '1px solid var(--border-color)',
                   }}
                 >
@@ -578,8 +659,14 @@ export default function GestionPartidos() {
                   }}
                   className='flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all'
                   style={{
-                    backgroundColor: watch('set_decisivo') === 'set_completo' ? 'var(--color-brand-dim)' : 'var(--bg-primary)',
-                    color: watch('set_decisivo') === 'set_completo' ? 'var(--color-brand)' : 'var(--text-muted)',
+                    backgroundColor:
+                      watch('set_decisivo') === 'set_completo'
+                        ? 'var(--color-brand-dim)'
+                        : 'var(--bg-primary)',
+                    color:
+                      watch('set_decisivo') === 'set_completo'
+                        ? 'var(--color-brand)'
+                        : 'var(--text-muted)',
                     border: '1px solid var(--border-color)',
                   }}
                 >
@@ -1041,7 +1128,9 @@ function ParticipantSelector({
       <label className='form-label'>{label}</label>
       <select className='form-input' {...register(modeField)}>
         <option value='fijo'>{fixedLabel} definido</option>
-        <option value='ganador' disabled={!sourceMatches.length}>Ganador de otro partido</option>
+        <option value='ganador' disabled={!sourceMatches.length}>
+          Ganador de otro partido
+        </option>
       </select>
 
       {mode === 'ganador' ? (

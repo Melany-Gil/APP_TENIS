@@ -20,22 +20,43 @@ exports.getByTorneo = async (torneoId) => {
 
   // Fetch all matches of this tournament (both finished and pending, to know participants & groups)
   const [allPartidos] = await db.query(
-    `SELECT p.id, torneo_id, fase, grupo, ronda, p.estado, ganador, COALESCE(c.nombre,'Sin categoría') AS categoria_nombre,
+    `SELECT p.id, p.categoria_id, torneo_id, fase, grupo, ronda, p.estado, ganador, COALESCE(c.nombre,'Sin categoría') AS categoria_nombre,
             ${col1} AS p1_id, ${col2} AS p2_id
      FROM partidos p LEFT JOIN categorias c ON c.id=p.categoria_id
      WHERE torneo_id = ? AND p.estado <> 'cancelado'`,
     [torneoId]
   )
 
+  const authoritative = isDoubles && torneo.sistema === 'grupos_eliminacion'
+  const structure = authoritative ? await require('../torneos/grupos.service').get(torneoId) : null
+  const assignment = new Map((structure?.parejas || []).map((p) => [Number(p.equipo_id), p]))
+  const [categoryRows] = authoritative ? await db.query('SELECT id,nombre FROM categorias') : [[]]
+  const catNames = new Map(categoryRows.map((c) => [Number(c.id), c.nombre]))
+  const label = (c, g) => (catNames.get(Number(c)) || 'Sin categoría') + ' · ' + g
+  const invalidIds = new Set((structure?.incidencias || []).map((i) => Number(i.partido_id)))
+  const validMatch = (p) =>
+    !authoritative ||
+    (!invalidIds.has(Number(p.id)) &&
+      p.fase === 'grupos' &&
+      require('../torneos/grupos.service').isCompatible(
+        { ...p, equipo1_id: p.p1_id, equipo2_id: p.p2_id },
+        assignment
+      ))
   const groupKey = (p) =>
-    p.fase === 'grupos' ? p.categoria_nombre + ' · ' + (p.grupo?.trim() || 'Sin grupo') : null
+    authoritative
+      ? assignment.has(Number(p.p1_id))
+        ? label(assignment.get(Number(p.p1_id)).categoria_id, assignment.get(Number(p.p1_id)).grupo)
+        : null
+      : p.fase === 'grupos'
+        ? p.categoria_nombre + ' · ' + (p.grupo?.trim() || 'Sin grupo')
+        : null
   // Collect participants and map them to their groups
   // participantId -> Set of groups
   const participantGroups = new Map()
   const allParticipantIds = new Set()
   const groupsSet = new Set()
 
-  allPartidos.forEach((p) => {
+  allPartidos.filter(validMatch).forEach((p) => {
     const groupName = groupKey(p)
     if (groupName) groupsSet.add(groupName)
 
@@ -50,6 +71,15 @@ exports.getByTorneo = async (torneoId) => {
       if (groupName) participantGroups.get(p.p2_id).add(groupName)
     }
   })
+
+  if (authoritative) {
+    for (const g of structure.grupos) groupsSet.add(label(g.categoria_id, g.nombre))
+    for (const a of structure.parejas) {
+      const pid = Number(a.equipo_id)
+      allParticipantIds.add(pid)
+      participantGroups.set(pid, new Set([label(a.categoria_id, a.grupo)]))
+    }
+  }
 
   // Also check inscripciones for this tournament
   const [inscritos] = await db.query(
@@ -110,7 +140,8 @@ exports.getByTorneo = async (torneoId) => {
 
   // Filter finished matches for stats
   const finishedPartidos = allPartidos.filter(
-    (p) => p.estado === 'finalizado' && ['jugador1', 'jugador2'].includes(p.ganador)
+    (p) =>
+      validMatch(p) && p.estado === 'finalizado' && ['jugador1', 'jugador2'].includes(p.ganador)
   )
 
   // Fetch sets for finished matches
@@ -278,5 +309,18 @@ exports.getByTorneo = async (torneoId) => {
     nombres_grupos: sortedGroupNames,
     grupos,
     tabla_general: tablaGeneral,
+    categorias: authoritative
+      ? categoryRows
+          .filter((c) => structure.grupos.some((g) => Number(g.categoria_id) === Number(c.id)))
+          .map((c) => ({
+            ...c,
+            grupos: structure.grupos
+              .filter((g) => Number(g.categoria_id) === Number(c.id))
+              .map((g) => ({ nombre: g.nombre, clave: label(c.id, g.nombre) })),
+          }))
+      : [],
+    sin_grupo: authoritative ? tablaGeneral.filter((r) => !assignment.has(Number(r.id))) : [],
+    incidencias: structure?.incidencias || [],
+    grupos_explicitos: authoritative,
   }
 }

@@ -1,7 +1,14 @@
-const db = require('../../config/db')
+const pool = require('../../config/db')
+const { AsyncLocalStorage } = require('node:async_hooks')
+const transaction = new AsyncLocalStorage()
+const db = {
+  query: (...args) => (transaction.getStore() || pool).query(...args),
+  getConnection: (...args) => pool.getConnection(...args),
+}
 const { rethrowDeleteConflict } = require('../../utils/deleteConflict')
 const { computeBreakpoint } = require('./score.engine')
 
+const groupsService = require('../torneos/grupos.service')
 const MAX_SETS = 127
 
 const MATCH_SELECT = `
@@ -64,6 +71,22 @@ const MATCH_SELECT = `
     j2.nombre   AS j2_nombre,
     j2.apellido AS j2_apellido,
     j2.foto     AS j2_foto,
+    tp11.id AS tp11_id,
+    tp11.nombre AS tp11_nombre,
+    tp11.apellido AS tp11_apellido,
+    tp11.foto AS tp11_foto,
+    tp12.id AS tp12_id,
+    tp12.nombre AS tp12_nombre,
+    tp12.apellido AS tp12_apellido,
+    tp12.foto AS tp12_foto,
+    tp21.id AS tp21_id,
+    tp21.nombre AS tp21_nombre,
+    tp21.apellido AS tp21_apellido,
+    tp21.foto AS tp21_foto,
+    tp22.id AS tp22_id,
+    tp22.nombre AS tp22_nombre,
+    tp22.apellido AS tp22_apellido,
+    tp22.foto AS tp22_foto,
     e1.id     AS e1_id,
     e1.jugador1_id AS e1_jugador1_id,
     e1.jugador2_id AS e1_jugador2_id,
@@ -89,6 +112,10 @@ const MATCH_SELECT = `
   LEFT JOIN jugadores j2 ON j2.id = p.jugador2_id
   LEFT JOIN equipos_padel e1 ON e1.id = p.equipo1_id
   LEFT JOIN equipos_padel e2 ON e2.id = p.equipo2_id
+  LEFT JOIN jugadores tp11 ON tp11.id = e1.jugador1_id
+  LEFT JOIN jugadores tp12 ON tp12.id = e1.jugador2_id
+  LEFT JOIN jugadores tp21 ON tp21.id = e2.jugador1_id
+  LEFT JOIN jugadores tp22 ON tp22.id = e2.jugador2_id
   LEFT JOIN users uj ON uj.id = p.juez_id
   LEFT JOIN canchas ch ON ch.id = p.cancha_id
   LEFT JOIN sedes s ON s.id = ch.sede_id
@@ -250,8 +277,11 @@ exports.getMyMatches = async (userId) => {
 
   const matches = rows.map((row) => {
     const match = { ...formatSummary(row), sets: setsByMatch.get(row.id) || [] }
-    const mySide = [row.j1_id, row.e1_jugador1_id, row.e1_jugador2_id]
-      .some(id => Number(id) === Number(player.id)) ? 'jugador1' : 'jugador2'
+    const mySide = [row.j1_id, row.e1_jugador1_id, row.e1_jugador2_id].some(
+      (id) => Number(id) === Number(player.id)
+    )
+      ? 'jugador1'
+      : 'jugador2'
     return {
       ...match,
       mi_lado: mySide,
@@ -530,7 +560,10 @@ exports.remove = async (id) => {
     [id, id]
   )
   if (dependents.length) {
-    const ids = dependents.slice(0, 3).map((match) => `#${match.id}`).join(', ')
+    const ids = dependents
+      .slice(0, 3)
+      .map((match) => `#${match.id}`)
+      .join(', ')
     const suffix = dependents.length > 3 ? ` y ${dependents.length - 3} más` : ''
     throw {
       status: 409,
@@ -554,7 +587,11 @@ exports.updateParticipants = async (id, data, user) => {
   if (!existing.length) throw { status: 404, message: 'Partido no encontrado' }
 
   const match = existing[0]
-  if (user.rol !== 'admin' && user.rol !== 'juez_director' && Number(match.juez_id) !== Number(user.id)) {
+  if (
+    user.rol !== 'admin' &&
+    user.rol !== 'juez_director' &&
+    Number(match.juez_id) !== Number(user.id)
+  ) {
     throw { status: 403, message: 'No tienes permiso para modificar este partido' }
   }
 
@@ -565,25 +602,41 @@ exports.updateParticipants = async (id, data, user) => {
   const changedFields = participantFields.filter((key) => data[key] !== undefined)
   if (changedFields.length) {
     if (user.rol === 'juez_director') {
-      throw { status: 403, message: 'Utiliza la sustitución supervisada desde el panel del director' }
+      throw {
+        status: 403,
+        message: 'Utiliza la sustitución supervisada desde el panel del director',
+      }
     }
     const doubles = Boolean(match.equipo1_id || match.equipo2_id)
     const allowed = doubles ? ['equipo1_id', 'equipo2_id'] : ['jugador1_id', 'jugador2_id']
     for (const key of changedFields) {
-      if (!allowed.includes(key) || !/^[1-9]\d*$/.test(String(data[key])) || !Number.isSafeInteger(Number(data[key]))) {
-        throw { status: 400, message: 'Selecciona un participante registrado válido para la modalidad del partido' }
+      if (
+        !allowed.includes(key) ||
+        !/^[1-9]\d*$/.test(String(data[key])) ||
+        !Number.isSafeInteger(Number(data[key]))
+      ) {
+        throw {
+          status: 400,
+          message: 'Selecciona un participante registrado válido para la modalidad del partido',
+        }
       }
       const side = key.includes('1') ? 1 : 2
       if (match[`origen_partido${side}_id`]) {
-        throw { status: 400, message: 'Este participante depende del ganador de otro partido. Modifica el origen desde la edición del encuentro.' }
+        throw {
+          status: 400,
+          message:
+            'Este participante depende del ganador de otro partido. Modifica el origen desde la edición del encuentro.',
+        }
       }
     }
     const ids = allowed.map((key) => Number(data[key] ?? match[key])).filter(Boolean)
     if (new Set(ids).size !== ids.length) {
       throw { status: 400, message: 'Los participantes del partido deben ser diferentes' }
     }
-    if (doubles) await validateTeams(ids, match.deporte, match.categoria_id)
-    else await validatePlayers(ids, match.deporte)
+    if (doubles) {
+      const grouped = await groupsService.validateMatch({ ...match, ...data, id: Number(id) }, db)
+      await validateTeams(ids, match.deporte, grouped ? null : match.categoria_id)
+    } else await validatePlayers(ids, match.deporte)
   }
 
   const cleanName = (value) => {
@@ -632,7 +685,12 @@ exports.updateParticipants = async (id, data, user) => {
 
 async function validateBasicMatch(body, currentMatchId = null) {
   const torneoId = positiveId(body.torneo_id)
-  if (body.torneo_id !== undefined && body.torneo_id !== null && body.torneo_id !== '' && !torneoId) {
+  if (
+    body.torneo_id !== undefined &&
+    body.torneo_id !== null &&
+    body.torneo_id !== '' &&
+    !torneoId
+  ) {
     throw { status: 400, message: 'Selecciona un torneo válido o Partido libre' }
   }
   const fechaInicio = normalizeOptionalDate(body.fecha_inicio)
@@ -708,7 +766,11 @@ async function validateBasicMatch(body, currentMatchId = null) {
   const source1Id = positiveId(body.origen_partido1_id)
   const source2Id = positiveId(body.origen_partido2_id)
   if (!torneoId && (source1Id || source2Id)) {
-    throw { status: 400, message: 'Para usar ganadores de otros partidos, selecciona un torneo. En partidos libres selecciona los participantes directamente.' }
+    throw {
+      status: 400,
+      message:
+        'Para usar ganadores de otros partidos, selecciona un torneo. En partidos libres selecciona los participantes directamente.',
+    }
   }
   const canchaId = positiveId(body.cancha_id)
 
@@ -767,7 +829,25 @@ async function validateBasicMatch(body, currentMatchId = null) {
   if (modalidad === 'individual') {
     await validatePlayers([resolvedPlayer1, resolvedPlayer2].filter(Boolean), deporte)
   } else {
-    await validateTeams([resolvedTeam1, resolvedTeam2].filter(Boolean), deporte, categoriaId)
+    const grouped = await groupsService.validateMatch(
+      {
+        id: currentMatchId,
+        torneo_id: torneoId,
+        categoria_id: categoriaId,
+        fase,
+        grupo,
+        equipo1_id: resolvedTeam1,
+        equipo2_id: resolvedTeam2,
+        origen_partido1_id: source1Id,
+        origen_partido2_id: source2Id,
+      },
+      db
+    )
+    await validateTeams(
+      [resolvedTeam1, resolvedTeam2].filter(Boolean),
+      deporte,
+      grouped ? null : categoriaId
+    )
   }
 
   return {
@@ -834,8 +914,8 @@ async function validateTeams(ids, deporte, categoriaId) {
      WHERE id IN (${placeholders})
        AND activo = TRUE
        AND deporte = ?
-       AND categoria_id = ?`,
-    [...ids, deporte, categoriaId]
+       ${categoriaId ? 'AND categoria_id = ?' : ''}`,
+    [...ids, deporte, ...(categoriaId ? [categoriaId] : [])]
   )
   if (rows.length !== new Set(ids).size) {
     throw { status: 400, message: 'Las parejas deben estar activas en la categoría del torneo' }
@@ -1081,8 +1161,25 @@ function formatSummary(row) {
   }
 
   if (match.modalidad === 'dobles') {
-    match.equipo1 = { id: row.e1_id, nombre: row.e1_nombre }
-    match.equipo2 = { id: row.e2_id, nombre: row.e2_nombre }
+    for (const side of [1, 2]) {
+      const player = (pos) => {
+        const k = 'tp' + side + pos
+        return row[k + '_id']
+          ? {
+              id: row[k + '_id'],
+              nombre: row[k + '_nombre'],
+              apellido: row[k + '_apellido'],
+              foto: row[k + '_foto'] || null,
+            }
+          : null
+      }
+      match['equipo' + side] = {
+        id: row['e' + side + '_id'],
+        nombre: row['e' + side + '_nombre'],
+        jugador1: player(1),
+        jugador2: player(2),
+      }
+    }
   } else {
     match.jugador1 = {
       id: row.j1_id,
@@ -1146,5 +1243,37 @@ function formatMatchSource(row, position) {
     id: sourceId,
     participante1: participant1 || null,
     participante2: participant2 || null,
+  }
+}
+// Serialize scheduling with group edits on the same tournament. The write and
+// validation use the SAME connection, including FK checks and duplicate checks.
+for (const method of ['create', 'update', 'updateParticipants']) {
+  const original = exports[method]
+  exports[method] = async (...args) => {
+    const body = method === 'create' ? args[0] : args[1]
+    let tournamentId = positiveId(body?.torneo_id)
+    if (
+      method === 'updateParticipants' &&
+      ['equipo1_id', 'equipo2_id'].some((k) => body?.[k] !== undefined)
+    ) {
+      const [[m]] = await pool.query('SELECT * FROM partidos WHERE id = ?', [args[0]])
+      tournamentId = m?.torneo_id
+    }
+    if (!tournamentId) return original(...args)
+    const [[t]] = await pool.query('SELECT sistema FROM torneos WHERE id=?', [tournamentId])
+    if (t?.sistema !== 'grupos_eliminacion') return original(...args)
+    const conn = await pool.getConnection()
+    try {
+      await conn.beginTransaction()
+      await conn.query('SELECT id FROM torneos WHERE id=? FOR UPDATE', [tournamentId])
+      const result = await transaction.run(conn, () => original(...args))
+      await conn.commit()
+      return result
+    } catch (e) {
+      await conn.rollback()
+      throw e
+    } finally {
+      conn.release()
+    }
   }
 }

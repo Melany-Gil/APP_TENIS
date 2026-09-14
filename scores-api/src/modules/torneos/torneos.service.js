@@ -72,6 +72,22 @@ exports.update = async (id, body) => {
   if (!existing.length) throw { status: 404, message: 'Torneo no encontrado' }
 
   const tournament = await validateTournament(body)
+  const [[groupCount]] = await db.query(
+    'SELECT COUNT(*) AS total FROM torneo_grupos WHERE torneo_id=?',
+    [id]
+  )
+  if (
+    Number(groupCount.total) > 0 &&
+    (tournament.sistema !== 'grupos_eliminacion' ||
+      tournament.modalidad !== 'dobles' ||
+      tournament.deporte !== existing[0].deporte ||
+      tournament.categoria_id)
+  )
+    throw {
+      status: 409,
+      message:
+        'Conserva el sistema, deporte y categorías mientras existan grupos. Revisa la distribución primero.',
+    }
   const structureChanged =
     existing[0].deporte !== tournament.deporte ||
     (existing[0].categoria_id ? Number(existing[0].categoria_id) : null) !==
@@ -79,8 +95,16 @@ exports.update = async (id, body) => {
     existing[0].modalidad !== tournament.modalidad
 
   if (structureChanged) {
-    const [[enrolled]]=await db.query("SELECT COUNT(*) AS total FROM inscripciones WHERE torneo_id=? AND estado<>'eliminado'",[id])
-    if(Number(enrolled.total)>0)throw {status:409,message:'No puedes cambiar deporte, categoría o modalidad mientras haya inscripciones. Revisa los participantes primero.'}
+    const [[enrolled]] = await db.query(
+      "SELECT COUNT(*) AS total FROM inscripciones WHERE torneo_id=? AND estado<>'eliminado'",
+      [id]
+    )
+    if (Number(enrolled.total) > 0)
+      throw {
+        status: 409,
+        message:
+          'No puedes cambiar deporte, categoría o modalidad mientras haya inscripciones. Revisa los participantes primero.',
+      }
     const [[usage]] = await db.query('SELECT COUNT(*) AS total FROM partidos WHERE torneo_id = ?', [
       id,
     ])
@@ -129,6 +153,8 @@ exports.remove = async (id) => {
 
   try {
     await db.query('DELETE FROM torneos WHERE id = ?', [id])
+    await db.query('DELETE FROM torneo_grupo_parejas WHERE torneo_id=?', [id])
+    await db.query('DELETE FROM torneo_grupos WHERE torneo_id=?', [id])
   } catch (error) {
     rethrowDeleteConflict(error, 'este torneo')
   }

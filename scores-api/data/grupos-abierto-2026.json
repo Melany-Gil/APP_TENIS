@@ -1,0 +1,63 @@
+{
+  "estado": "propuesta_cotejada_no_aplicada",
+  "torneo": { "id": 3, "nombre": "TORNEO ABIERTO DOBLES CLUB UNIÓN" },
+  "fuente": "Fotografías del organizador y consulta pública de legal-branding.com del 2026-09-13",
+  "categorias": [
+    { "nombre": "Damas", "categoria_id": 13, "grupos": [
+      [105, 93, 18, 140],
+      [111, 44, 122, 98]
+    ] },
+    { "nombre": "Quinta", "categoria_id": 4, "grupos": [
+      [15, 101, 55, 109],
+      [61, 132, 128, 123],
+      [13, 16, 72, 136],
+      [108, 30, 95, 137],
+      [127, 119, 73, 64]
+    ] },
+    { "nombre": "Cuarta", "categoria_id": 3, "grupos": [
+      [47, 65, 58, 49],
+      [56, 34, 130, 54],
+      [124, 106, 86, 66],
+      [134, 21, 17, 62],
+      [45, 38, 118, 76],
+      [41, 133, 20, 88],
+      [139, 75, 107, 103],
+      [89, 60, 42, 99],
+      [81, 116, 78, 114],
+      [39, 24, 37, 115],
+      [138, 74, 68, 117],
+      [112, 33, 35, 125],
+      [135, 29]
+    ] },
+    { "nombre": "Tercera", "categoria_id": 2, "grupos": [
+      [19, 104, 90, 25],
+      [46, 97, 92, 52],
+      [82, 28, 40, 110],
+      [84, 32, 14, 70],
+      [91, 131, 77, 85],
+      [120, 51, 31],
+      [79, 113, 87]
+    ] },
+    { "nombre": "Segunda", "categoria_id": 1, "grupos": [
+      [57, 126, 96, 63],
+      [48, null, 121, 71],
+      [27, 36, 26, 100]
+    ] }
+  ],
+  "pendientes": [
+    { "categoria": "Segunda", "grupo": 2, "posicion": 2, "jugadores_foto": ["José D. Soria", "Nicolás Vásquez"], "motivo": "No existe una pareja coincidente en la consulta pública; no crear ni sustituir automáticamente." }
+  ],
+  "inferencias": [
+    { "equipo_id": 46, "motivo": "Tercera 2: David Jiménez coincide de manera única con JIMENEZ / PLATA; el compañero no es legible en la foto. Asignación propuesta según autorización de cruzar parejas similares." },
+    { "equipo_id": 19, "motivo": "Tercera 1: nombres cortados Sayago / Ching Yi Ling coinciden con JOSE LUIS SAYAGO / CHING YI LIN." },
+    { "equipo_id": 139, "motivo": "Cuarta 7: Rubén D. Prada / Juan C. Prada en foto; base RUBÉN PRADA / CAMILO PRADA. Revisar nombres completos sin renombrar fichas." }
+  ],
+  "reglas": [
+    "Cada arreglo es un grupo numerado desde 1 y mantiene el orden de las parejas en la foto.",
+    "Los números identifican parejas existentes, no jugadores.",
+    "null es una identidad pendiente, nunca un participante ficticio.",
+    "No modificar categorías generales de parejas ni jugadores al aplicar categorías del torneo.",
+    "No crear partidos, fechas, resultados ni participantes de relleno.",
+    "Revalidar torneo, integrantes e identificadores antes de aplicar en producción."
+  ]
+}
