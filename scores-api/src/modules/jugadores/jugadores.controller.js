@@ -56,11 +56,11 @@ exports.update = async (req, res) => {
 exports.remove = async (req, res) => {
   try {
     const previous = await jugadoresService.getById(req.params.id)
-    const data = await jugadoresService.remove(req.params.id)
+    const data = await jugadoresService.remove(req.params.id, req.user.id)
     deleteUpload(previous.foto)
     return success(res, data)
   } catch (err) {
-    return error(res, err.message || 'Error al eliminar jugador', err.status || 500)
+    return error(res, err.status ? err.message : 'No se pudo eliminar el jugador. Intenta nuevamente.', err.status || 500)
   }
 }
 

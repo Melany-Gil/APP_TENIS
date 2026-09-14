@@ -137,6 +137,15 @@ const base = "http://127.0.0.1:4175";
       assert.ok(
         (await page.locator('img[alt^="Foto de Jugador"]').count()) >= 6,
       );
+      await page.getByText('Crear un grupo', { exact: true }).click();
+      await page.getByLabel('Categoría del nuevo grupo').selectOption('3');
+      await page.getByLabel('Sistema de numeración').selectOption('letters');
+      const addGroup = page.getByRole('button', { name: 'Añadir grupo', exact: true });
+      assert.equal(await addGroup.isEnabled(), true);
+      await addGroup.click();
+      await page.getByRole('button', { name: 'Guardar grupos', exact: true }).click();
+      await page.getByRole('button', { name: 'Guardar grupos', exact: true }).waitFor({ state: 'hidden' });
+      assert.ok(distribution.grupos.some(g => g.nombre === 'GRUPO A'));
       await page
         .getByRole("button", { name: "Posiciones", exact: true })
         .click();

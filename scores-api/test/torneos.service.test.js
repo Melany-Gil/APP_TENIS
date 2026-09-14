@@ -15,6 +15,45 @@ const loadService = (fakeDb) => {
   return require(servicePath)
 }
 
+test('eliminar torneo borra solo hijos, conserva auditoría y usa una transacción', async () => {
+  const calls = []
+  const conn = {
+    beginTransaction: async () => calls.push('BEGIN'),
+    commit: async () => calls.push('COMMIT'),
+    rollback: async () => calls.push('ROLLBACK'),
+    release: () => calls.push('RELEASE'),
+    query: async (sql, params) => {
+      calls.push(sql)
+      if (sql.startsWith('SELECT id,nombre')) return [[{id:7,nombre:'Prueba'}]]
+      if (sql.startsWith('SELECT id FROM partidos')) return [[{id:22}]]
+      assert.ok(params.includes(7), `Consulta sin alcance al torneo: ${sql}`)
+      return [{affectedRows:1}]
+    },
+  }
+  await loadService({getConnection:async()=>conn}).remove(7, 9)
+  assert.ok(calls.includes('COMMIT'))
+  assert.ok(!calls.includes('ROLLBACK'))
+  assert.ok(calls.some(s=>s.startsWith('INSERT INTO auditoria_eliminaciones')))
+  assert.ok(!calls.some(s=>/DELETE FROM (jugadores|equipos_padel|users|jugador_stats)/.test(s)))
+  assert.ok(calls.indexOf('DELETE FROM partidos WHERE torneo_id=?') < calls.indexOf('DELETE FROM torneos WHERE id=?'))
+})
+
+test('eliminar torneo revierte todos los cambios ante un fallo', async () => {
+  let rollback = false, commit = false
+  const conn = {
+    beginTransaction:async()=>{}, release:()=>{},
+    commit:async()=>{commit=true}, rollback:async()=>{rollback=true},
+    query:async sql=>{
+      if(sql.startsWith('SELECT id,nombre')) return [[{id:7,nombre:'Prueba'}]]
+      if(sql.startsWith('SELECT id FROM partidos')) return [[]]
+      throw Error('Fallo simulado')
+    },
+  }
+  await assert.rejects(loadService({getConnection:async()=>conn}).remove(7), /Fallo simulado/)
+  assert.equal(rollback,true)
+  assert.equal(commit,false)
+})
+
 test('crear torneo guarda modalidad, sistema y categoría', async () => {
   const calls = []
   const fakeDb = {

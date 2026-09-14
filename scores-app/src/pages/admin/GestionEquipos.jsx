@@ -1,3 +1,4 @@
+import BulkDelete from '../../components/ui/BulkDelete'
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
@@ -29,11 +30,7 @@ export default function GestionEquipos() {
 
   const fetchAll = () => {
     setLoading(true)
-    Promise.all([
-      teamService.getAll(),
-      playerService.getAll(),
-      categoriaService.getAll(),
-    ])
+    Promise.all([teamService.getAll(), playerService.getAll(), categoriaService.getAll()])
       .then(([e, j, c]) => {
         setEquipos(e.data || [])
         setJugadores(j.data || [])
@@ -74,9 +71,10 @@ export default function GestionEquipos() {
       jugadores.find((jugador) => String(jugador.id) === String(id))
     )
     const apellidos = integrantes.map((jugador) => String(jugador?.apellido || '').trim())
-    const nombre = apellidos.every(Boolean) && String(jugador1Id) !== String(jugador2Id)
-      ? apellidos.join(' / ')
-      : ''
+    const nombre =
+      apellidos.every(Boolean) && String(jugador1Id) !== String(jugador2Id)
+        ? apellidos.join(' / ')
+        : ''
     setValue('nombre', nombre, { shouldValidate: Boolean(nombre) })
   }, [jugador1Id, jugador2Id, jugadores, editing, showForm, setValue])
   const jugadoresDisponibles = jugadores.filter(
@@ -155,9 +153,15 @@ export default function GestionEquipos() {
                 label='Nombre de la pareja *'
                 placeholder={editing ? 'García / López' : 'Selecciona los dos jugadores'}
                 readOnly={!editing}
-                hint={!editing ? 'Se genera automáticamente con los apellidos registrados de ambos jugadores.' : undefined}
+                hint={
+                  !editing
+                    ? 'Se genera automáticamente con los apellidos registrados de ambos jugadores.'
+                    : undefined
+                }
                 error={errors.nombre?.message}
-                {...register('nombre', { required: 'Selecciona dos jugadores distintos con apellidos registrados' })}
+                {...register('nombre', {
+                  required: 'Selecciona dos jugadores distintos con apellidos registrados',
+                })}
               />
             </div>
 
@@ -231,6 +235,15 @@ export default function GestionEquipos() {
           </form>
         </div>
       )}
+
+      <BulkDelete
+        records={equipos}
+        remove={teamService.remove}
+        onComplete={fetchAll}
+        disabled={loading}
+        warning='Se eliminarán las parejas seleccionadas, no sus jugadores. Si una pareja tiene dependencias, se conservará y se indicará el motivo.'
+        label={(r) => r.nombre}
+      />
 
       {/* Lista */}
       <div className='card overflow-hidden'>

@@ -137,28 +137,77 @@ exports.update = async (id, body) => {
   return exports.getById(id)
 }
 
-exports.remove = async (id) => {
-  const [existing] = await db.query('SELECT id FROM torneos WHERE id = ?', [id])
-  if (!existing.length) throw { status: 404, message: 'Torneo no encontrado' }
-
-  const [[usage]] = await db.query('SELECT COUNT(*) AS total FROM partidos WHERE torneo_id = ?', [
-    id,
-  ])
-  if (Number(usage.total) > 0) {
-    throw {
-      status: 409,
-      message: 'El torneo tiene partidos. Elimínalos o reasígnalos antes de borrar el torneo',
-    }
-  }
-
+exports.remove = async (id, actorId = null) => {
+  id = Number(id)
+  if (!Number.isSafeInteger(id) || id < 1) throw { status: 400, message: 'Torneo inválido' }
+  const conn = await db.getConnection()
   try {
-    await db.query('DELETE FROM torneos WHERE id = ?', [id])
-    await db.query('DELETE FROM torneo_grupo_parejas WHERE torneo_id=?', [id])
-    await db.query('DELETE FROM torneo_grupos WHERE torneo_id=?', [id])
+    await conn.beginTransaction()
+    const [[tournament]] = await conn.query('SELECT id,nombre FROM torneos WHERE id=? FOR UPDATE', [
+      id,
+    ])
+    if (!tournament) throw { status: 404, message: 'Torneo no encontrado' }
+    const [matches] = await conn.query('SELECT id FROM partidos WHERE torneo_id=? FOR UPDATE', [id])
+    // Keep the historical supervision log independently of the deleted matches.
+    await conn.query(
+      `INSERT INTO auditoria_eliminaciones (entidad,registro_id,actor_id,detalle)
+      SELECT 'auditoria_partido',a.partido_id,?,JSON_OBJECT('accion',a.accion,'detalle',a.detalle,'created_by',a.created_by,'created_at',a.created_at)
+      FROM auditoria_control_partido a JOIN partidos p ON p.id=a.partido_id WHERE p.torneo_id=?`,
+      [actorId, id]
+    )
+    await conn.query(
+      `INSERT INTO auditoria_eliminaciones (entidad,registro_id,actor_id,detalle) VALUES ('torneo',?,?,?)`,
+      [
+        id,
+        actorId,
+        JSON.stringify({ nombre: tournament.nombre, partidos: matches.map((m) => m.id) }),
+      ]
+    )
+    await conn.query("DELETE FROM favoritos WHERE tipo='torneo' AND referencia_id=?", [id])
+    await conn.query(
+      "DELETE f FROM favoritos f JOIN partidos p ON p.id=f.referencia_id WHERE f.tipo='partido' AND p.torneo_id=?",
+      [id]
+    )
+    // Links from other tournaments are detached, never delete those other matches.
+    await conn.query(
+      'UPDATE partidos p JOIN partidos source ON source.id=p.origen_partido1_id SET p.origen_partido1_id=NULL WHERE source.torneo_id=?',
+      [id]
+    )
+    await conn.query(
+      'UPDATE partidos p JOIN partidos source ON source.id=p.origen_partido2_id SET p.origen_partido2_id=NULL WHERE source.torneo_id=?',
+      [id]
+    )
+    await conn.query(
+      'UPDATE tickets_soporte t JOIN partidos p ON p.id=t.partido_id SET t.partido_id=NULL WHERE p.torneo_id=?',
+      [id]
+    )
+    for (const table of [
+      'fotos_partido',
+      'estado_en_vivo_partido',
+      'auditoria_control_partido',
+      'eventos_partido',
+      'sets_partido',
+    ]) {
+      await conn.query(
+        `DELETE child FROM ${table} child JOIN partidos p ON p.id=child.partido_id WHERE p.torneo_id=?`,
+        [id]
+      )
+    }
+    await conn.query('DELETE FROM partidos WHERE torneo_id=?', [id])
+    await conn.query('DELETE FROM inscripciones WHERE torneo_id=?', [id])
+    await conn.query('DELETE FROM torneo_grupo_parejas WHERE torneo_id=?', [id])
+    await conn.query('DELETE FROM torneo_grupos WHERE torneo_id=?', [id])
+    await conn.query('DELETE FROM torneos WHERE id=?', [id])
+    await conn.commit()
+    return {
+      message: 'Torneo y sus datos dependientes eliminados. Jugadores y parejas conservados.',
+    }
   } catch (error) {
+    await conn.rollback()
     rethrowDeleteConflict(error, 'este torneo')
+  } finally {
+    conn.release()
   }
-  return { message: 'Torneo eliminado correctamente' }
 }
 
 async function validateTournament({

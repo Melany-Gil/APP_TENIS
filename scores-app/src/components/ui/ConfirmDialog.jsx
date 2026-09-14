@@ -18,7 +18,14 @@ export default function ConfirmDialog() {
   } = useConfirmStore()
 
   const [typed, setTyped] = useState('')
-  const dialogRef = useDialogFocus(isOpen, () => { resolver?.(false); close() }, false)
+  const dialogRef = useDialogFocus(
+    isOpen,
+    () => {
+      resolver?.(false)
+      close()
+    },
+    false
+  )
 
   useEffect(() => {
     if (isOpen) setTyped('')
@@ -52,7 +59,7 @@ export default function ConfirmDialog() {
         aria-modal='true'
         aria-labelledby='confirm-dialog-title'
         tabIndex={-1}
-        className='w-full rounded-2xl overflow-hidden'
+        className='w-full rounded-2xl max-h-[90dvh] overflow-y-auto'
         style={{
           maxWidth: '420px',
           backgroundColor: 'var(--bg-sidebar)',
@@ -75,18 +82,29 @@ export default function ConfirmDialog() {
             />
           </div>
           <div className='flex-1 min-w-0 pt-1'>
-            <h3 id='confirm-dialog-title' className='text-base font-bold' style={{ color: 'var(--text-primary)' }}>
+            <h3
+              id='confirm-dialog-title'
+              className='text-base font-bold'
+              style={{ color: 'var(--text-primary)' }}
+            >
               {title}
             </h3>
           </div>
-          <button aria-label='Cerrar diálogo' onClick={handleCancel} className='btn-ghost p-1 shrink-0'>
+          <button
+            aria-label='Cerrar diálogo'
+            onClick={handleCancel}
+            className='btn-ghost p-1 shrink-0'
+          >
             <X className='w-4 h-4' style={{ color: 'var(--text-muted)' }} />
           </button>
         </div>
 
         {/* Mensaje */}
         <div className='px-5 pb-4'>
-          <p className='text-sm leading-relaxed' style={{ color: 'var(--text-secondary)' }}>
+          <p
+            className='text-sm leading-relaxed whitespace-pre-line break-words'
+            style={{ color: 'var(--text-secondary)' }}
+          >
             {message}
           </p>
 

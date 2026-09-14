@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { tournamentService } from '../../services/tournamentService'
 import { categoriaService } from '../../services/categoriaService'
 import ParticipantAvatar from '../ui/ParticipantAvatar'
+import { confirm } from '../../utils/confirm'
 
 export default function TournamentRoster({
   tournament,
@@ -27,9 +28,36 @@ export default function TournamentRoster({
     [customPrefix, setCustomPrefix] = useState(''),
     [numbering, setNumbering] = useState('numbers'),
     [ordinal, setOrdinal] = useState('1')
-  const [savedCategories,setSavedCategories] = useState({})
-  const letters = (n) => { let label='';for(;n>0;n=Math.floor((n-1)/26))label=String.fromCharCode(65+(n-1)%26)+label;return label }
-  const prefix = (prefixMode === 'GRUPO' ? 'GRUPO' : customPrefix.trim().replace(/\s+/g,' ').toUpperCase())
+  const [savedCategories, setSavedCategories] = useState({})
+  const [selectedGroups, setSelectedGroups] = useState([])
+  const groupKey = (g) => `${g.categoria_id}:${g.nombre}`
+  const removeSelectedGroups = async () => {
+    const visible = groups.filter(
+      (g) => (!filter || String(g.categoria_id) === filter) && selectedGroups.includes(groupKey(g))
+    )
+    if (!visible.length || busy) return
+    if (
+      !(await confirm({
+        title: 'Quitar grupos seleccionados',
+        message: `Se quitarán ${visible.length} grupos. Sus parejas seguirán inscritas y quedarán sin grupo. No se eliminarán jugadores ni partidos. Al guardar se comprobará que no se invaliden cruces existentes.`,
+        confirmLabel: 'Quitar grupos',
+        danger: true,
+      }))
+    )
+      return
+    const keys = new Set(visible.map(groupKey))
+    setGroups((old) => old.filter((g) => !keys.has(groupKey(g))))
+    setSelectedGroups([])
+    setDirty(true)
+  }
+  const letters = (n) => {
+    let label = ''
+    for (; n > 0; n = Math.floor((n - 1) / 26))
+      label = String.fromCharCode(65 + ((n - 1) % 26)) + label
+    return label
+  }
+  const prefix =
+    prefixMode === 'GRUPO' ? 'GRUPO' : customPrefix.trim().replace(/\s+/g, ' ').toUpperCase()
   const newName = prefix + ' ' + (numbering === 'numbers' ? ordinal : letters(Number(ordinal)))
   const validPrefix = /^\p{L}[\p{L} -]{0,11}$/u.test(prefix)
   useEffect(() => {
@@ -47,7 +75,11 @@ export default function TournamentRoster({
       .then(([g, c]) => {
         if (active) {
           setGroups(g.data.grupos)
-          setSavedCategories(Object.fromEntries((g.data.parejas || []).map(p=>[p.equipo_id,Number(p.categoria_id)])))
+          setSavedCategories(
+            Object.fromEntries(
+              (g.data.parejas || []).map((p) => [p.equipo_id, Number(p.categoria_id)])
+            )
+          )
           setVersion(g.data.version)
           setIssues(g.data.incidencias)
           setCategories(c.data.filter((x) => [tournament.deporte, 'ambos'].includes(x.deporte)))
@@ -86,8 +118,14 @@ export default function TournamentRoster({
       .includes(search.toLowerCase())
   const categoryFor = (p) => savedCategories[p.equipo_id] ?? Number(p.categoria_id)
   const move = (id, value) => {
-    const team = teams.find(p=>Number(p.equipo_id)===Number(id))
-    if(value!=='' && (!team || Number(groups[Number(value)]?.categoria_id)!==categoryFor(team))){setError('Selecciona un grupo de la categoría de esta pareja.');return}
+    const team = teams.find((p) => Number(p.equipo_id) === Number(id))
+    if (
+      value !== '' &&
+      (!team || Number(groups[Number(value)]?.categoria_id) !== categoryFor(team))
+    ) {
+      setError('Selecciona un grupo de la categoría de esta pareja.')
+      return
+    }
     setGroups((old) =>
       old.map((g, i) => ({
         ...g,
@@ -105,7 +143,9 @@ export default function TournamentRoster({
     try {
       const r = await tournamentService.saveGroups(tournament.id, groups, version)
       setGroups(r.data.grupos)
-      setSavedCategories(Object.fromEntries((r.data.parejas || []).map(p=>[p.equipo_id,Number(p.categoria_id)])))
+      setSavedCategories(
+        Object.fromEntries((r.data.parejas || []).map((p) => [p.equipo_id, Number(p.categoria_id)]))
+      )
       setVersion(r.data.version)
       setIssues(r.data.incidencias)
       setDirty(false)
@@ -180,11 +220,14 @@ export default function TournamentRoster({
             onChange={(e) => move(p.equipo_id, e.target.value)}
           >
             <option value=''>Sin grupo asignado</option>
-            {groups.map((g,i)=>({g,i})).filter(({g})=>Number(g.categoria_id)===categoryFor(p)).map(({g,i}) => (
-              <option key={i} value={i}>
-                {catName(g.categoria_id)} · {g.nombre}
-              </option>
-            ))}
+            {groups
+              .map((g, i) => ({ g, i }))
+              .filter(({ g }) => Number(g.categoria_id) === categoryFor(p))
+              .map(({ g, i }) => (
+                <option key={i} value={i}>
+                  {catName(g.categoria_id)} · {g.nombre}
+                </option>
+              ))}
           </select>
         </label>
       )}
@@ -292,22 +335,55 @@ export default function TournamentRoster({
                 </option>
               ))}
             </select>
-            <select aria-label='Prefijo del grupo' className='form-input' value={prefixMode} onChange={e=>setPrefixMode(e.target.value)}>
-              <option value='GRUPO'>GRUPO</option><option value='custom'>Otra palabra…</option>
+            <select
+              aria-label='Prefijo del grupo'
+              className='form-input'
+              value={prefixMode}
+              onChange={(e) => setPrefixMode(e.target.value)}
+            >
+              <option value='GRUPO'>GRUPO</option>
+              <option value='custom'>Otra palabra…</option>
             </select>
-            {prefixMode==='custom' && <label className='text-xs'>Prefijo personalizado (solo letras)
-              <input aria-label='Prefijo personalizado' className='form-input' maxLength={12} value={customPrefix} onChange={e=>setCustomPrefix(e.target.value)} placeholder='Ej.: ZONA' />
-            </label>}
-            <select aria-label='Sistema de numeración' className='form-input' value={numbering} onChange={e=>setNumbering(e.target.value)}>
-              <option value='numbers'>Números: 1, 2, 3…</option><option value='letters'>Letras: A, B, C…</option>
+            {prefixMode === 'custom' && (
+              <label className='text-xs'>
+                Prefijo personalizado (solo letras)
+                <input
+                  aria-label='Prefijo personalizado'
+                  className='form-input'
+                  maxLength={12}
+                  value={customPrefix}
+                  onChange={(e) => setCustomPrefix(e.target.value)}
+                  placeholder='Ej.: ZONA'
+                />
+              </label>
+            )}
+            <select
+              aria-label='Sistema de numeración'
+              className='form-input'
+              value={numbering}
+              onChange={(e) => setNumbering(e.target.value)}
+            >
+              <option value='numbers'>Números: 1, 2, 3…</option>
+              <option value='letters'>Letras: A, B, C…</option>
             </select>
-            <select aria-label='Identificador del grupo' className='form-input' value={ordinal} onChange={e=>setOrdinal(e.target.value)}>
-              {Array.from({length:200},(_,i)=>i+1).map(n=><option key={n} value={n}>{numbering==='numbers'?n:letters(n)}</option>)}
+            <select
+              aria-label='Identificador del grupo'
+              className='form-input'
+              value={ordinal}
+              onChange={(e) => setOrdinal(e.target.value)}
+            >
+              {Array.from({ length: 200 }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  {numbering === 'numbers' ? n : letters(n)}
+                </option>
+              ))}
             </select>
-            <p className='text-sm self-center' aria-live='polite'>Nombre: <strong>{validPrefix?newName:'Introduce un prefijo válido'}</strong></p>
+            <p className='text-sm self-center' aria-live='polite'>
+              Nombre: <strong>{validPrefix ? newName : 'Introduce un prefijo válido'}</strong>
+            </p>
             <button
               className='btn-secondary'
-              disabled={busy || !newCat || !validPrefix || newName.length>20}
+              disabled={busy || !newCat || !validPrefix || newName.length > 20}
               onClick={() => {
                 const name = newName.trim().replace(/\s+/g, ' ')
                 if (
@@ -325,7 +401,7 @@ export default function TournamentRoster({
                   { categoria_id: Number(newCat), nombre: name, equipo_ids: [] },
                 ])
                 setDirty(true)
-                setOrdinal(String(Math.min(200,Number(ordinal)+1)))
+                setOrdinal(String(Math.min(200, Number(ordinal) + 1)))
                 setError('')
               }}
             >
@@ -363,6 +439,35 @@ export default function TournamentRoster({
         </details>
       )}
       <div className='grid gap-4 lg:grid-cols-2'>
+        {admin && grouped && (
+          <div className='flex flex-wrap gap-2 lg:col-span-2'>
+            <button
+              className='btn-ghost text-xs'
+              disabled={busy}
+              onClick={() =>
+                setSelectedGroups(
+                  groups.filter((g) => !filter || String(g.categoria_id) === filter).map(groupKey)
+                )
+              }
+            >
+              Seleccionar grupos de esta categoría
+            </button>
+            <button
+              className='btn-ghost text-xs'
+              disabled={busy}
+              onClick={() => setSelectedGroups([])}
+            >
+              Limpiar selección
+            </button>
+            <button
+              className='btn-secondary text-xs'
+              disabled={busy || !selectedGroups.length}
+              onClick={removeSelectedGroups}
+            >
+              Quitar grupos seleccionados
+            </button>
+          </div>
+        )}
         {groups
           .map((g, i) => ({ g, i }))
           .filter(
@@ -373,6 +478,22 @@ export default function TournamentRoster({
           .map(({ g, i }) => (
             <section className='card p-4 min-w-0' key={`${g.categoria_id}:${g.nombre}`}>
               <header className='flex justify-between gap-2 items-start mb-2'>
+                {admin && grouped && (
+                  <input
+                    type='checkbox'
+                    className='w-5 h-5 shrink-0'
+                    aria-label={`Seleccionar ${catName(g.categoria_id)} ${g.nombre}`}
+                    disabled={busy}
+                    checked={selectedGroups.includes(groupKey(g))}
+                    onChange={(e) =>
+                      setSelectedGroups((old) =>
+                        e.target.checked
+                          ? [...old, groupKey(g)]
+                          : old.filter((k) => k !== groupKey(g))
+                      )
+                    }
+                  />
+                )}
                 <div>
                   <p className='text-xs text-[var(--color-brand)]'>{catName(g.categoria_id)}</p>
                   <h3 className='font-bold'>{g.nombre}</h3>

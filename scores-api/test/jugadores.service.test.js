@@ -211,6 +211,7 @@ test('una cuenta no puede vincularse a dos jugadores', async () => {
 test('explica todas las relaciones que impiden eliminar un jugador', async () => {
   const calls = []
   const fakeDb = {
+    async getConnection() { return { query: this.query, beginTransaction: async()=>{}, rollback:async()=>{}, release:()=>{} } },
     async query(sql) {
       calls.push(sql)
       if (/SELECT id, nombre, apellido FROM jugadores/.test(sql)) return [[playerRow]]
@@ -229,4 +230,26 @@ test('explica todas las relaciones que impiden eliminar un jugador', async () =>
       /3 partidos/.test(error.message)
   )
   assert.equal(calls.some((sql) => /^DELETE/.test(sql.trim())), false)
+})
+
+test('eliminación explícita del jugador conserva auditoría y confirma atómicamente', async () => {
+  const calls = []
+  const conn = {
+    beginTransaction:async()=>{}, release:()=>{}, rollback:async()=>{},
+    commit:async()=>calls.push('COMMIT'),
+    query:async(sql,args)=>{
+      calls.push(sql)
+      if(sql.startsWith('SELECT id, nombre')) return [[playerRow]]
+      if(sql.includes('AS parejas')) return [[{parejas:0,partidos:0,inscripciones:0}]]
+      if(sql.startsWith('INSERT INTO auditoria_eliminaciones')) {
+        assert.equal(args[0],8)
+        assert.equal(args[1],3)
+        assert.deepEqual(JSON.parse(args[2]),{nombre:'Laura',apellido:'Díaz'})
+      }
+      return [{affectedRows:1}]
+    },
+  }
+  await loadService({getConnection:async()=>conn}).remove(8,3)
+  assert.ok(calls.findIndex(s=>s.startsWith('INSERT INTO auditoria')) < calls.indexOf('DELETE FROM jugadores WHERE id = ?'))
+  assert.equal(calls.at(-1),'COMMIT')
 })

@@ -1,3 +1,4 @@
+import BulkDelete from '../../components/ui/BulkDelete'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
@@ -143,15 +144,12 @@ export default function GestionTorneos() {
   const handleDelete = async (torneo) => {
     const ok = await confirm({
       title: 'Eliminar torneo',
-      message:
-        torneo.partidos_count > 0
-          ? 'Este torneo tiene partidos y no se puede eliminar hasta reasignarlos o borrarlos.'
-          : `Esta acción eliminará permanentemente el torneo "${torneo.nombre}".`,
-      confirmLabel: torneo.partidos_count > 0 ? 'Entendido' : 'Eliminar',
-      danger: torneo.partidos_count === 0,
-      requireText: torneo.partidos_count > 0 ? undefined : torneo.nombre,
+      message: `Se eliminará el torneo "${torneo.nombre}" con sus partidos, resultados, inscripciones y grupos. Los jugadores, las parejas y la auditoría se conservan.`,
+      confirmLabel: 'Eliminar torneo y dependencias',
+      danger: true,
+      requireText: torneo.nombre,
     })
-    if (!ok || torneo.partidos_count > 0) return
+    if (!ok) return
     try {
       await tournamentService.remove(torneo.id)
       addToast({ type: 'success', title: 'Torneo eliminado' })
@@ -304,6 +302,15 @@ export default function GestionTorneos() {
       )}
 
       <section className='space-y-3'>
+        <BulkDelete
+          records={torneos}
+          remove={tournamentService.remove}
+          onComplete={fetchAll}
+          disabled={loading}
+          warning='Se eliminarán los torneos seleccionados con sus partidos, resultados, fotos registradas, inscripciones y grupos. Se conservan jugadores, parejas y el historial de auditoría.'
+          label={(r) => r.nombre}
+        />
+
         {loading ? (
           Array.from({ length: 3 }, (_, index) => (
             <div key={index} className='skeleton h-36 rounded-2xl' />
@@ -363,7 +370,9 @@ export default function GestionTorneos() {
                   </div>
                 </div>
                 <div className='flex flex-wrap items-center gap-2 shrink-0'>
-                  <Link to={`/torneo/${tournament.id}`} className='btn-secondary px-3 py-2 text-xs'>Detalle e inscripciones</Link>
+                  <Link to={`/torneo/${tournament.id}`} className='btn-secondary px-3 py-2 text-xs'>
+                    Detalle e inscripciones
+                  </Link>
                   <span
                     className='text-xs font-semibold px-3'
                     style={{ color: 'var(--text-muted)' }}

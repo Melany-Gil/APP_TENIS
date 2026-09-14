@@ -45,9 +45,9 @@ exports.update = async (req, res) => {
 // ── Eliminar ────────────────────────────────────────────────────────────────────
 exports.remove = async (req, res) => {
   try {
-    const data = await torneosService.remove(req.params.id)
+    const data = await torneosService.remove(req.params.id, req.user.id)
     return success(res, data)
   } catch (err) {
-    return error(res, err.message || 'Error al eliminar torneo', err.status || 500)
+    return error(res, err.status ? err.message : 'No se pudo eliminar el torneo. No se guardaron cambios; intenta nuevamente.', err.status || 500)
   }
 }

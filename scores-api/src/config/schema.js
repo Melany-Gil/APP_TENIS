@@ -77,6 +77,13 @@ const columnForeignKeyExists = async (tableName, columnName) => {
 }
 
 exports.ensureSchema = async () => {
+  // No foreign keys: deletion history survives the original entity and account.
+  await db.query(`CREATE TABLE IF NOT EXISTS auditoria_eliminaciones (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    entidad VARCHAR(40) NOT NULL, registro_id BIGINT NOT NULL, actor_id BIGINT NULL,
+    detalle JSON NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_eliminacion (entidad,registro_id)
+  ) ENGINE=InnoDB`)
   // Independent tournament membership: never infer or populate it from old matches.
   await db.query(`CREATE TABLE IF NOT EXISTS torneo_grupos (
     torneo_id INT NOT NULL, categoria_id INT NOT NULL, nombre VARCHAR(20) NOT NULL,

@@ -118,7 +118,7 @@ test('grupos: conserva resultados y bloquea redistribuir un partido válido', as
           ],
         ]
       if (sql.includes('FROM categorias')) return [[{ id: 3 }]]
-      if (sql.includes('FROM inscripciones')) return [[{ equipo_id: 1 }, { equipo_id: 2 }]]
+      if (sql.includes('FROM inscripciones')) return [[{ equipo_id: 1, categoria_id: 3 }, { equipo_id: 2, categoria_id: 3 }]]
       if (sql.includes('FROM torneo_grupo_parejas')) return [memberships]
       if (sql.includes('FROM torneo_grupos')) return [[{ categoria_id: 3, nombre: 'Grupo 1' }]]
       if (sql.includes('FROM partidos')) return [[match]]
@@ -130,7 +130,7 @@ test('grupos: conserva resultados y bloquea redistribuir un partido válido', as
   await assert.rejects(
     svc.save(
       8,
-      [{ categoria_id: 3, nombre: 'Otro grupo', equipo_ids: [1, 2] }],
+      [{ categoria_id: 3, nombre: 'GRUPO 2', equipo_ids: [1, 2] }],
       svc.revision([{ categoria_id: 3, nombre: 'Grupo 1' }], memberships)
     ),
     (e) => e.status === 409 && /alteraría/.test(e.message)
@@ -219,7 +219,7 @@ test('grupos: revisión antigua no sobrescribe distribución y guardado confirma
       if (sql.startsWith('SELECT') && sql.includes('FROM torneo_grupo_parejas'))
         return [storedPairs]
       if (sql.startsWith('SELECT') && sql.includes('FROM torneo_grupos')) return [storedGroups]
-      if (sql.includes('FROM inscripciones')) return [[{ equipo_id: 1 }, { equipo_id: 2 }]]
+      if (sql.includes('FROM inscripciones')) return [[{ equipo_id: 1, categoria_id: 3 }, { equipo_id: 2, categoria_id: 3 }]]
       if (sql.includes('FROM partidos')) return [[]]
       writes.push(sql)
       if (sql.startsWith('DELETE FROM torneo_grupo_parejas')) storedPairs = []

@@ -1,3 +1,4 @@
+import BulkDelete from '../../components/ui/BulkDelete'
 import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { Plus, Pencil, Trash2, X, Radio, Gavel, SlidersHorizontal, MapPin } from 'lucide-react'
@@ -992,6 +993,15 @@ export default function GestionPartidos() {
 
       {/* Filtros */}
       <Tabs tabs={FILTER_TABS} activeTab={filterTab} onChange={setFilterTab} />
+
+      <BulkDelete
+        records={filtered}
+        remove={matchService.remove}
+        onComplete={fetchAll}
+        disabled={loading}
+        warning='Se eliminarán los partidos seleccionados y sus resultados, no sus jugadores ni parejas. Los cruces dependientes se validan individualmente.'
+        label={(r) => `#${r.id} · ${getParticipantName(r, 1)} / ${getParticipantName(r, 2)}`}
+      />
 
       {/* Lista */}
       <div className='card overflow-hidden'>

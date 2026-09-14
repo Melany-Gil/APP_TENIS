@@ -1,3 +1,4 @@
+import BulkDelete from '../../components/ui/BulkDelete'
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { Camera, Link2, Plus, Pencil, Trash2, Search, X } from 'lucide-react'
@@ -119,8 +120,15 @@ export default function GestionJugadores() {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file || !editing) return
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
-      addToast({ type: 'error', title: 'Imagen no válida', message: 'Usa JPG, PNG o WebP de máximo 2 MB.' })
+    if (
+      !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
+      file.size > 2 * 1024 * 1024
+    ) {
+      addToast({
+        type: 'error',
+        title: 'Imagen no válida',
+        message: 'Usa JPG, PNG o WebP de máximo 2 MB.',
+      })
       return
     }
     setMediaBusy(true)
@@ -159,7 +167,11 @@ export default function GestionJugadores() {
       await fetchAll(editing.id)
       addToast({ type: 'success', title: userId ? 'Cuenta vinculada' : 'Cuenta desvinculada' })
     } catch (error) {
-      addToast({ type: 'error', title: 'No se pudo cambiar la vinculación', message: error.message })
+      addToast({
+        type: 'error',
+        title: 'No se pudo cambiar la vinculación',
+        message: error.message,
+      })
     } finally {
       setMediaBusy(false)
     }
@@ -213,7 +225,13 @@ export default function GestionJugadores() {
             />
             <div className='form-group'>
               <label className='form-label'>Deporte *</label>
-              <select className='form-input' {...register('deporte', { required: 'Requerido', onChange: () => setValue('categoria_id', '') })}>
+              <select
+                className='form-input'
+                {...register('deporte', {
+                  required: 'Requerido',
+                  onChange: () => setValue('categoria_id', ''),
+                })}
+              >
                 <option value=''>Seleccionar</option>
                 {DEPORTES.map((d) => (
                   <option key={d} value={d}>
@@ -227,7 +245,12 @@ export default function GestionJugadores() {
               <select className='form-input' {...register('categoria_id')}>
                 <option value=''>Sin categoría</option>
                 {categorias
-                  .filter((c) => watch('deporte') === 'ambos' || c.deporte === watch('deporte') || c.deporte === 'ambos')
+                  .filter(
+                    (c) =>
+                      watch('deporte') === 'ambos' ||
+                      c.deporte === watch('deporte') ||
+                      c.deporte === 'ambos'
+                  )
                   .map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.nombre}
@@ -237,7 +260,13 @@ export default function GestionJugadores() {
             </div>
 
             {editing && (
-              <div className='sm:col-span-2 rounded-xl p-4 grid gap-4 sm:grid-cols-[auto_1fr]' style={{ backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)' }}>
+              <div
+                className='sm:col-span-2 rounded-xl p-4 grid gap-4 sm:grid-cols-[auto_1fr]'
+                style={{
+                  backgroundColor: 'var(--bg-hover)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
                 <Avatar
                   src={editing.foto}
                   name={`${editing.nombre || ''} ${editing.apellido || ''}`}
@@ -250,10 +279,23 @@ export default function GestionJugadores() {
                     <div className='flex flex-wrap gap-2'>
                       <label className='btn-secondary inline-flex cursor-pointer items-center gap-2 text-xs px-3 py-2'>
                         <Camera className='w-4 h-4' /> Cambiar foto
-                        <input type='file' accept='image/jpeg,image/png,image/webp' onChange={handlePhotoUpload} disabled={mediaBusy} className='hidden' />
+                        <input
+                          type='file'
+                          accept='image/jpeg,image/png,image/webp'
+                          onChange={handlePhotoUpload}
+                          disabled={mediaBusy}
+                          className='hidden'
+                        />
                       </label>
                       {editing.foto && (
-                        <Button type='button' variant='ghost' size='sm' onClick={handleDeletePhoto} disabled={mediaBusy} leftIcon={<Trash2 className='w-4 h-4 text-red-500' />}>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='sm'
+                          onClick={handleDeletePhoto}
+                          disabled={mediaBusy}
+                          leftIcon={<Trash2 className='w-4 h-4 text-red-500' />}
+                        >
                           Quitar foto
                         </Button>
                       )}
@@ -261,18 +303,30 @@ export default function GestionJugadores() {
                     <p className='form-hint'>JPG, PNG o WebP · máximo 2 MB.</p>
                   </div>
                   <label className='form-group'>
-                    <span className='form-label inline-flex items-center gap-1.5'><Link2 className='w-3.5 h-3.5' /> Cuenta de acceso</span>
-                    <select className='form-input' value={editing.usuario?.id || ''} onChange={handleAccountChange} disabled={mediaBusy}>
+                    <span className='form-label inline-flex items-center gap-1.5'>
+                      <Link2 className='w-3.5 h-3.5' /> Cuenta de acceso
+                    </span>
+                    <select
+                      className='form-input'
+                      value={editing.usuario?.id || ''}
+                      onChange={handleAccountChange}
+                      disabled={mediaBusy}
+                    >
                       <option value=''>Sin cuenta vinculada</option>
                       {usuarios
-                        .filter((usuario) => !usuario.jugador || Number(usuario.jugador.id) === Number(editing.id))
+                        .filter(
+                          (usuario) =>
+                            !usuario.jugador || Number(usuario.jugador.id) === Number(editing.id)
+                        )
                         .map((usuario) => (
                           <option key={usuario.id} value={usuario.id}>
                             {usuario.nombre} {usuario.apellido} · {usuario.email}
                           </option>
                         ))}
                     </select>
-                    <span className='form-hint'>Esta asociación habilita “Mis partidos” en el perfil del usuario.</span>
+                    <span className='form-hint'>
+                      Esta asociación habilita “Mis partidos” en el perfil del usuario.
+                    </span>
                   </label>
                 </div>
               </div>
@@ -303,6 +357,15 @@ export default function GestionJugadores() {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
+
+      <BulkDelete
+        records={filtered}
+        remove={playerService.remove}
+        onComplete={fetchAll}
+        disabled={loading}
+        warning='Solo esta acción elimina jugadores explícitamente seleccionados. Los jugadores vinculados a partidos o parejas se conservan; se mostrará cada impedimento.'
+        label={(r) => `${r.nombre} ${r.apellido || ''}`}
+      />
 
       {/* Lista */}
       <div className='card overflow-hidden'>
@@ -341,9 +404,7 @@ export default function GestionJugadores() {
                     {j.deporte}
                   </span>
                   {j.categoria && (
-                    <span className='badge-brand text-[10px]'>
-                      {j.categoria.nombre}
-                    </span>
+                    <span className='badge-brand text-[10px]'>{j.categoria.nombre}</span>
                   )}
                   {j.usuario && (
                     <span className='text-[10px]' style={{ color: 'var(--text-muted)' }}>

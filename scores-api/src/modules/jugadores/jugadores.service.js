@@ -102,44 +102,64 @@ exports.update = async (id, body) => {
   return exports.getById(id)
 }
 
-exports.remove = async (id) => {
-  const [existing] = await db.query(
-    'SELECT id, nombre, apellido FROM jugadores WHERE id = ?',
-    [id]
-  )
-  if (!existing.length) {
-    throw { status: 404, message: 'Jugador no encontrado' }
-  }
+exports.remove = async (id, actorId = null) => {
+  id = Number(id)
+  if (!Number.isSafeInteger(id) || id < 1) throw { status: 400, message: 'Jugador inválido' }
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+    const [existing] = await conn.query(
+      'SELECT id, nombre, apellido FROM jugadores WHERE id = ? FOR UPDATE',
+      [id]
+    )
+    if (!existing.length) {
+      throw { status: 404, message: 'Jugador no encontrado' }
+    }
 
-  const [[usage]] = await db.query(
-    `SELECT
+    const [[usage]] = await conn.query(
+      `SELECT
        (SELECT COUNT(*) FROM equipos_padel
         WHERE jugador1_id = ? OR jugador2_id = ?) AS parejas,
        (SELECT COUNT(*) FROM partidos
         WHERE jugador1_id = ? OR jugador2_id = ?) AS partidos,
        (SELECT COUNT(*) FROM inscripciones WHERE jugador_id = ?) AS inscripciones`,
-    [id, id, id, id, id]
-  )
-  const dependencies = describeDependencies([
-    { count: usage.parejas, singular: 'pareja', plural: 'parejas' },
-    { count: usage.partidos, singular: 'partido', plural: 'partidos' },
-    { count: usage.inscripciones, singular: 'inscripción', plural: 'inscripciones' },
-  ])
-  if (dependencies.length) {
-    throw {
-      status: 409,
-      message: `${existing[0].nombre} ${existing[0].apellido} no se puede eliminar porque está vinculado a ${dependencies.join(', ')}. Elimina o reasigna primero esos registros.`,
+      [id, id, id, id, id]
+    )
+    const dependencies = describeDependencies([
+      { count: usage.parejas, singular: 'pareja', plural: 'parejas' },
+      { count: usage.partidos, singular: 'partido', plural: 'partidos' },
+      { count: usage.inscripciones, singular: 'inscripción', plural: 'inscripciones' },
+    ])
+    if (dependencies.length) {
+      throw {
+        status: 409,
+        message: `${existing[0].nombre} ${existing[0].apellido} no se puede eliminar porque está vinculado a ${dependencies.join(', ')}. Elimina o reasigna primero esos registros.`,
+      }
     }
-  }
 
-  try {
-    await db.query('DELETE FROM jugador_stats WHERE jugador_id = ?', [id])
-    await db.query('DELETE FROM jugadores WHERE id = ?', [id])
+    try {
+      await conn.query(
+        "INSERT INTO auditoria_eliminaciones (entidad,registro_id,actor_id,detalle) VALUES ('jugador',?,?,?)",
+        [
+          id,
+          actorId,
+          JSON.stringify({ nombre: existing[0].nombre, apellido: existing[0].apellido }),
+        ]
+      )
+      await conn.query('DELETE FROM jugador_stats WHERE jugador_id = ?', [id])
+      await conn.query('DELETE FROM jugadores WHERE id = ?', [id])
+    } catch (error) {
+      rethrowDeleteConflict(error, 'este jugador')
+    }
+
+    await conn.commit()
+    return { message: 'Jugador eliminado correctamente' }
   } catch (error) {
-    rethrowDeleteConflict(error, 'este jugador')
+    await conn.rollback()
+    throw error
+  } finally {
+    conn.release()
   }
-
-  return { message: 'Jugador eliminado correctamente' }
 }
 
 exports.updateFoto = async (id, fotoPath) => {
@@ -157,21 +177,30 @@ exports.linkUser = async (id, userId) => {
   const [players] = await db.query('SELECT id FROM jugadores WHERE id = ?', [id])
   if (!players.length) throw { status: 404, message: 'Jugador no encontrado' }
 
-  const [users] = await db.query('SELECT id FROM users WHERE id = ? AND activo = TRUE', [normalizedUserId])
+  const [users] = await db.query('SELECT id FROM users WHERE id = ? AND activo = TRUE', [
+    normalizedUserId,
+  ])
   if (!users.length) throw { status: 404, message: 'Usuario no encontrado o inactivo' }
 
   try {
-    const [result] = await db.query('UPDATE jugadores SET user_id = ? WHERE id = ? AND (user_id IS NULL OR user_id = ?)', [normalizedUserId, id, normalizedUserId])
-    if (!result.affectedRows) throw { status: 409, message: 'El jugador ya tiene otra cuenta. Desvincúlala explícitamente antes de reasignar.' }
+    const [result] = await db.query(
+      'UPDATE jugadores SET user_id = ? WHERE id = ? AND (user_id IS NULL OR user_id = ?)',
+      [normalizedUserId, id, normalizedUserId]
+    )
+    if (!result.affectedRows)
+      throw {
+        status: 409,
+        message: 'El jugador ya tiene otra cuenta. Desvincúlala explícitamente antes de reasignar.',
+      }
   } catch (linkError) {
     if (linkError.code === 'ER_DUP_ENTRY') {
       throw { status: 409, message: 'Esa cuenta ya está vinculada a otro jugador' }
     }
     throw linkError
   }
-  return exports.getAll({ includeAccount: true }).then((playersList) => (
-    playersList.find((player) => Number(player.id) === Number(id))
-  ))
+  return exports
+    .getAll({ includeAccount: true })
+    .then((playersList) => playersList.find((player) => Number(player.id) === Number(id)))
 }
 
 exports.unlinkUser = async (id) => {
