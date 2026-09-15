@@ -14,11 +14,12 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     const page = await context.newPage()
     const failures = []
     page.on('pageerror', error => failures.push(error.message))
-    const user = { id: 12, rol: 'juez', nombre: 'Juez', apellido: 'Prueba' }
+    page.on('dialog', dialog => { if (dialog.type() === 'beforeunload') void dialog.accept() })
+    const user = { id: 12, rol: 'juez', nombre: 'Juez', apellido: 'Prueba', email: 'juez-qa@example.com', numero_documento: '12345678' }
     let match = { id: 30, juez_id: 12, modalidad: 'singles', estado: 'en_vivo', jugador1: { nombre: 'Carlos', apellido: 'Rodríguez' }, jugador2: { nombre: 'Andrés', apellido: 'Martínez' }, cancha: { nombre: 'Cancha 1' }, formato: { mejor_de_sets: 3, juegos_por_set: 6 } }
     let state = createInitialState(), events = [], snapshots = [], posts = 0, reads = 0, drop = false, sequence = 0
     const receipts = new Set()
-    let paused = false
+    let paused = false, logoutCalls = 0
     let photo = null, photoWrites = 0, photoStorageBlocked = false
     const photoBytes = await sharp({ create: { width: 1200, height: 800, channels: 3, background: '#15764a' } }).jpeg().toBuffer()
     const control = () => ({ partido: match, marcador: serializeState(state), revision: `${sequence}:${events.length}`, configuration: 'fixture', eventos_recientes: events, en_vivo: { iniciado_at: new Date().toISOString(), pausado_at: paused ? new Date().toISOString() : null, segundos_pausa: 0 } })
@@ -27,6 +28,7 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
       const req = route.request(), url = new URL(req.url())
       if (url.pathname.startsWith('/api/')) {
         const endpoint = url.pathname.replace('/api', '')
+        if (endpoint === '/auth/logout') { logoutCalls++; return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, message: 'Fallo de red simulado' }) }) }
         let data
         if (endpoint.endsWith('/stream')) return route.fulfill({ status: 200, contentType: 'text/event-stream', body: ': fixture\n\n' })
         if (endpoint.endsWith('/foto/estado')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data: { configured: true, writable: true } }) })
@@ -75,6 +77,8 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await page.waitForURL('**/juez')
     await page.getByRole('button', { name: /Carlos Rodríguez.*Andrés Martínez/ }).click()
     await page.locator('.judge-point').first().waitFor()
+    await page.getByText('Marcación activa', { exact: true }).waitFor()
+    assert.equal(await page.getByRole('button', { name: /^Notificaciones/ }).count(), 0, 'Scoring hides general notifications')
     for (const [width, height] of [[390,844], [360,640], [320,568], [1440,900]]) {
       await page.setViewportSize({ width, height })
       const metrics = await page.evaluate(() => ({ height: document.documentElement.scrollHeight, width: document.documentElement.scrollWidth, viewport: innerHeight, bottom: document.querySelector('.judge-bottom-controls').getBoundingClientRect().bottom }))
@@ -133,6 +137,13 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await page.locator('.judge-point').nth(1).click()
     await page.waitForFunction(() => document.querySelectorAll('.judge-points')[1].textContent === '40')
     assert.deepEqual(state.points, [2,1], 'Offline points have not reached server')
+    const savedQueue = await page.evaluate(() => localStorage.getItem('judge-outbox-v2:12'))
+    await page.getByRole('button', { name: 'Abrir menú del juez' }).click()
+    await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+    await page.getByRole('heading', { name: 'Hay marcaciones sin sincronizar' }).waitFor()
+    await page.getByRole('button', { name: 'Volver a la mesa', exact: true }).click()
+    assert.equal(logoutCalls, 0, 'Cancelled logout never reaches server')
+    assert.equal(await page.evaluate(() => localStorage.getItem('judge-outbox-v2:12')), savedQueue, 'Logout warning preserves pending actions')
     await page.context().setOffline(false)
     await page.reload()
     await settled()
@@ -191,6 +202,12 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await page.getByRole('button', { name: 'Estadísticas', exact: true }).click()
     await page.getByRole('heading', { name: 'Estadísticas y últimas acciones' }).waitFor()
     await page.getByRole('button', { name: 'Cerrar panel' }).click()
+    await page.getByRole('button', { name: 'Abrir menú del juez' }).click()
+    await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+    await page.getByRole('alert').filter({hasText:'No se pudo cerrar la sesión'}).waitFor()
+    assert.equal(logoutCalls, 1)
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('auth-storage-v2')).state.isAuthenticated), true)
+    await page.getByRole('button', { name: 'Abrir menú del juez' }).click()
     await page.getByRole('link', { name: 'Mi perfil', exact: true }).click()
     await page.getByRole('heading', { name: 'Mi perfil', exact: true }).waitFor()
     assert.equal(await page.locator('.sponsor-dock').count(), 0)
@@ -214,6 +231,55 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await publicPage.getByRole('button', { name: 'Regresar a partidos' }).click()
     await publicPage.getByRole('heading', { name: 'Jornada de hoy' }).waitFor()
     assert.deepEqual(failures, [])
+    // Exercise the real React hooks with delayed responses and an SSE burst.
+    const hooksPage = await browser.newPage()
+    await hooksPage.route('**/*', route => {
+      const url = new URL(route.request().url())
+      if (url.pathname === '/qa-hooks') return route.fulfill({ contentType: 'text/html', body: '<html><body><div id="root"></div></body></html>' })
+      return url.origin === 'http://127.0.0.1:4173' ? route.continue() : route.abort()
+    })
+    await hooksPage.goto('http://127.0.0.1:4173/qa-hooks')
+    await hooksPage.evaluate(async () => {
+      const { default: refresh } = await import('/@react-refresh')
+      refresh.injectIntoGlobalHook(window)
+      window.$RefreshReg$ = () => {}
+      window.$RefreshSig$ = () => type => type
+      window.__vite_plugin_react_preamble_installed__ = true
+      const reactModule = await import('/node_modules/.vite/deps/react.js')
+      const React = reactModule.default || reactModule
+      const domModule = await import('/node_modules/.vite/deps/react-dom_client.js')
+      const { createRoot } = domModule.default || domModule
+      const { matchService } = await import('/src/services/matchService.js')
+      const { matchRealtimeService } = await import('/src/services/matchRealtimeService.js')
+      const callbacks = new Set()
+      matchRealtimeService.subscribe = cb => { callbacks.add(cb); return () => callbacks.delete(cb) }
+      window.listReads = 0
+      matchService.getAll = async () => { window.listReads++; return { data: [{ id: 2 }] } }
+      const old = new Promise(resolve => { window.finishOldRead = () => resolve({data:{id:1}}) })
+      matchService.getById = id => id === 1 ? old : Promise.resolve({data:{id}})
+      const { useMatch, useMatches } = await import('/src/hooks/useMatches.js')
+      window.notifyBurst = () => { for (let i=0;i<40;i++) callbacks.forEach(cb=>cb({matchId:2})) }
+      function Harness() {
+        const [id, setId] = React.useState(1)
+        window.changeMatch = setId
+        useMatches()
+        const detail = useMatch(id)
+        window.hookMatch = detail.match
+        return React.createElement('p', null, detail.match?.id || 'Loading')
+      }
+      createRoot(document.getElementById('root')).render(React.createElement(Harness))
+    })
+    await hooksPage.waitForFunction(() => window.listReads === 1 && window.changeMatch)
+    await hooksPage.evaluate(() => window.notifyBurst())
+    await hooksPage.waitForFunction(() => window.listReads === 2)
+    await hooksPage.waitForTimeout(300)
+    assert.equal(await hooksPage.evaluate(() => window.listReads), 2, '40 SSE messages require only one list refresh')
+    await hooksPage.evaluate(() => window.changeMatch(2))
+    await hooksPage.waitForFunction(() => window.hookMatch?.id === 2)
+    await hooksPage.evaluate(() => window.finishOldRead())
+    await hooksPage.waitForTimeout(100)
+    assert.equal(await hooksPage.evaluate(() => window.hookMatch?.id), 2, 'Old match response cannot overwrite current detail')
+    await hooksPage.close()
     console.log('PASS: mobile scoring, offline photo queue/reload, explicit replacement, public photo detail, network recovery and restricted routes')
     console.log('Screenshot:', path.join(os.tmpdir(), 'tenis-judge-mobile.png'))
   } finally { await browser.close() }

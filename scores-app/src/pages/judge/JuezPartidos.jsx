@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { ArrowLeft, Pause, Play, Undo2, RefreshCw, X, Settings2, BarChart3, UserCheck, AlertTriangle, Search } from 'lucide-react'
 import { matchService } from '../../services/matchService'
 import { getParticipantName } from '../../utils/matchParticipants'
@@ -31,6 +32,7 @@ const reasonLabel = (event, names) => {
 }
 
 export default function JuezPartidos() {
+  const { setScoringActive } = useOutletContext() || {}
   const user = useAuthStore((store) => store.user)
   const userId = user?.id
   const [exclusive, setExclusive] = useState(false)
@@ -151,6 +153,16 @@ export default function JuezPartidos() {
   const finished = score?.terminado || ['finalizado', 'cancelado'].includes(live?.estado)
   const paused = Boolean(live?.pausado_at)
   const playing = live?.estado === 'en_vivo' && !finished
+  useEffect(() => {
+    setScoringActive?.(playing && !paused)
+    return () => setScoringActive?.(false)
+  }, [playing, paused, setScoringActive])
+  useEffect(() => {
+    if (!view.pendingCount) return
+    const warn = event => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [Boolean(view.pendingCount)])
   const locked = view.busy || view.needsSync || view.conflict || nameBusy || !exclusive
   const adminLocked = locked || Boolean(view.pendingCount) || !online
   const canScore = playing && !paused && !locked

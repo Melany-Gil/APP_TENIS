@@ -32,12 +32,15 @@ export default function ProfileMenu() {
   const panel = { admin: '/admin', juez: '/juez', juez_director: '/director' }[user.rol] || '/'
   const name = `${user.nombre || ''} ${user.apellido || ''}`.trim()
   const closeSession = async () => {
+    if (busy) return
     setBusy(true); setError('')
-    try { await authService.logout(); logout(); navigate('/login', { replace: true }) }
-    catch { setError('No se pudo cerrar la sesión. Reintenta cuando tengas conexión.') }
+    try { if (await authService.logoutSafely()) { logout(); navigate('/login', { replace: true }) } }
+    catch { setError('No se pudo cerrar la sesión. Tus datos locales se conservan. Reintenta cuando tengas conexión.') }
     finally { setBusy(false) }
   }
-  return <div className='relative' ref={root} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false) }}>
+  // Safari can blur a focused link with relatedTarget=null when a button is tapped.
+  // Keep the menu mounted until click; pointerdown outside still dismisses it.
+  return <div className='relative' ref={root} onBlur={e => { if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) setOpen(false) }}>
     <button ref={trigger} type='button' aria-label={`Abrir menú de ${name}`} aria-expanded={open} aria-controls='profile-menu' onClick={() => setOpen(v => !v)} className='flex items-center gap-2 rounded-xl p-1 hover:bg-[var(--bg-hover)]'>
       <Avatar src={user.avatar} name={name} size='sm' />
       <span className='hidden lg:block text-left max-w-40'><strong className='block truncate text-sm'>{name}</strong><span className='text-xs' style={{ color: 'var(--text-muted)' }}>{ROLES[user.rol]}</span></span>
@@ -49,7 +52,7 @@ export default function ProfileMenu() {
         <div className='min-w-0'><strong className='block text-sm truncate'>{name}</strong><p className='text-xs truncate' style={{ color: 'var(--text-muted)' }}>{user.email || user.usuario || user.telefono || ROLES[user.rol]}</p></div>
       </div>
       {[[profile, UserRound, 'Mi perfil'], [panel, LayoutDashboard, 'Mi panel'], ...(!official ? [['/settings', Settings, 'Configuración']] : [])].map(([to, Icon, label]) => <Link key={to} to={to} className='flex gap-3 items-center rounded-lg p-3 text-sm hover:bg-[var(--bg-hover)]'><Icon size={18} />{label}</Link>)}
-      <button disabled={busy} onClick={closeSession} className='w-full text-left flex gap-3 items-center text-red-600 rounded-lg p-3 text-sm border-t border-[var(--border-color)] disabled:opacity-50'><LogOut size={18} />{busy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
+      <button type='button' disabled={busy} onClick={closeSession} className='w-full text-left flex gap-3 items-center text-red-600 rounded-lg p-3 text-sm border-t border-[var(--border-color)] disabled:opacity-50'><LogOut size={18} />{busy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
       {error && <p role='alert' className='p-2 text-sm text-red-600'>{error}</p>}
     </div>}
   </div>

@@ -1,5 +1,14 @@
 // Durable ordered outbox. Only an acknowledged server response removes an
 // action. The same UUID is reused after timeout/reload; no blind score overwrite.
+export function getPendingJudgeCount(storage, userId) {
+  if (!userId) return 0
+  const saved = storage.getItem(`judge-outbox-v2:${userId}`)
+  if (!saved) return 0
+  const parsed = JSON.parse(saved)
+  if (!Array.isArray(parsed.queue)) throw new Error('No se pudo comprobar la marcación pendiente. No borres los datos del navegador.')
+  return parsed.queue.length
+}
+
 export function createJudgeSession(service, publish, {
   storage = null, userId = null, isOnline = () => true,
   makeId = () => crypto.randomUUID(), project = null, canWrite = () => true, now = () => Date.now(),

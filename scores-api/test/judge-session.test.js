@@ -4,6 +4,19 @@ const load = () => import('../../scores-app/src/utils/judgeSession.js')
 const response = (point = '0') => ({ data: { marcador: { punto_j1: point } } })
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
 
+test('salida del juez comprueba pendientes solo de su cuenta sin modificar la cola', async () => {
+  const { getPendingJudgeCount } = await load()
+  const saved = JSON.stringify({ queue: [{ client_action_id: 'a' }, { client_action_id: 'b' }] })
+  const storage = { getItem: key => key === 'judge-outbox-v2:12' ? saved : null }
+  assert.equal(getPendingJudgeCount(storage, 12), 2)
+  assert.equal(getPendingJudgeCount(storage, 13), 0)
+  assert.equal(getPendingJudgeCount(storage, null), 0)
+  assert.equal(storage.getItem('judge-outbox-v2:12'), saved)
+  assert.throws(() => getPendingJudgeCount({getItem:()=>'{broken'}, 12))
+  assert.throws(() => getPendingJudgeCount({getItem:()=>JSON.stringify({})}, 12))
+  assert.throws(() => getPendingJudgeCount({getItem:()=>{throw Error('Storage bloqueado')}}, 12))
+})
+
 test('juez reutiliza respuesta al marcar, bloquea doble toque y no recarga la lista', async () => {
   const { createJudgeSession } = await load()
   let view, reads = 0, writes = 0

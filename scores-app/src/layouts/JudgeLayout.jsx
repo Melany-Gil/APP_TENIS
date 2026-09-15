@@ -13,6 +13,11 @@ import { authService } from '../services/authService'
 export default function JudgeLayout() {
   const { user, logout } = useAuthStore()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [scoringActive, setScoringActive] = useState(false)
+  const [showGeneralControls, setShowGeneralControls] = useState(false)
+  const focused = scoringActive && !showGeneralControls
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState('')
   const officialNav = (
     <nav aria-label='Navegación oficial' className='flex flex-wrap items-center gap-1'>
       {['admin', 'juez_director'].includes(user?.rol) && (
@@ -60,9 +65,18 @@ export default function JudgeLayout() {
   // session handles reconnection; real 401 responses still expire the session.
 
   const signOut = async () => {
-    await authService.logout().catch(() => {})
-    logout()
-    navigate('/login')
+    if (signingOut) return
+    setSigningOut(true)
+    setSignOutError('')
+    setMenuOpen(false)
+    try {
+      if (await authService.logoutSafely()) {
+        logout()
+        navigate('/login', { replace: true })
+      }
+    } catch {
+      setSignOutError('No se pudo cerrar la sesión. Tus marcaciones locales se conservan; vuelve a intentarlo con conexión.')
+    } finally { setSigningOut(false) }
   }
 
   return (
@@ -103,9 +117,11 @@ export default function JudgeLayout() {
           </span>
         </Link>
         <div className='ml-auto flex flex-wrap items-center justify-end gap-1'>
-          <div className='judge-desktop-nav'>{officialNav}</div>
+          {!focused && <div className='judge-desktop-nav'>{officialNav}</div>}
+          {focused && <span className='text-xs font-semibold px-2'>Marcación activa</span>}
+          {scoringActive && showGeneralControls && <button className='btn-ghost text-xs' onClick={() => setShowGeneralControls(false)}>Concentrar mesa</button>}
           <button
-            className='judge-mobile-nav btn-ghost p-2'
+            className={`${focused ? '' : 'judge-mobile-nav'} btn-ghost p-2`}
             aria-label='Abrir menú del juez'
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen(true)}
@@ -121,6 +137,10 @@ export default function JudgeLayout() {
                 }}
               >
                 {officialNav}
+                {focused && <div className='flex flex-wrap items-center gap-2 pt-3 border-t'>
+                  <button className='btn-ghost text-sm' onClick={() => { setShowGeneralControls(true); setMenuOpen(false) }}>Mostrar controles generales</button>
+                  <button className='btn-ghost text-sm' disabled={signingOut} onClick={signOut}>Cerrar sesión</button>
+                </div>}
               </div>
             </ActionDialog>
           )}
@@ -130,17 +150,18 @@ export default function JudgeLayout() {
               Administración
             </Link>
           )}
-          <ThemeToggle />
-          <NotificationBell />
-          <button onClick={signOut} className='btn-ghost p-2' aria-label='Cerrar sesión'>
+          {!focused && <ThemeToggle />}
+          {!focused && <NotificationBell />}
+          {!focused && <button disabled={signingOut} onClick={signOut} className='btn-ghost p-2' aria-label='Cerrar sesión'>
             <LogOut className='w-5 h-5' />
-          </button>
+          </button>}
         </div>
       </header>
 
       <main className='flex-1 w-full max-w-5xl mx-auto px-3 sm:px-6 py-2 sm:py-4'>
+        {signOutError && <p role='alert' className='text-sm text-red-600 mb-2'>{signOutError}</p>}
         <Suspense fallback={<ContentLoader />}>
-          <Outlet />
+          <Outlet context={{ setScoringActive }} />
         </Suspense>
       </main>
       <ToastContainer />
