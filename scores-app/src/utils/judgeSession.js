@@ -115,6 +115,20 @@ export function createJudgeSession(service, publish, {
       } catch (error) { update({ error: error.message || 'No se pudo guardar la acción en el dispositivo.' }); return false }
     },
     getPending() { return queue.map(event => ({ ...event })) },
+    async reviewConflict() {
+      if (!conflict || !queue.length || sending || current.busy || disposed || !canWrite()) return null
+      try {
+        const response = await service.getLiveState(current.match.id)
+        if (!response?.data?.marcador || !response.data.revision) throw new Error('Respuesta incompleta del servidor')
+        if (disposed || !canWrite()) return null
+        confirmed = response.data
+        update({ control: confirmed, needsSync: true, error: '' })
+        return { revision: confirmed.revision, control: confirmed, actions: queue.map(event => ({ ...event })) }
+      } catch (error) {
+        update({ error: error.message || 'No se pudo consultar el marcador. Conservamos todos los pendientes.' })
+        return null
+      }
+    },
     undoLocal() {
       if (!queue.length || queue.at(-1).attempted || conflict || !canWrite()) return false
       try {
@@ -125,12 +139,25 @@ export function createJudgeSession(service, publish, {
         return true
       } catch { update({ error: 'No se pudo guardar la corrección local.' }); return false }
     },
-    async discardConflict() {
-      if (!conflict || sending || current.busy || !canWrite()) return
-      persist([])
+    async discardConflict(reviewedRevision) {
+      if (!conflict || sending || current.busy || disposed || !canWrite()) return false
+      try {
+        if (!reviewedRevision) throw new Error('Primero consulta y revisa el marcador del servidor.')
+        const response = await service.getLiveState(current.match.id)
+        if (disposed || !canWrite()) return false
+        if (response?.data?.revision !== reviewedRevision) throw new Error('El marcador cambió durante la revisión. Vuelve a consultarlo; los pendientes se conservan.')
+        if (!storage || !userId) throw new Error('No se puede conservar una copia de las acciones. No se descartaron.')
+        // Archive before clearing; never overwrite an earlier review or replay it automatically.
+        storage.setItem(`${storageKey}:review:${makeId()}`, JSON.stringify({ match: current.match, actions: queue, server: response.data, reviewedAt: now() }))
+        persist([])
+      } catch (error) {
+        update({ error: error.message || 'No se pudo guardar la revisión. Los pendientes se conservan.' })
+        return false
+      }
       queue = []; conflict = false
       update({ needsSync: true, error: '' })
       await sync()
+      return true
     },
     async select(match) {
       if (current.busy || queue.length || conflict) return

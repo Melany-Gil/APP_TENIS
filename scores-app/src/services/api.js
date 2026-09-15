@@ -1,5 +1,7 @@
 import axios from 'axios'
 import { showAlert } from '../utils/confirm'
+import useAuthStore from '../store/useAuthStore'
+import { saveSessionRecovery } from '../utils/sessionRecovery'
 
 // Elimina el almacenamiento usado por la versión anterior, que guardaba el JWT.
 localStorage.removeItem('auth-storage')
@@ -14,9 +16,13 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('auth-storage-v2')
-      if (window.location.pathname !== '/login') window.location.href = '/login'
+    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+      // Keep the account-scoped judge outbox intact. Never retain credentials.
+      try {
+        saveSessionRecovery(sessionStorage, useAuthStore.getState().user, window.location.pathname)
+      } catch {}
+      useAuthStore.getState().logout()
+      window.location.href = '/login'
     }
     const payload = error.response?.data || error
     if (payload && typeof payload === 'object' && error.response?.status) {

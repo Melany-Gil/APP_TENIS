@@ -4,6 +4,54 @@ const load = () => import('../../scores-app/src/utils/judgeSession.js')
 const response = (point = '0') => ({ data: { marcador: { punto_j1: point } } })
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
 
+test('revisión de conflicto exige versión vigente y archiva antes de retirar pendientes', async () => {
+  const { createJudgeSession } = await load()
+  const key = 'judge-outbox-v2:12'
+  const action = { client_action_id: 'pending', expected_revision: '1:1', tipo: 'punto' }
+  const data = new Map([[key, JSON.stringify({ match: { id: 7 }, confirmed: { marcador: {}, revision: '1:1' }, queue: [action] })]])
+  let revision = '1:2', blocked = false, view
+  const storage = { getItem: k => data.get(k), removeItem: k => data.delete(k), setItem: (k, v) => { if (blocked) throw Error('Sin espacio'); data.set(k, v) } }
+  const session = createJudgeSession({
+    addJudgeEvent: async () => { throw { status: 409, message: 'Conflicto' } },
+    getLiveState: async () => ({ data: { marcador: {}, revision } }),
+  }, value => { view = value }, { storage, userId: 12, project: s => s, makeId: () => 'review-1' })
+  await session.sync()
+  assert.equal(view.conflict, true)
+  assert.equal(await session.discardConflict(), false)
+  const review = await session.reviewConflict()
+  assert.equal(review.actions.length, 1)
+  revision = '1:3'
+  assert.equal(await session.discardConflict(review.revision), false)
+  assert.ok(data.has(key))
+  blocked = true
+  assert.equal(await session.discardConflict('1:3'), false)
+  assert.equal(session.getPending().length, 1)
+  blocked = false
+  assert.equal(await session.discardConflict('1:3'), true)
+  assert.equal(data.has(key), false)
+  assert.equal(JSON.parse(data.get(`${key}:review:review-1`)).actions[0].client_action_id, 'pending')
+  assert.equal(view.conflict, false)
+})
+
+test('recuperación de sesión conserva solo cuenta y ruta oficial, nunca credenciales ni cola', async () => {
+  const { saveSessionRecovery, readSessionRecovery, clearSessionRecovery } = await import('../../scores-app/src/utils/sessionRecovery.js')
+  const data = new Map([['judge-outbox-v2:12', 'pendientes']])
+  const storage = { getItem: key => data.get(key), setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) }
+  saveSessionRecovery(storage, { id: 12, rol: 'juez', password: 'secret' }, '/juez')
+  assert.deepEqual(readSessionRecovery(storage), { userId: '12', role: 'juez', path: '/juez' })
+  assert.equal(data.get('session-recovery-v1').includes('secret'), false)
+  clearSessionRecovery(storage)
+  assert.equal(readSessionRecovery(storage), null)
+  assert.equal(data.get('judge-outbox-v2:12'), 'pendientes')
+  for (const path of ['//example.com', '/admin', '/juez-falso', 'https://example.com']) {
+    saveSessionRecovery(storage, { id: 12 }, path)
+    assert.equal(readSessionRecovery(storage), null)
+  }
+  data.set('session-recovery-v1', '{roto')
+  assert.equal(readSessionRecovery(storage), null)
+  assert.doesNotThrow(() => saveSessionRecovery({ setItem() { throw Error('bloqueado') } }, { id: 12 }, '/juez'))
+})
+
 test('salida del juez comprueba pendientes solo de su cuenta sin modificar la cola', async () => {
   const { getPendingJudgeCount } = await load()
   const saved = JSON.stringify({ queue: [{ client_action_id: 'a' }, { client_action_id: 'b' }] })

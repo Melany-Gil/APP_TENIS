@@ -7,10 +7,14 @@ import useUIStore from '../../store/useUIStore'
 import { authService } from '../../services/authService'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import { readSessionRecovery, clearSessionRecovery } from '../../utils/sessionRecovery'
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
-  const [accessType, setAccessType] = useState('general')
+  const [recovery] = useState(() => {
+    try { return readSessionRecovery(sessionStorage) } catch { return null }
+  })
+  const [accessType, setAccessType] = useState(() => ['juez', 'juez_director'].includes(recovery?.role) ? 'juez' : 'general')
   const judgeAccess = accessType === 'juez'
   const { login } = useAuthStore()
   const { addToast } = useUIStore()
@@ -33,9 +37,14 @@ export default function Login() {
       if (!user) throw new Error('Respuesta inválida del servidor')
 
       login(user)
+      const sameAccount = recovery && String(user.id) === recovery.userId
+      if (recovery && !sameAccount) {
+        addToast({ type: 'warning', title: 'Ingresaste con otra cuenta', message: 'Las marcaciones pendientes siguen guardadas para la cuenta anterior. No se transferirán a esta cuenta.' })
+      }
+      if (sameAccount) clearSessionRecovery(sessionStorage)
       addToast({ type: 'success', title: '¡Bienvenido!', message: `Hola, ${user.nombre}` })
       const redirectTo =
-        requestedRedirect ||
+        (sameAccount ? recovery.path : null) || requestedRedirect ||
         (user.rol === 'juez_director' ? '/director' : user.rol === 'juez' ? '/juez' : user.rol === 'admin' ? '/admin' : '/')
       navigate(redirectTo, { replace: true })
     } catch (error) {
@@ -64,6 +73,12 @@ export default function Login() {
           Inicia sesión para guardar favoritos, gestionar tu perfil y administrar el torneo.
         </p>
       </div>
+
+      {recovery && <div role='status' className='mb-5 rounded-xl border p-4 text-sm' style={{ borderColor: 'var(--color-brand)', backgroundColor: 'var(--color-brand-dim)', color: 'var(--text-primary)' }}>
+        <strong>Tu sesión venció. Recupera tu mesa.</strong>
+        <p className='mt-2'>Inicia sesión con la misma cuenta para volver a la mesa y revisar las acciones pendientes. No borres los datos de este navegador ni uses otro dispositivo para recuperarlas.</p>
+        <p className='mt-2'>Los puntos locales aún no confirmados no aparecerán en la pantalla pública hasta sincronizarse.</p>
+      </div>}
 
       {location.state?.message && (
         <p

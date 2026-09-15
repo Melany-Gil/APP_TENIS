@@ -45,6 +45,9 @@ export default function JuezPartidos() {
   const [quick, setQuick] = useState(true)
   const [pending, setPending] = useState(null)
   const [panel, setPanel] = useState(null)
+  const [conflictReview, setConflictReview] = useState(null)
+  const [reviewBusy, setReviewBusy] = useState(false)
+  const [reviewChecked, setReviewChecked] = useState(false)
   const [online, setOnline] = useState(navigator.onLine)
   const [nameDraft, setNameDraft] = useState(['', ''])
   const [nameBusy, setNameBusy] = useState(false)
@@ -288,7 +291,7 @@ export default function JuezPartidos() {
           <button
             key={item.id}
             onClick={() => select(item)}
-            className='card p-4 text-left hover:bg-[var(--bg-hover)] transition-colors flex flex-col justify-between'
+            className={`judge-assignment card p-4 text-left flex flex-col justify-between ${item.estado === 'en_vivo' ? 'is-live' : ''}`}
           >
             <div>
               <div className='flex items-center justify-between gap-2 text-xs text-[var(--text-muted)] mb-1'>
@@ -297,9 +300,12 @@ export default function JuezPartidos() {
                   {{ en_vivo: '● En vivo', programado: 'Programado', finalizado: 'Finalizado', cancelado: 'Cancelado' }[item.estado] || item.estado} →
                 </span>
               </div>
-              <strong className='block my-2 text-base leading-tight'>
-                {getParticipantName(item, 1)} <span className='font-normal text-xs text-[var(--text-muted)]'>vs</span> {getParticipantName(item, 2)}
-              </strong>
+              <div className='judge-assignment-players'>
+                <strong><i aria-hidden='true' />{getParticipantName(item, 1)}</strong>
+                <span>contra</span>
+                <strong><i aria-hidden='true' />{getParticipantName(item, 2)}</strong>
+              </div>
+              <span className='judge-assignment-action'>{['finalizado', 'cancelado'].includes(item.estado) ? 'Consultar encuentro' : item.estado === 'en_vivo' ? 'Ir a la mesa' : 'Preparar encuentro'} <span aria-hidden='true'>↗</span></span>
             </div>
 
             {isDirectorOrAdmin && (
@@ -348,12 +354,13 @@ export default function JuezPartidos() {
           <span>{score.currentSet.tiebreak ? 'Desempate' : score.deuce ? (match?.formato?.modo_game === 'sin_ventaja' ? 'Punto decisivo' : 'Iguales · 40–40') : score.breakpoint ? 'Oportunidad de ganar el juego al sacador' : `Set ${score.sets.length + (finished ? 0 : 1)}`}</span>
         </div>
         <div className='judge-scoreboard'>
+          <div className='judge-score-title'><span>MESA DE MARCACIÓN</span><span>{finished ? 'Resultado' : paused ? 'En pausa' : 'Cada punto cuenta'}</span></div>
           <div className='judge-score-heading'><span>Jugador / pareja</span><span>Sets<br />ganados</span><span>Juegos<br />del set</span><span>Punto<br />actual</span></div>
-          {['jugador1', 'jugador2'].map((side, i) => <div key={side} className={`judge-score-row ${!finished && server === side ? 'is-serving' : ''}`}>
+          {['jugador1', 'jugador2'].map((side, i) => <div key={side} className={`judge-score-row judge-team-${i + 1} ${!finished && server === side ? 'is-serving' : ''}`}>
             <div className='min-w-0'><strong className='judge-player-name'>{names[side]}</strong>{!finished && server === side ? <span className='judge-serving-badge'>● AL SAQUE · {score.numero_servicio === 1 ? 'Primero' : 'Segundo'}</span> : finished && score.ganador === side ? <span className='judge-serving-badge'>Ganador</span> : <span className='text-xs text-[var(--text-muted)]'>{!finished ? 'Recibe' : ''}</span>}</div>
             <span>{score.sets.filter((set) => set[`games_j${i + 1}`] > set[`games_j${2 - i}`]).length}</span>
             <span>{score.currentSet[`games_j${i + 1}`]}</span>
-            <strong className='judge-points'>{finished ? '—' : score[`punto_j${i + 1}`]}</strong>
+            <strong key={`${side}:${score[`punto_j${i + 1}`]}`} className='judge-points'>{finished ? '—' : score[`punto_j${i + 1}`]}</strong>
           </div>)}
           <div className='judge-sets'>Sets: {score.sets.length ? score.sets.map((set, i) => <span key={i}>S{i + 1}: {set.games_j1}–{set.games_j2}</span>) : 'sin sets terminados'}</div>
         </div>
@@ -362,16 +369,43 @@ export default function JuezPartidos() {
         </div>
         {view.pending && <p className='sr-only'>Puedes seguir anotando. La pantalla pública se actualizará al sincronizar. No borres los datos del navegador.</p>}
         {view.error && (view.conflict || !view.pending) && <p role='alert' className='text-xs text-red-500'>{view.error}</p>}
-        {view.conflict && <button className='judge-tool' onClick={async () => {
-          await sessionRef.current.sync()
-          const pendingList = sessionRef.current.getPending().map((event, i) => `${i + 1}. ${reasonLabel(event, names)}`).join('\n')
-          if (await confirm({ title: 'Revisar acciones en conflicto', message: `El marcador visible ahora es el del servidor. Conserva una copia de esta lista antes de descartarla y vuelve a registrar solo lo que falte:\n${pendingList}`, requireText: 'DESCARTAR', confirmLabel: 'Descartar pendientes' })) await sessionRef.current.discardConflict()
-        }}>Revisar y descartar pendiente</button>}
+        {view.conflict && <section className='rounded-2xl border p-4 space-y-3' style={{ borderColor: 'var(--color-brand)', background: 'var(--bg-card)' }} aria-label='Revisión de marcación'>
+          <h2 className='font-bold'>Revisemos antes de continuar</h2>
+          <p className='text-sm'>Hay acciones locales sin confirmar. No se sumarán automáticamente sobre un marcador distinto.</p>
+          <button className='judge-tool' disabled={reviewBusy || !exclusive || !online} onClick={async () => {
+            setReviewBusy(true); setReviewChecked(false); setConflictReview(null)
+            try { setConflictReview(await sessionRef.current.reviewConflict()) } finally { setReviewBusy(false) }
+          }}>{reviewBusy ? 'Consultando…' : '1. Consultar marcador del servidor'}</button>
+          {conflictReview && <>
+            <div className='rounded-xl p-3 text-sm' style={{ background: 'var(--color-brand-dim)' }}>
+              <strong>Servidor al consultar</strong>
+              <p>Puntos: {conflictReview.control.marcador.punto_j1} – {conflictReview.control.marcador.punto_j2}</p>
+              <p>Games: {conflictReview.control.marcador.currentSet?.games_j1 ?? '—'} – {conflictReview.control.marcador.currentSet?.games_j2 ?? '—'}</p>
+              <p>Sets: {conflictReview.control.marcador.sets?.map(set => `${set.games_j1}–${set.games_j2}`).join(' / ') || 'sin sets terminados'}</p>
+              <p className='text-xs mt-1'>Orden: {names.jugador1} / {names.jugador2}</p>
+            </div>
+            <h3 className='font-semibold text-sm'>2. Contrasta estas acciones con lo ocurrido en cancha</h3>
+            <ol className='list-decimal pl-5 space-y-2 text-sm max-h-60 overflow-y-auto'>
+              {conflictReview.actions.map(event => <li key={event.client_action_id}>{reasonLabel(event, names)}<span className='block text-xs opacity-70'>{event.attempted ? 'Enviada anteriormente: puede estar registrada; no la repitas sin verificar.' : 'Guardada localmente, aún no enviada.'}</span></li>)}
+            </ol>
+            <p className='text-sm'>Si tienes dudas, consulta al juez director. Mantén los pendientes hasta aclararlo.</p>
+            <label className='flex items-start gap-3 py-3 text-sm'><input type='checkbox' className='mt-1 h-5 w-5 shrink-0' checked={reviewChecked} onChange={e => setReviewChecked(e.target.checked)} />Revisé la lista y sé cuáles acciones ya están registradas y cuáles faltan.</label>
+            <button className='judge-tool' disabled={!reviewChecked || reviewBusy || !online || !exclusive} onClick={async () => {
+              setReviewBusy(true)
+              try {
+                if (await confirm({ title: 'Conservar el marcador del servidor', message: 'La lista pendiente se archivará en este navegador y dejará de enviarse. Esto no modifica el marcador del servidor. Después registra únicamente las acciones que verificaste que faltan. La copia local no se restaura automáticamente.', requireText: 'REVISADO', confirmLabel: 'Archivar pendientes y continuar', danger: true })) {
+                  await sessionRef.current.discardConflict(conflictReview.revision)
+                  setConflictReview(null); setReviewChecked(false)
+                }
+              } finally { setReviewBusy(false) }
+            }}>3. Resolver revisión</button>
+          </>}
+        </section>}
         {playing && <>
           <label className={`judge-mode ${!quick ? 'is-detailed' : ''}`}><span className='judge-mode-copy'><strong>¿Cómo se ganó el punto?</strong><small>{quick ? 'Rápido: suma sin clasificar el motivo' : 'Detallado: elige ganador y motivo'}</small></span><span className='judge-mode-switch'><input aria-label='Registrar motivo del punto' type='checkbox' checked={!quick} disabled={locked || Boolean(pending)} onChange={(event) => setQuick(!event.target.checked)} /><span>{quick ? 'Activar detalle' : 'Detalle activo'}</span></span></label>
           <div className='judge-point-buttons'>
             {['jugador1', 'jugador2'].map((side, i) => <button key={side} className={`judge-point judge-side-${i + 1}`} disabled={!canScore || Boolean(pending)} onClick={() => quick ? point(side) : setPending(side)}>
-              <span className='text-sm'>Punto para</span><strong>{names[side]}</strong><span className='text-3xl leading-none'>+1</span>
+              <span className='judge-point-label'>Punto para <span className='judge-team-dot' aria-hidden='true' /></span><strong>{names[side]}</strong><span className='judge-point-add' aria-hidden='true'>+1</span>
             </button>)}
           </div>
           <div className='judge-service-controls'>
@@ -381,8 +415,16 @@ export default function JuezPartidos() {
             <button className='judge-tool' disabled={!canScore} onClick={() => record({ tipo: 'let' })}>Repetir saque (let)</button>
           </div>
         </>}
-        {!playing && !finished && <button className='btn-primary py-4' disabled={adminLocked} onClick={() => write((id) => matchService.startLive(id))}><Play size={18} /> Iniciar partido</button>}
-        {finished && <p className='text-sm font-semibold text-center'>{score.ganador ? `Ganador: ${names[score.ganador]}. ${view.pendingCount ? 'Resultado local pendiente de envío.' : 'Resultado guardado.'}` : 'Este partido no admite puntos.'}</p>}
+        {!playing && !finished && <section className='judge-state-card'>
+          <span className='judge-eyebrow'>ANTES DEL PRIMER SAQUE</span>
+          <h2>Todo listo para comenzar</h2>
+          <p>Comprueba los participantes y la cancha. Al iniciar se activa la marcación.</p>
+          <div className='judge-preflight'><span>Formato<strong>Al mejor de {state?.reglas?.mejor_de ?? '—'} sets</strong></span><span>Por set<strong>{state?.reglas?.juegos_por_set ?? '—'} juegos</strong></span></div>
+          <p>El saque cambia automáticamente. Si necesitas corregir el sacador inicial, entra en Ajustes después de iniciar y antes de anotar el primer punto.</p>
+          <button className='btn-primary py-4 w-full' disabled={adminLocked} onClick={() => write((id) => matchService.startLive(id))}><Play size={18} /> Iniciar partido</button>
+        </section>}
+        {paused && !finished && <section className='judge-state-card' role='status'><span className='judge-eyebrow'>MESA EN PAUSA</span><h2>Un momento para retomar</h2><p>No puedes sumar puntos durante la pausa. Usa Reanudar cuando el encuentro continúe.</p></section>}
+        {finished && <section className='judge-state-card' role='status'><span className='judge-eyebrow'>{live?.estado === 'cancelado' ? 'ENCUENTRO CANCELADO' : 'CIERRE DEL ENCUENTRO'}</span><h2>{score.ganador ? `Ganador: ${names[score.ganador]}` : 'Este partido no admite puntos.'}</h2><p>{view.pendingCount ? 'El resultado sigue pendiente de envío. Conserva este navegador y recupera la conexión.' : view.needsSync ? 'Sincroniza para verificar el estado del resultado.' : 'Consulta el resumen en Estadísticas.'}</p></section>}
         <div className='judge-bottom-controls'>
           {playing && <button className='judge-tool' disabled={adminLocked} onClick={() => write((id) => matchService.pauseLive(id, !paused))}>{paused ? <Play size={18} /> : <Pause size={18} />}{paused ? 'Reanudar' : 'Pausar'}</button>}
           <button className='judge-tool' disabled={(view.canUndoLocal ? locked : adminLocked) || !lastEvent || live?.estado === 'cancelado'} onClick={undo}><Undo2 size={18} />{view.canUndoLocal ? 'Deshacer local' : 'Deshacer'}</button>
@@ -392,7 +434,7 @@ export default function JuezPartidos() {
       </>}
 
       {pending && <JudgePanel title={`Punto para ${names[pending]}`} onClose={() => setPending(null)} busy={view.busy}>
-        <p className='text-sm mb-3'>Selecciona cómo terminó el punto. Los errores corresponden al rival.</p>
+        <p className='judge-panel-tip'>El ganador ya está seleccionado. Ahora elige cómo terminó el punto; los errores corresponden al rival. Puedes cerrar para volver sin anotar.</p>
         <div className='grid grid-cols-2 gap-2'>
           {reasons.map(([key, label, description]) => <button key={key} className='judge-reason' disabled={locked || !canScore || (key === 'ace' && pending !== server)} onClick={() => point(pending, key)}><strong>{label}</strong><span>{description}</span></button>)}
         </div>
