@@ -107,6 +107,13 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     assert.deepEqual(state.points, [1, 1])
     await page.getByRole('checkbox', { name: /Registrar motivo/ }).check()
     await page.locator('.judge-point').nth(1).click()
+    for (const [width, height] of [[320,568], [360,640], [390,844], [844,390], [1440,900]]) {
+      await page.setViewportSize({ width, height })
+      const modal = await page.locator('dialog[open]').evaluate(el => ({ scroll: el.scrollHeight, client: el.clientHeight, width: el.scrollWidth, clientWidth: el.clientWidth }))
+      assert.ok(modal.scroll <= modal.client + 1, `Reason selector fits without vertical scroll at ${width}x${height}`)
+      assert.ok(modal.width <= modal.clientWidth + 1, 'Reason selector has no horizontal overflow')
+    }
+    await page.setViewportSize({ width: 390, height: 844 })
     assert.equal(await page.getByRole('button', { name: /^Ace/ }).isDisabled(), true)
     await page.getByRole('button', { name: /^Error no forzado/ }).click()
     await page.waitForFunction(() => !document.querySelector('dialog[open]'))

@@ -16,8 +16,8 @@ import { projectJudgeEvent } from '../../utils/projectJudgeEvent'
 const reasons = [
   ['tiro_ganador', 'Winner', 'Golpe ganador que el rival no logra devolver'],
   ['ace', 'Ace', 'Saque válido que gana el punto sin que el rival toque la pelota'],
-  ['error_no_forzado', 'Error no forzado', 'El rival falla una pelota sin presión clara de tu golpe'],
-  ['error_forzado', 'Error forzado', 'El rival falla por la presión de tu golpe'],
+  ['error_no_forzado', 'Error no forzado', 'Fallo sin presión clara del oponente'],
+  ['error_forzado', 'Error forzado', 'Fallo provocado por la presión del oponente'],
   ['infraccion', 'Infracción del rival', 'Por ejemplo, tocar la red'],
   ['penalizacion', 'Penalización', 'Punto otorgado por sanción'],
 ]
@@ -448,8 +448,8 @@ export default function JuezPartidos() {
           <button type='submit' className='btn-primary w-full' disabled={adminLocked || suspensionReason.trim().length < 5}>{view.busy ? 'Guardando…' : 'Confirmar suspensión'}</button>
         </form>
       </JudgePanel>}
-      {pending && <JudgePanel title={`Punto para ${names[pending]}`} onClose={() => setPending(null)} busy={view.busy}>
-        <p className='judge-panel-tip'>El ganador ya está seleccionado. Ahora elige cómo terminó el punto; los errores corresponden al rival. Puedes cerrar para volver sin anotar.</p>
+      {pending && <JudgePanel compact title={`Punto para ${names[pending]}`} onClose={() => setPending(null)} busy={view.busy}>
+        <p className='judge-panel-tip'>Error cometido por: <strong>{names[pending === 'jugador1' ? 'jugador2' : 'jugador1']}</strong>. Cerrar no registra el punto.</p>
         <div className='judge-reason-groups'>
           {[
             ['Golpe ganador', reasons.slice(0, 2)],
@@ -491,10 +491,10 @@ export default function JuezPartidos() {
   )
 }
 
-function JudgePanel({ title, children, onClose, busy }) {
+function JudgePanel({ title, children, onClose, busy, compact = false }) {
   const ref = useRef(null)
   useEffect(() => { ref.current?.showModal() }, [])
-  return <dialog ref={ref} className='judge-dialog' aria-labelledby='judge-panel-title' onCancel={(event) => { event.preventDefault(); if (!busy) onClose() }}>
+  return <dialog ref={ref} className={`judge-dialog${compact ? ' judge-dialog-compact' : ''}`} aria-labelledby='judge-panel-title' onCancel={(event) => { event.preventDefault(); if (!busy) onClose() }}>
     <div className='judge-dialog-heading'><h2 className='font-bold' id='judge-panel-title'>{title}</h2><button className='judge-tool' onClick={onClose} disabled={busy} aria-label='Cerrar panel'><X size={20} /></button></div>
     <div className='p-4'>{children}</div>
   </dialog>

@@ -80,6 +80,18 @@
 @media (max-width: 359px) { .judge-reason { padding: 10px; } .judge-reason strong { font-size: 12px; } }
 @media (prefers-reduced-motion: reduce) { .judge-reason { transition: none; } }
 .judge-reason:hover:not(:disabled), .judge-reason:focus-visible { border-color: var(--color-brand); background: var(--color-brand-dim); }
+.judge-dialog-compact { max-height: calc(100dvh - 16px); }
+.judge-dialog-compact > .p-4 { padding: 10px 12px; }
+.judge-dialog-compact .judge-panel-tip { font-size: 11px; margin-bottom: 10px; padding: 6px 8px; }
+.judge-dialog-compact .judge-reason-groups { gap: 10px; }
+.judge-dialog-compact .judge-reason-group legend { margin-bottom: 4px; }
+.judge-dialog-compact .judge-reason { min-height: 76px; padding: 10px; }
+.judge-dialog-compact .judge-reason > span { margin-top: 4px; line-height: 1.3; }
+@media (max-height: 500px) and (min-width: 640px) {
+  .judge-dialog-compact { width: min(96vw, 960px); }
+  .judge-dialog-compact .judge-reason-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .judge-dialog-compact .judge-reason-grid { grid-template-columns: 1fr; }
+}
 @media (min-width: 640px) { .judge-desk { gap: 12px; } .judge-point { min-height: 150px; } .judge-points { font-size: 40px; } }
 @media (max-height: 700px) and (max-width: 639px) { .judge-desk { gap: 4px; } .judge-point { min-height: 80px; gap: 3px; } .judge-score-row { padding-top: 4px; padding-bottom: 4px; } .judge-mode { min-height: 45px; padding: 5px 8px; } }
 @media (max-height: 600px) and (max-width: 639px) {
