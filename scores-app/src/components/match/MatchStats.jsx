@@ -5,12 +5,12 @@ import { matchService } from '../../services/matchService'
 
 const ROWS = [
   ['Total de puntos ganados', 'puntos_ganados'],
-  ['Saques directos (aces)', 'aces'],
+  ['Aces · puntos directos de saque', 'aces'],
   ['Dobles faltas cometidas', 'dobles_faltas'],
-  ['Primeros saques válidos', 'porcentaje_primer_servicio', '%'],
+  ['Primer saque dentro (%)', 'porcentaje_primer_servicio', '%'],
   ['Puntos ganados al primer saque', 'puntos_primer_servicio_ganados'],
   ['Puntos ganados al segundo saque', 'puntos_segundo_servicio_ganados'],
-  ['Tiros ganadores', 'tiros_ganadores'],
+  ['Winners · golpes ganadores', 'tiros_ganadores'],
   ['Errores no forzados cometidos', 'errores_no_forzados'],
 ]
 
@@ -67,6 +67,18 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
     <div className='space-y-4'>
       {hasCorrections && <p className='text-xs rounded-lg p-3 bg-amber-500/10'>Este marcador tiene correcciones supervisadas. Las estadísticas conservan los puntos registrados y pueden no coincidir con los games corregidos.</p>}
       <p className='text-xs' style={{ color: 'var(--text-muted)' }}>Solo incluye acciones confirmadas por el servidor. Los aces y errores dependen de los motivos registrados por el juez. El porcentaje de primeros saques se calcula sobre los puntos con servicio registrado.</p>
+      <details className='rounded-xl p-3 text-xs' style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+        <summary className='cursor-pointer font-semibold py-1'>¿Qué significa cada indicador?</summary>
+        <dl className='mt-3 space-y-2'>
+          <div><dt className='font-bold'>Puntos ganados</dt><dd>Total de puntos registrados a favor, no juegos ni sets.</dd></div>
+          <div><dt className='font-bold'>Ace / Winner</dt><dd>Ace: saque válido que el rival no toca. Winner: golpe ganador que el rival no consigue devolver.</dd></div>
+          <div><dt className='font-bold'>Doble falta</dt><dd>Dos faltas de saque en el mismo punto; el punto lo gana el receptor.</dd></div>
+          <div><dt className='font-bold'>Primer saque dentro</dt><dd>Porcentaje de puntos con servicio registrado en los que entró el primer saque. No es el porcentaje de puntos ganados.</dd></div>
+          <div><dt className='font-bold'>Puntos ganados al primer / segundo saque</dt><dd>Cantidad de puntos que ganó el sacador usando ese servicio; no es un porcentaje.</dd></div>
+          <div><dt className='font-bold'>Error no forzado / forzado</dt><dd>No forzado: fallo sin presión clara del golpe rival. Forzado: fallo provocado por esa presión. El error se atribuye a quien falla, no a quien gana el punto.</dd></div>
+        </dl>
+        <p className='mt-3'>En el modo rápido no se clasifica el motivo: un cero en Winners, Aces o errores no demuestra que no hayan ocurrido. «—» indica que el dato no está disponible.</p>
+      </details>
       <div className='flex flex-wrap gap-2' role='group' aria-label='Vista de estadísticas'>
         <FilterButton active={view === 'chart'} onClick={() => setView('chart')}>Comparación gráfica</FilterButton>
         <FilterButton active={view === 'table'} onClick={() => setView('table')}>Tabla de datos</FilterButton>

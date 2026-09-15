@@ -88,6 +88,8 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     }
     await page.setViewportSize({ width: 390, height: 844 })
     const initialReads = reads
+    assert.equal(await page.getByRole('checkbox', { name: /Registrar motivo/ }).isChecked(), true, 'Point detail defaults on')
+    await page.getByRole('checkbox', { name: /Registrar motivo/ }).uncheck()
     await page.locator('.judge-point').first().evaluate(button => { button.click(); button.click() })
     await page.waitForFunction(() => document.querySelector('.judge-points').textContent === '15')
     await settled()
@@ -106,7 +108,7 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await page.getByRole('checkbox', { name: /Registrar motivo/ }).check()
     await page.locator('.judge-point').nth(1).click()
     assert.equal(await page.getByRole('button', { name: /^Ace/ }).isDisabled(), true)
-    await page.getByRole('button', { name: /^Error del rival/ }).click()
+    await page.getByRole('button', { name: /^Error no forzado/ }).click()
     await page.waitForFunction(() => !document.querySelector('dialog[open]'))
     await settled()
     assert.equal(events[0].motivo, 'error_no_forzado')

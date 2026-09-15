@@ -14,10 +14,10 @@ import useAuthStore from '../../store/useAuthStore'
 import { projectJudgeEvent } from '../../utils/projectJudgeEvent'
 
 const reasons = [
-  ['tiro_ganador', 'Tiro ganador', 'La pelota no pudo ser devuelta'],
-  ['ace', 'Ace', 'Saque que el receptor no toca'],
-  ['error_no_forzado', 'Error del rival', 'Error no forzado'],
-  ['error_forzado', 'Error provocado', 'Forzaste el error del rival'],
+  ['tiro_ganador', 'Winner', 'Golpe ganador que el rival no logra devolver'],
+  ['ace', 'Ace', 'Saque válido que gana el punto sin que el rival toque la pelota'],
+  ['error_no_forzado', 'Error no forzado', 'El rival falla una pelota sin presión clara de tu golpe'],
+  ['error_forzado', 'Error forzado', 'El rival falla por la presión de tu golpe'],
   ['infraccion', 'Infracción del rival', 'Por ejemplo, tocar la red'],
   ['penalizacion', 'Penalización', 'Punto otorgado por sanción'],
 ]
@@ -42,9 +42,11 @@ export default function JuezPartidos() {
   const [listError, setListError] = useState('')
   const [view, setView] = useState({ match: null, control: null, busy: false })
   const sessionRef = useRef(null)
-  const [quick, setQuick] = useState(true)
+  const [quick, setQuick] = useState(false)
   const [pending, setPending] = useState(null)
   const [panel, setPanel] = useState(null)
+  const [suspending, setSuspending] = useState(false)
+  const [suspensionReason, setSuspensionReason] = useState('')
   const [conflictReview, setConflictReview] = useState(null)
   const [reviewBusy, setReviewBusy] = useState(false)
   const [reviewChecked, setReviewChecked] = useState(false)
@@ -423,7 +425,7 @@ export default function JuezPartidos() {
           <p>El saque cambia automáticamente. Si necesitas corregir el sacador inicial, entra en Ajustes después de iniciar y antes de anotar el primer punto.</p>
           <button className='btn-primary py-4 w-full' disabled={adminLocked} onClick={() => write((id) => matchService.startLive(id))}><Play size={18} /> Iniciar partido</button>
         </section>}
-        {paused && !finished && <section className='judge-state-card' role='status'><span className='judge-eyebrow'>MESA EN PAUSA</span><h2>Un momento para retomar</h2><p>No puedes sumar puntos durante la pausa. Usa Reanudar cuando el encuentro continúe.</p></section>}
+        {paused && !finished && <section className='judge-state-card' role='status'><span className='judge-eyebrow'>{live?.motivo_suspension ? 'PARTIDO SUSPENDIDO' : 'MESA EN PAUSA'}</span><h2>Marcador conservado</h2>{live?.motivo_suspension && <p className='break-words'><strong>Motivo:</strong> {live.motivo_suspension}</p>}<p>No puedes sumar puntos durante la pausa. Usa Reanudar cuando el encuentro continúe.</p></section>}
         {finished && <section className='judge-state-card' role='status'><span className='judge-eyebrow'>{live?.estado === 'cancelado' ? 'ENCUENTRO CANCELADO' : 'CIERRE DEL ENCUENTRO'}</span><h2>{score.ganador ? `Ganador: ${names[score.ganador]}` : 'Este partido no admite puntos.'}</h2><p>{view.pendingCount ? 'El resultado sigue pendiente de envío. Conserva este navegador y recupera la conexión.' : view.needsSync ? 'Sincroniza para verificar el estado del resultado.' : 'Consulta el resumen en Estadísticas.'}</p></section>}
         <div className='judge-bottom-controls'>
           {playing && <button className='judge-tool' disabled={adminLocked} onClick={() => write((id) => matchService.pauseLive(id, !paused))}>{paused ? <Play size={18} /> : <Pause size={18} />}{paused ? 'Reanudar' : 'Pausar'}</button>}
@@ -433,10 +435,33 @@ export default function JuezPartidos() {
         </div>
       </>}
 
+      {suspending && <JudgePanel title='Suspender el encuentro' onClose={() => setSuspending(false)} busy={view.busy}>
+        <form className='space-y-4' onSubmit={async e => {
+          e.preventDefault()
+          if (adminLocked || suspensionReason.trim().length < 5) return
+          if (await write(id => matchService.suspendLive(id, suspensionReason.trim()))) setSuspending(false)
+        }}>
+          <p className='judge-panel-tip'>El marcador se conserva y no se declara ganador. Podrás continuar desde este punto con Reanudar. El motivo quedará en el historial de control.</p>
+          <label className='block text-sm font-semibold'>Motivo de suspensión<textarea className='form-input mt-2' rows={3} required minLength={5} maxLength={500} value={suspensionReason} onChange={e => setSuspensionReason(e.target.value)} placeholder='Ejemplo: lluvia; la cancha no permite continuar.' /></label>
+          <p className='text-xs text-[var(--text-muted)]'>Entre 5 y 500 caracteres. Evita incluir datos personales o médicos.</p>
+          {view.error && <p role='alert' className='text-sm text-red-500'>{view.error}</p>}
+          <button type='submit' className='btn-primary w-full' disabled={adminLocked || suspensionReason.trim().length < 5}>{view.busy ? 'Guardando…' : 'Confirmar suspensión'}</button>
+        </form>
+      </JudgePanel>}
       {pending && <JudgePanel title={`Punto para ${names[pending]}`} onClose={() => setPending(null)} busy={view.busy}>
         <p className='judge-panel-tip'>El ganador ya está seleccionado. Ahora elige cómo terminó el punto; los errores corresponden al rival. Puedes cerrar para volver sin anotar.</p>
-        <div className='grid grid-cols-2 gap-2'>
-          {reasons.map(([key, label, description]) => <button key={key} className='judge-reason' disabled={locked || !canScore || (key === 'ace' && pending !== server)} onClick={() => point(pending, key)}><strong>{label}</strong><span>{description}</span></button>)}
+        <div className='judge-reason-groups'>
+          {[
+            ['Golpe ganador', reasons.slice(0, 2)],
+            ['Fallo del rival', reasons.slice(2, 4)],
+            ['Decisión arbitral', reasons.slice(4)],
+          ].map(([heading, options]) => <fieldset key={heading} className='judge-reason-group'>
+            <legend>{heading}</legend>
+            <div className='judge-reason-grid'>{options.map(([key, label, description]) => <button key={key} className={`judge-reason reason-${key}`} disabled={locked || !canScore || (key === 'ace' && pending !== server)} onClick={() => point(pending, key)}>
+              <strong>{label}<span className='judge-reason-arrow' aria-hidden='true'>↗</span></strong>
+              <span>{key === 'ace' && pending !== server ? 'Solo disponible para quien está sacando' : description}</span>
+            </button>)}</div>
+          </fieldset>)}
         </div>
         {view.error && <p role='alert' className='text-sm mt-3'>{view.error}</p>}
       </JudgePanel>}
@@ -447,6 +472,7 @@ export default function JuezPartidos() {
           <ol className='space-y-2 text-sm'>{state?.eventos_recientes?.map((event) => <li key={event.id}>#{event.secuencia} · {reasonLabel(event, names)}</li>)}</ol>
         </> : <div className='space-y-4'>
           <p className='text-sm'>Al mejor de {state?.reglas.mejor_de} sets · {state?.reglas.juegos_por_set} games por set. El formato configurado del torneo se conserva.</p>
+          {playing && <button className='judge-tool w-full' disabled={adminLocked} onClick={() => { setPanel(null); setSuspensionReason(''); setSuspending(true) }}><Pause size={18} /> Suspender con motivo</button>}
           <p className='text-xs'>El saque cambia automáticamente. Corrígelo aquí solo si es necesario.</p>
           <button className='judge-tool w-full' disabled={!canScore || adminLocked} onClick={async () => {
             // Close the native modal so the global confirmation stays reachable.

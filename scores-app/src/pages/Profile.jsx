@@ -5,7 +5,6 @@ import {
   Bell,
   Camera,
   ChevronRight,
-  Globe,
   LogOut,
   Mail,
   Shield,
@@ -146,7 +145,6 @@ export default function Profile() {
   const menu = [
     { icon: Shield, label: 'Cambiar contraseña' },
     { icon: Bell, label: 'Notificaciones' },
-    { icon: Globe, label: 'Idioma', value: 'Español' },
   ]
 
   const fullName = `${user?.nombre || ''} ${user?.apellido || ''}`.trim()

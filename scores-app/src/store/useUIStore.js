@@ -17,10 +17,6 @@ const useUIStore = create(
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: (val) => set({ sidebarCollapsed: val }),
 
-      // ── Idioma ──────────────────────────────────────
-      language: 'es',
-      setLanguage: (lang) => set({ language: lang }),
-
       // ── Notificaciones ──────────────────────────────
       notifications: {
         push: true,
@@ -47,7 +43,6 @@ const useUIStore = create(
       name: 'ui-storage-v2',
       partialize: (s) => ({
         darkMode: s.darkMode,
-        language: s.language,
         notifications: s.notifications,
         // No persistir sidebarCollapsed — siempre inicia colapsado en mobile
       }),

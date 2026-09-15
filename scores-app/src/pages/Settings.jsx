@@ -1,15 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import ChangePassword from '../components/profile/ChangePassword'
-import { Moon, Bell, Globe, Shield, ChevronRight, User, KeyRound } from 'lucide-react'
+import { Moon, Bell, Shield, ChevronRight, User, KeyRound } from 'lucide-react'
 import useUIStore from '../store/useUIStore'
 import useAuthStore from '../store/useAuthStore'
 import { cn } from '../utils/cn'
-
-const LANGUAGES = [
-  { code: 'es', label: 'Español', flag: '🇨🇴' },
-  { code: 'en', label: 'English', flag: '🇺🇸' },
-]
 
 function ToggleSwitch({ value, onChange }) {
   return (
@@ -55,7 +50,7 @@ function SettingRow({ icon: Icon, label, description, children, last }) {
 
 export default function Settings() {
   const [passwordOpen, setPasswordOpen] = useState(false)
-  const { darkMode, toggleDarkMode, language, setLanguage, notifications, setNotification } =
+  const { darkMode, toggleDarkMode, notifications, setNotification } =
     useUIStore()
 
   const { user } = useAuthStore()
@@ -116,53 +111,6 @@ export default function Settings() {
             <ToggleSwitch value={darkMode} onChange={toggleDarkMode} />
           </SettingRow>
         </div>
-      </div>
-
-      {/* ── Idioma ──────────────────────────────────────── */}
-      <div>
-        <p
-          className='text-xs font-semibold uppercase tracking-wider mb-2 px-1'
-          style={{ color: 'var(--text-muted)' }}
-        >
-          Idioma
-        </p>
-        <div className='card overflow-hidden'>
-          {LANGUAGES.map((lang, i) => (
-            <button
-              key={lang.code}
-              onClick={() => setLanguage(lang.code)}
-              className='w-full flex items-center gap-3 px-4 py-3.5 transition-all'
-              style={{
-                borderBottom: i < LANGUAGES.length - 1 ? '1px solid var(--border-color)' : 'none',
-                backgroundColor: language === lang.code ? 'var(--color-brand-dim)' : 'transparent',
-              }}
-            >
-              <div
-                className='w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-base'
-                style={{ backgroundColor: 'var(--bg-hover)' }}
-              >
-                {lang.flag}
-              </div>
-              <span
-                className='flex-1 text-sm font-medium text-left'
-                style={{ color: 'var(--text-primary)' }}
-              >
-                {lang.label}
-              </span>
-              {language === lang.code && (
-                <div
-                  className='w-4 h-4 rounded-full flex items-center justify-center'
-                  style={{ backgroundColor: 'var(--color-brand)' }}
-                >
-                  <span className='text-white text-[10px] font-bold'>✓</span>
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
-        <p className='text-xs mt-1.5 px-1' style={{ color: 'var(--text-muted)' }}>
-          Traducción completa disponible en próxima versión
-        </p>
       </div>
 
       {/* ── Notificaciones ──────────────────────────────── */}

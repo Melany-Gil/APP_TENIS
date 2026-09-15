@@ -154,7 +154,7 @@ exports.setPaused = async (req, res) => {
   try {
     return changed(
       res,
-      await eventService.setPaused(req.params.id, Boolean(req.body.pausado), req.user),
+      await eventService.setPaused(req.params.id, req.body.pausado, req.user, req.body.motivo),
       req.params.id,
       200,
       req.body.pausado ? 'paused' : 'resumed'

@@ -69,7 +69,16 @@
 .judge-preflight strong { display: block; color: var(--text-primary); font-size: 13px; margin-top: 3px; }
 .judge-panel-tip { border-left: 3px solid var(--color-brand); padding: 8px 10px; background: var(--color-brand-dim); border-radius: 0 10px 10px 0; margin-bottom: 12px; }
 .judge-dialog-heading h2 { font-size: 15px; line-height: 1.3; }
-.judge-reason { border-radius: 14px; min-height: 88px; }
+.judge-reason { border-radius: 16px; min-height: 94px; background: var(--bg-card, var(--bg-primary)); padding: 14px; border-color: transparent; box-shadow: 0 2px 8px #12342606; transition: background .15s ease, border-color .15s ease; }
+.judge-reason-groups { display: grid; gap: 18px; }
+.judge-reason-group { min-width: 0; padding: 0; border: 0; }
+.judge-reason-group legend { font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--text-muted); margin-bottom: 8px; }
+.judge-reason-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 5px; border-radius: 20px; background: var(--bg-hover); }
+.judge-reason strong { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 14px; }
+.judge-reason .judge-reason-arrow { color: var(--color-brand); font-size: 17px; margin: 0; }
+.judge-reason > span { line-height: 1.45; margin-top: 8px; }
+@media (max-width: 359px) { .judge-reason { padding: 10px; } .judge-reason strong { font-size: 12px; } }
+@media (prefers-reduced-motion: reduce) { .judge-reason { transition: none; } }
 .judge-reason:hover:not(:disabled), .judge-reason:focus-visible { border-color: var(--color-brand); background: var(--color-brand-dim); }
 @media (min-width: 640px) { .judge-desk { gap: 12px; } .judge-point { min-height: 150px; } .judge-points { font-size: 40px; } }
 @media (max-height: 700px) and (max-width: 639px) { .judge-desk { gap: 4px; } .judge-point { min-height: 80px; gap: 3px; } .judge-score-row { padding-top: 4px; padding-bottom: 4px; } .judge-mode { min-height: 45px; padding: 5px 8px; } }

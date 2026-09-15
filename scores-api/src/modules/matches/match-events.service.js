@@ -53,6 +53,11 @@ exports.getControl = async (id, user, { lightweight = false } = {}) => {
   )
   if (revisionRows[0] && 'latest_state' in revisionRows[0]) state = parseJson(revisionRows[0].latest_state) || createInitialState(matchRow)
   const breakpoint = computeBreakpoint(state, matchRow)
+  let suspension = null
+  if (liveRows[0]?.pausado_at) {
+    const [entries] = await db.query("SELECT accion, detalle FROM auditoria_control_partido WHERE partido_id = ? AND accion IN ('suspender', 'pausar', 'reanudar') ORDER BY id DESC LIMIT 1", [id])
+    if (entries[0]?.accion === 'suspender') suspension = parseJson(entries[0].detalle)?.motivo || null
+  }
 
   return {
     partido: match,
@@ -62,7 +67,7 @@ exports.getControl = async (id, user, { lightweight = false } = {}) => {
     revision: revisionOf(revisionRows[0]),
     configuration: configurationOf(matchRow),
     eventos_recientes: lastEvents.map(formatEvent),
-    en_vivo: formatLiveState(liveRows[0]),
+    en_vivo: { ...formatLiveState(liveRows[0]), motivo_suspension: suspension },
   }
 }
 
@@ -122,7 +127,11 @@ exports.startMatch = async (id, user) => {
   return exports.getControl(id, user)
 }
 
-exports.setPaused = async (id, paused, user) => {
+exports.setPaused = async (id, paused, user, motivo) => {
+  if (typeof paused !== 'boolean') throw { status: 400, message: 'El estado de pausa debe ser verdadero o falso' }
+  if (motivo !== undefined && (!paused || typeof motivo !== 'string' || motivo.trim().length < 5 || motivo.trim().length > 500)) {
+    throw { status: 400, message: 'Indica un motivo de suspensión entre 5 y 500 caracteres' }
+  }
   const connection = await db.getConnection()
   try {
     await connection.beginTransaction()
@@ -137,6 +146,10 @@ exports.setPaused = async (id, paused, user) => {
       'SELECT pausado_at FROM estado_en_vivo_partido WHERE partido_id = ? FOR UPDATE',
       [id]
     )
+    if (Boolean(liveRows[0].pausado_at) !== paused || motivo !== undefined) {
+      await connection.query('INSERT INTO auditoria_control_partido (partido_id, created_by, accion, detalle) VALUES (?, ?, ?, ?)',
+        [id, user.id, paused ? (motivo === undefined ? 'pausar' : 'suspender') : 'reanudar', JSON.stringify({ motivo: motivo?.trim() || null })])
+    }
     if (paused && !liveRows[0].pausado_at) {
       await connection.query(
         'UPDATE estado_en_vivo_partido SET pausado_at = NOW() WHERE partido_id = ?',
