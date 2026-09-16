@@ -164,6 +164,11 @@ exports.setPaused = async (req, res) => {
   }
 }
 
+exports.setDoublesOrder = async (req, res) => {
+  try { return changed(res, await eventService.setDoublesOrder(req.params.id, req.body, req.user), req.params.id) }
+  catch (err) { return error(res, err.message, err.status || 500) }
+}
+
 exports.changeServer = async (req, res) => {
   try {
     return changed(res, await eventService.changeServer(req.params.id, req.body.servidor, req.user), req.params.id)

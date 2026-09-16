@@ -20,6 +20,7 @@ router.get('/:id/control', requireAuth, requireOfficial, controller.getControl)
 router.post('/:id/iniciar', requireAuth, requireOfficial, controller.startMatch)
 router.put('/:id/pausa', requireAuth, requireOfficial, controller.setPaused)
 router.put('/:id/saque', requireAuth, requireOfficial, controller.changeServer)
+router.put('/:id/orden-saque-dobles', requireAuth, requireOfficial, controller.setDoublesOrder)
 router.post('/:id/eventos', requireAuth, requireOfficial, controller.addEvent)
 router.post('/:id/deshacer', requireAuth, requireOfficial, controller.undoEvent)
 // POST /api/partidos

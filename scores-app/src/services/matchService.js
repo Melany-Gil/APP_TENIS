@@ -44,6 +44,7 @@ export const matchService = {
   pauseLive: async (id, pausado) => judgeResponse(await api.put(`/partidos/${id}/pausa`, { pausado })),
   suspendLive: async (id, motivo) => judgeResponse(await api.put(`/partidos/${id}/pausa`, { pausado: true, motivo })),
   setServer: async (id, servidor) => judgeResponse(await api.put(`/partidos/${id}/saque`, { servidor })),
+  setDoublesOrder: async (id, data) => judgeResponse(await api.put(`/partidos/${id}/orden-saque-dobles`, data)),
   recordPoint: async (id, ganador, metadata = {}, serviceAttempt = 1) => {
     const needsFirstFault =
       Number(serviceAttempt) === 1 &&

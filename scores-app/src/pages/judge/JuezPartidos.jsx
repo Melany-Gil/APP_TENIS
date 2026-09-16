@@ -12,6 +12,7 @@ import { useMatchRealtime } from '../../hooks/useMatchRealtime'
 import './judge.css'
 import useAuthStore from '../../store/useAuthStore'
 import { projectJudgeEvent } from '../../utils/projectJudgeEvent'
+import { doublesServer } from '../../utils/doublesServer'
 
 const reasons = [
   ['tiro_ganador', 'Winner', 'Golpe ganador que el rival no logra devolver'],
@@ -45,6 +46,7 @@ export default function JuezPartidos() {
   const [quick, setQuick] = useState(false)
   const [pending, setPending] = useState(null)
   const [panel, setPanel] = useState(null)
+  const [firstServers, setFirstServers] = useState(['', ''])
   const [suspending, setSuspending] = useState(false)
   const [suspensionReason, setSuspensionReason] = useState('')
   const [conflictReview, setConflictReview] = useState(null)
@@ -172,6 +174,10 @@ export default function JuezPartidos() {
   const adminLocked = locked || Boolean(view.pendingCount) || !online
   const canScore = playing && !paused && !locked
   const server = live?.saca || 'jugador1'
+  const isDoubles = match?.modalidad === 'dobles'
+  const individualServer = doublesServer(state?.raw_marcador, state?.doubles_order)
+  const servingPlayer = individualServer && match?.[`equipo${individualServer.team}`]?.[`jugador${individualServer.member}`]
+  const servingName = servingPlayer ? [servingPlayer.nombre, servingPlayer.apellido].filter(Boolean).join(' ') : null
   const receiver = server === 'jugador1' ? 'jugador2' : 'jugador1'
   const lastEvent = state?.eventos_recientes?.[0]
   const { formatted: elapsed } = useMatchTimer(live, live?.estado)
@@ -355,6 +361,9 @@ export default function JuezPartidos() {
           <span>Tiempo: {elapsed}</span>
           <span>{score.currentSet.tiebreak ? 'Desempate' : score.deuce ? (match?.formato?.modo_game === 'sin_ventaja' ? 'Punto decisivo' : 'Iguales · 40–40') : score.breakpoint ? 'Oportunidad de ganar el juego al sacador' : `Set ${score.sets.length + (finished ? 0 : 1)}`}</span>
         </div>
+        {isDoubles && !finished && <div className='judge-feedback' role='status'>
+          {servingName ? <>Al saque: <strong>{servingName}</strong></> : <>Sacador individual sin confirmar. <button className='underline font-semibold' onClick={openSettings}>Configurar orden del set</button></>}
+        </div>}
         <div className='judge-scoreboard'>
           <div className='judge-score-title'><span>MESA DE MARCACIÓN</span><span>{finished ? 'Resultado' : paused ? 'En pausa' : 'Cada punto cuenta'}</span></div>
           <div className='judge-score-heading'><span>Jugador / pareja</span><span>Sets<br />ganados</span><span>Juegos<br />del set</span><span>Punto<br />actual</span></div>
@@ -364,7 +373,13 @@ export default function JuezPartidos() {
             <span>{score.currentSet[`games_j${i + 1}`]}</span>
             <strong key={`${side}:${score[`punto_j${i + 1}`]}`} className='judge-points'>{finished ? '—' : score[`punto_j${i + 1}`]}</strong>
           </div>)}
-          <div className='judge-sets'>Sets: {score.sets.length ? score.sets.map((set, i) => <span key={i}>S{i + 1}: {set.games_j1}–{set.games_j2}</span>) : 'sin sets terminados'}</div>
+          <div className='judge-set-history' aria-label='Marcador por sets'>
+            {(state.raw_marcador?.sets || []).map((set, i) => <div key={i} className={`judge-set-chip ${!set.completed ? 'is-current' : ''}`}>
+              <span>{set.type === 'match_tiebreak' ? 'Super TB' : `Set ${i + 1}`} · {set.completed ? 'cerrado' : 'actual'}</span>
+              <strong><span>{set.games[0]}</span><span aria-hidden='true'>–</span><span>{set.games[1]}</span></strong>
+              {set.type !== 'match_tiebreak' && set.tiebreak?.some(Boolean) && <small>TB {set.tiebreak[0]}–{set.tiebreak[1]}</small>}
+            </div>)}
+          </div>
         </div>
         <div className={`judge-feedback ${view.pending ? 'is-pending' : ''}`} role='status' aria-live='polite'>
           {view.pending ? `Marcador local · ${view.pendingCount} pendientes · ${view.sending ? 'sincronizando' : 'guardados aquí'}` : !online ? 'Sin conexión · los puntos se guardarán aquí' : view.busy ? 'Confirmando en el servidor…' : view.needsSync ? 'Revisa la conexión · pulsa sincronizar' : `Confirmado: ${reasonLabel(lastEvent, names)}`}
@@ -412,9 +427,9 @@ export default function JuezPartidos() {
           </div>
           <div className='judge-service-controls'>
             <button className='judge-tool' disabled={!canScore} onClick={() => score.numero_servicio === 1 ? record({ tipo: 'primera_falta' }) : point(receiver, 'doble_falta')}>
-              {score.numero_servicio === 1 ? '1ª falta · sin punto' : 'Doble falta · punto al receptor'}
+              {score.numero_servicio === 1 ? '1ª falta · sin punto' : 'Marcar doble falta'}
             </button>
-            <button className='judge-tool' disabled={!canScore} onClick={() => record({ tipo: 'let' })}>Repetir saque (let)</button>
+            <button className='judge-tool' disabled={!canScore} onClick={() => record({ tipo: 'let' })}>Let · repetir {score.numero_servicio === 1 ? '1er' : '2º'} saque</button>
           </div>
         </>}
         {!playing && !finished && <section className='judge-state-card'>
@@ -474,6 +489,22 @@ export default function JuezPartidos() {
           <p className='text-sm'>Al mejor de {state?.reglas.mejor_de} sets · {state?.reglas.juegos_por_set} games por set. El formato configurado del torneo se conserva.</p>
           {playing && <button className='judge-tool w-full' disabled={adminLocked} onClick={() => { setPanel(null); setSuspensionReason(''); setSuspending(true) }}><Pause size={18} /> Suspender con motivo</button>}
           <p className='text-xs'>El saque cambia automáticamente. Corrígelo aquí solo si es necesario.</p>
+          {isDoubles && !finished && <form className='judge-state-card' onSubmit={async e => {
+            e.preventDefault()
+            if (!firstServers.every(Boolean)) return
+            if (await write(id => matchService.setDoublesOrder(id, { first1: Number(firstServers[0]), first2: Number(firstServers[1]), set: state.raw_marcador.currentSet }))) setPanel(null)
+          }}>
+            <h3 className='font-semibold'>Orden de saque · set {state.raw_marcador?.currentSet}</h3>
+            <p>Antes del primer saque del set, selecciona quién sirve primero dentro de cada pareja. Los compañeros se alternarán automáticamente en los juegos y desempates. Vuelve a confirmar al comenzar otro set.</p>
+            {[1, 2].map((team, i) => <label key={team} className='text-sm'>{names[`jugador${team}`]}
+              <select className='form-input mt-1' required value={firstServers[i]} onChange={e => setFirstServers(old => old.map((v, index) => index === i ? e.target.value : v))}>
+                <option value=''>Primer sacador de esta pareja</option>
+                {[1, 2].map(member => { const player = match[`equipo${team}`]?.[`jugador${member}`]; return player && <option key={member} value={member}>{player.nombre} {player.apellido}</option> })}
+              </select>
+            </label>)}
+            <button className='btn-primary' disabled={adminLocked || !firstServers.every(Boolean)}>Confirmar orden</button>
+            {view.error && <p role='alert'>{view.error}</p>}
+          </form>}
           <button className='judge-tool w-full' disabled={!canScore || adminLocked} onClick={async () => {
             // Close the native modal so the global confirmation stays reachable.
             setPanel(null)

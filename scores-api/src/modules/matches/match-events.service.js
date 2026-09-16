@@ -53,6 +53,12 @@ exports.getControl = async (id, user, { lightweight = false } = {}) => {
   )
   if (revisionRows[0] && 'latest_state' in revisionRows[0]) state = parseJson(revisionRows[0].latest_state) || createInitialState(matchRow)
   const breakpoint = computeBreakpoint(state, matchRow)
+  let doublesOrder = null
+  if (matchRow.equipo1_id && matchRow.equipo2_id) {
+    const [orders] = await db.query("SELECT detalle FROM auditoria_control_partido WHERE partido_id = ? AND accion = 'orden_saque_dobles' ORDER BY id DESC LIMIT 1", [id])
+    const order = parseJson(orders[0]?.detalle)
+    if (order?.set === state.currentSet && order.team1 === matchRow.equipo1_id && order.team2 === matchRow.equipo2_id) doublesOrder = order
+  }
   let suspension = null
   if (liveRows[0]?.pausado_at) {
     const [entries] = await db.query("SELECT accion, detalle FROM auditoria_control_partido WHERE partido_id = ? AND accion IN ('suspender', 'pausar', 'reanudar') ORDER BY id DESC LIMIT 1", [id])
@@ -61,6 +67,7 @@ exports.getControl = async (id, user, { lightweight = false } = {}) => {
 
   return {
     partido: match,
+    doubles_order: doublesOrder,
     marcador: { ...serializeState(state), breakpoint },
     breakpoint,
     estadisticas: lightweight ? null : buildStats(pointEvents),
@@ -171,6 +178,28 @@ exports.setPaused = async (id, paused, user, motivo) => {
   } finally {
     connection.release()
   }
+  return exports.getControl(id, user)
+}
+
+exports.setDoublesOrder = async (id, body, user) => {
+  if (![1, 2].includes(body.first1) || ![1, 2].includes(body.first2)) throw { status: 400, message: 'Selecciona el primer sacador de cada pareja' }
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+    const [rows] = await conn.query('SELECT * FROM partidos WHERE id = ? FOR UPDATE', [id])
+    if (!rows.length) throw { status: 404, message: 'Partido no encontrado' }
+    const match = rows[0]
+    assertCanManage(match, user)
+    if (!match.equipo1_id || !match.equipo2_id || !['programado', 'en_vivo'].includes(match.estado)) throw { status: 409, message: 'Solo disponible para dobles sin finalizar' }
+    const [events] = await conn.query('SELECT marcador_despues FROM eventos_partido WHERE partido_id = ? AND anulado_at IS NULL ORDER BY secuencia DESC LIMIT 1', [id])
+    const state = parseJson(events[0]?.marcador_despues) || createInitialState(match)
+    const set = state.sets[state.currentSet - 1]
+    if (state.currentSet !== body.set || state.winner || set.games.some(Boolean) || state.points.some(Boolean) || state.serviceAttempt !== 1) throw { status: 409, message: 'Confirma el orden antes del primer punto y del primer saque del set' }
+    const [teams] = await conn.query('SELECT id, jugador1_id, jugador2_id FROM equipos_padel WHERE id IN (?, ?)', [match.equipo1_id, match.equipo2_id])
+    if (teams.length !== 2 || teams.some(team => !team.jugador1_id || !team.jugador2_id)) throw { status: 409, message: 'Las parejas deben tener sus dos jugadores registrados' }
+    await conn.query('INSERT INTO auditoria_control_partido (partido_id, created_by, accion, detalle) VALUES (?, ?, ?, ?)', [id, user.id, 'orden_saque_dobles', JSON.stringify({ set: state.currentSet, firstSide: state.server, first1: body.first1, first2: body.first2, team1: match.equipo1_id, team2: match.equipo2_id })])
+    await conn.commit()
+  } catch (error) { await conn.rollback(); throw error } finally { conn.release() }
   return exports.getControl(id, user)
 }
 

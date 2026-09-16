@@ -128,7 +128,7 @@ export default function AdminLayout() {
           <Outlet />
         </Suspense>
       </main>
-      <SponsorDock defaultMinimized />
+      <SponsorDock />
     </div>
   )
 }

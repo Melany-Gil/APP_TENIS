@@ -17,6 +17,12 @@
 .judge-team-1 .judge-player-name::before, .judge-team-2 .judge-player-name::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--color-brand); margin-right: 6px; vertical-align: middle; }
 .judge-team-2 .judge-player-name::before { background: var(--club-clay, #c2410c); }
 .judge-sets { padding: 5px 10px; font-size: 11px; display: flex; gap: 8px; flex-wrap: wrap; color: var(--text-muted); }
+.judge-set-history { display: flex; flex-wrap: wrap; gap: 5px; padding: 5px 10px; border-top: 1px solid var(--border-color); }
+.judge-set-chip { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 7px; background: var(--bg-hover); font-size: 9px; color: var(--text-muted); }
+.judge-set-chip.is-current { background: var(--color-brand-dim); }
+.judge-set-chip strong { display: flex; gap: 4px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.judge-set-chip strong > :first-child { color: var(--color-brand); }
+.judge-set-chip strong > :last-child { color: var(--club-clay); }
 .judge-feedback { font-size: 11px; line-height: 1.3; min-height: 16px; color: var(--text-muted); border-left: 2px solid var(--color-brand); padding-left: 8px; }
 .judge-mode { display: flex; align-items: center; gap: 7px; font-size: 12px; min-height: 52px; padding: 8px 10px; border: 1px solid var(--border-focus); border-radius: 12px; background: var(--color-brand-dim); cursor: pointer; }
 .judge-mode input { width: 18px; height: 18px; accent-color: var(--color-brand); }
@@ -93,7 +99,7 @@
   .judge-dialog-compact .judge-reason-grid { grid-template-columns: 1fr; }
 }
 @media (min-width: 640px) { .judge-desk { gap: 12px; } .judge-point { min-height: 150px; } .judge-points { font-size: 40px; } }
-@media (max-height: 700px) and (max-width: 639px) { .judge-desk { gap: 4px; } .judge-point { min-height: 80px; gap: 3px; } .judge-score-row { padding-top: 4px; padding-bottom: 4px; } .judge-mode { min-height: 45px; padding: 5px 8px; } }
+@media (max-height: 700px) and (max-width: 639px) { .judge-desk { gap: 2px; } .judge-point { min-height: 72px; gap: 3px; } .judge-score-row { padding-top: 4px; padding-bottom: 4px; } .judge-mode { min-height: 45px; padding: 5px 8px; } .judge-score-title { padding: 4px 10px; } .judge-set-history { padding: 2px 8px; } .judge-set-chip { padding: 1px 4px; } }
 @media (max-height: 600px) and (max-width: 639px) {
   .judge-score-title { padding: 4px 10px; font-size: 8px; }
   .judge-desk { gap: 2px; }
@@ -106,7 +112,7 @@
   .judge-feedback { font-size: 10px; }
   .judge-mode { min-height: 38px; padding: 4px 8px; }
   .judge-mode-copy small { display: none; }
-  .judge-point { min-height: 74px; padding: 6px; gap: 2px; }
+  .judge-point { min-height: 64px; padding: 6px; gap: 2px; }
   .judge-point strong { font-size: 12px; }
   .judge-point > span:first-child { font-size: 10px; }
   .judge-point > span:last-child { font-size: 22px; }

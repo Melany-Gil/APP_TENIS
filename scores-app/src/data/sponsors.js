@@ -1,5 +1,5 @@
 export const SPONSORS = [
-  { name: 'Gente Útil', image: '/sponsors/6.webp', accent: '#123ca3' },
+  { name: 'GENTE UTIL', image: '/sponsors/6.webp', accent: '#123ca3' },
   { name: 'Supermercados Más x Menos', image: '/sponsors/4.webp', accent: '#2d5688' },
   { name: 'Actúa Legal', image: '/sponsors/15.webp', accent: '#161616' },
   { name: 'Toscano Producciones', image: '/sponsors/33.webp', accent: '#171717' },
