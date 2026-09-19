@@ -93,6 +93,15 @@ exports.ensureSchema = async () => {
     torneo_id INT NOT NULL, equipo_id INT NOT NULL, categoria_id INT NOT NULL, grupo VARCHAR(20) NOT NULL,
     PRIMARY KEY (torneo_id,equipo_id), KEY idx_grupo (torneo_id,categoria_id,grupo)
   ) ENGINE=InnoDB`)
+  // Almacenamiento persistente de fotos de perfil y multimedia frente a despliegues efímeros
+  await db.query(`CREATE TABLE IF NOT EXISTS media_storage (
+    path VARCHAR(255) NOT NULL PRIMARY KEY,
+    mime_type VARCHAR(100) NOT NULL,
+    data MEDIUMBLOB NOT NULL,
+    size INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
   // Nullable identities preserve unknown data; never invent documents/emails.
   if ((await getColumn('users', 'numero_documento'))?.isNullable === 'NO') {
     await db.query('ALTER TABLE users MODIFY numero_documento VARCHAR(20) NULL')

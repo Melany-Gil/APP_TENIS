@@ -232,7 +232,7 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await publicPage.getByRole('heading', { name: 'Jornada de hoy' }).waitFor()
     await publicPage.getByRole('button', { name: 'Ver este partido a detalle' }).first().click()
     await publicPage.getByRole('heading', { name: 'Estadísticas de los jugadores' }).waitFor()
-    await publicPage.getByRole('heading', { name: 'Foto del partido · Final' }).waitFor()
+    await publicPage.getByRole('heading', { name: 'Foto oficial del partido' }).waitFor()
     await publicPage.getByRole('button', { name: 'Ampliar foto', exact: true }).click()
     await publicPage.getByRole('button', { name: 'Reducir foto', exact: true }).waitFor()
     assert.equal(await publicPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)

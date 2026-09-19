@@ -25,4 +25,5 @@ export const SPONSORS = [
   { name: 'Cajasan', image: '/sponsors/27.webp', accent: '#313f91' },
   { name: 'Propiedad Legal Inmobiliaria', image: '/sponsors/72.webp', accent: '#171717' },
   { name: 'Legal Branding', image: '/sponsors/75.webp', accent: '#202b42' },
+  { name: 'OBESALUD', image: '/sponsors/76.webp', accent: '#00b2c0' },
 ]

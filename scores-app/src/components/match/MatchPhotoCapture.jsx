@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Camera, X } from 'lucide-react'
 import { compressPhoto, getPhoto, getPhotoStatus, photoDraft, photoUrl, sendPhoto } from '../../services/matchPhotoService'
+import { PHOTOCALL_SPONSORS } from '../../data/photocallSponsors'
 
 export default function MatchPhotoCapture({ matchId, userId, finished, deferUpload = false, disabled = false }) {
   const key = `${userId}:${matchId}`
@@ -110,7 +111,27 @@ export default function MatchPhotoCapture({ matchId, userId, finished, deferUplo
     <dialog ref={dialog} onCancel={() => setOpen(false)} className='rounded-2xl p-5 w-[min(94vw,520px)] max-h-[90dvh] overflow-auto backdrop:bg-black/60' style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
       <div className='flex items-center justify-between mb-3'><h2 className='font-bold'>Una foto del partido</h2><button onClick={() => setOpen(false)} aria-label='Cerrar fotografía'><X /></button></div>
       <p className='text-sm mb-3'>Puedes tomarla al inicio o al final. No es obligatoria para marcar puntos.</p>
-      {(preview || photo) && <img src={preview || photoUrl(matchId, photo.version, true)} alt='Vista previa de la foto del partido' className='rounded-xl w-full object-contain max-h-64 mb-3' />}
+      {(preview || photo) && (
+        <div className='rounded-xl overflow-hidden p-2.5 bg-[#0b1c15] border border-white/10 mb-3'>
+          <div className='flex items-center justify-between px-1 pb-2 text-[10px] font-bold text-slate-300 border-b border-white/10 mb-2'>
+            <span className='text-emerald-400'>● MARCO OFICIAL CON PATROCINADORES</span>
+            <span>{PHOTOCALL_SPONSORS.length} MARCAS</span>
+          </div>
+          <img
+            src={preview || photoUrl(matchId, photo.version, true)}
+            alt='Vista previa de la foto del partido'
+            className='rounded-lg w-full object-contain max-h-56'
+          />
+          <div className='flex gap-1.5 overflow-x-auto py-1 mt-2 justify-center opacity-85'>
+            {PHOTOCALL_SPONSORS.slice(0, 7).map((s, i) => (
+              <span key={i} className='bg-white rounded px-1.5 py-0.5 shrink-0'>
+                <img src={s.image} alt='' className='h-3.5 max-w-[45px] object-contain inline' />
+              </span>
+            ))}
+            <span className='text-[10px] text-slate-400 self-center font-semibold'>+{PHOTOCALL_SPONSORS.length - 7} más</span>
+          </div>
+        </div>
+      )}
       <p role='status' className='text-sm my-2'>{sending ? 'Subiendo foto… puedes seguir marcando.' : pending ? message || 'Foto pendiente en este dispositivo.' : message}</p>
       {pending && <p className='text-xs mb-3'>Para sincronizar, mantén este partido abierto en la aplicación. No borres los datos del navegador. El público solo verá la foto cuando esté confirmada.</p>}
       {(pending || !storageReady || !known) && <div className='flex flex-wrap gap-3 mb-3'>
