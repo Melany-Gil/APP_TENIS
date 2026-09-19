@@ -6,9 +6,9 @@ export const PHOTOCALL_SPONSORS = [
     "accent": "#123ca3"
   },
   {
-    "name": "Supermercados Más x Menos",
-    "image": "/sponsors-photocall/mas-x-menos.webp",
-    "accent": "#2d5688"
+    "name": "Induleche",
+    "image": "/sponsors-photocall/induleche.webp",
+    "accent": "#ed4b12"
   },
   {
     "name": "Actúa Legal",
@@ -16,19 +16,19 @@ export const PHOTOCALL_SPONSORS = [
     "accent": "#161616"
   },
   {
-    "name": "Toscano Producciones",
-    "image": "/sponsors-photocall/toscano-producciones.webp",
-    "accent": "#171717"
-  },
-  {
     "name": "Metrollantas",
     "image": "/sponsors-photocall/metrollantas.webp",
     "accent": "#173874"
   },
   {
-    "name": "Induleche",
-    "image": "/sponsors-photocall/induleche.webp",
-    "accent": "#ed4b12"
+    "name": "Supermercados Más x Menos",
+    "image": "/sponsors-photocall/mas-x-menos.webp",
+    "accent": "#2d5688"
+  },
+  {
+    "name": "Toscano Producciones",
+    "image": "/sponsors-photocall/toscano-producciones.webp",
+    "accent": "#171717"
   },
   {
     "name": "Choconato Artesanal",

@@ -20,7 +20,8 @@
 .photocall-score tbody tr:last-child td { color: #a44923; }
 .photocall-score sup { font-size: 8px; }
 .photocall-score-note { font-size: 9px; color: #52685b; margin-top: 5px; }
-.photocall-sponsors { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 10px; }
+.photocall-sponsors { display: grid; grid-auto-flow: row dense; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 10px; }
+.photocall-logo-mxm { grid-column: 1; grid-row: 2; }
 .photocall-logo { background: #fff; border-radius: 7px; height: 38px; padding: 5px; display: flex; align-items: center; justify-content: center; min-width: 0; }
 .photocall-logo img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
 .photocall-actions { text-align: center; padding-top: 10px; }
@@ -30,3 +31,4 @@
 @container (min-width: 480px) { .photocall-sponsors { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; } .photocall-logo { height: 46px; padding: 6px; } .photocall-score tbody th { font-size: 15px; } .photocall-score td { font-size: 24px; } .photocall-photo-img { max-height: 460px; } }
 @container (max-width: 300px) { .photocall-logo { height: 34px; padding: 4px; } .photocall-score th:first-child { width: 44%; } .photocall-score td { font-size: 16px; } .match-photocall-title { font-size: 11px; } }
 @media print { .photocall-actions, .photocall-expand { display: none; } .match-photocall-card { break-inside: avoid; print-color-adjust: exact; } }
+.photocall-logo.photocall-logo-large { padding: 1px; }

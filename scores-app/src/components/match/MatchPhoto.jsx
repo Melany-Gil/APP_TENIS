@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Download, Maximize2 } from 'lucide-react'
 import { useMatchRealtime } from '../../hooks/useMatchRealtime'
 import { getPhoto, photoUrl } from '../../services/matchPhotoService'
 import { PHOTOCALL_SPONSORS } from '../../data/photocallSponsors'
 import { getParticipantName } from '../../utils/matchParticipants'
+import { exportMatchPhoto } from '../../utils/exportMatchPhoto'
 import './matchPhoto.css'
 
 export default function MatchPhoto({ matchId, match, dark = false }) {
@@ -11,6 +12,8 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
   const [expanded, setExpanded] = useState(false)
   const [failed, setFailed] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
+  const cardRef = useRef(null)
 
   const refresh = useCallback(() => {
     getPhoto(matchId)
@@ -52,22 +55,21 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
   const handleDownload = async () => {
     if (!photo || downloading) return
     setDownloading(true)
+    setDownloadError('')
     try {
-      const response = await fetch(photoUrl(matchId, photo.version, false))
-      if (!response.ok) throw new Error('No se pudo descargar')
-      const url = URL.createObjectURL(await response.blob())
+      if (failed) throw new Error('Reintenta cargar la foto antes de descargar el marco.')
+      await Promise.all([...cardRef.current.querySelectorAll('img')].map(image => image.decode()))
+      const blob = await exportMatchPhoto(cardRef.current, photoUrl(matchId, photo.version, false))
+      const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
-      link.download = `partido-${matchId}.webp`
+      link.download = `partido-${matchId}-marco.png`
       link.href = url
+      document.body.appendChild(link)
       link.click()
+      link.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
-    } catch {
-      // Fallback a enlace directo
-      const link = document.createElement('a')
-      link.download = `partido-${matchId}.webp`
-      link.href = photoUrl(matchId, photo.version, false)
-      link.target = '_blank'
-      link.click()
+    } catch (error) {
+      setDownloadError(error.message || 'No se pudo descargar el marco. Intenta nuevamente.')
     } finally {
       setDownloading(false)
     }
@@ -79,7 +81,7 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
   const sets = marker?.sets || []
   const finished = match?.estado === 'finalizado'
   return (
-    <section className='match-photocall-card' aria-label='Foto del partido' data-dark={dark || undefined}>
+    <section ref={cardRef} className='match-photocall-card' aria-label='Foto del partido' data-dark={dark || undefined}>
       <header className='match-photocall-header'>
         <div><span className='photocall-kicker'>CLUB UNIÓN · TENIS</span><h2 className='match-photocall-title'>Foto oficial del partido</h2></div>
         <span className='match-photocall-badge'>{photo.momento === 'inicio' ? 'Foto de inicio' : 'Foto de cierre'}</span>
@@ -101,9 +103,9 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
         {!finished && marker && <p className='photocall-score-note'>Marcador actual, no necesariamente el del momento de la foto.</p>}
       </div>}
       <div className='photocall-sponsors' aria-label='Patrocinadores oficiales'>
-        {PHOTOCALL_SPONSORS.map(sponsor => <div className='photocall-logo' key={sponsor.image} title={sponsor.name}><img src={sponsor.image} alt={sponsor.name} loading='eager' decoding='async' /></div>)}
+        {PHOTOCALL_SPONSORS.map(sponsor => <div className={`photocall-logo${sponsor.name === 'Metrollantas' ? ' photocall-logo-large' : ''}${sponsor.name === 'Supermercados Más x Menos' ? ' photocall-logo-mxm' : ''}`} key={sponsor.image} title={sponsor.name}><img src={sponsor.image} alt={sponsor.name} loading='eager' decoding='async' /></div>)}
       </div>
-      <div className='photocall-actions'><button type='button' className='photocall-download-btn' disabled={downloading} onClick={handleDownload}><Download size={14} /> {downloading ? 'Descargando…' : 'Descargar foto original'}</button></div>
+      <div className='photocall-actions'><button type='button' className='photocall-download-btn' disabled={downloading} onClick={handleDownload}><Download size={14} /> {downloading ? 'Preparando imagen…' : 'Descargar foto con marco'}</button>{downloadError && <p role='alert'>{downloadError}</p>}</div>
     </section>
   )
 }

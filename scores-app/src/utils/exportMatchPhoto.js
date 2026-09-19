@@ -1,0 +1,64 @@
+// Render the visible card geometry directly to canvas (no SVG foreignObject,
+// so the export also works in Safari). Never upload the composed image.
+export async function exportMatchPhoto(card, originalPhotoUrl) {
+  await document.fonts.ready
+  const bounds = card.getBoundingClientRect()
+  const sponsors = card.querySelector('.photocall-sponsors').getBoundingClientRect()
+  const height = sponsors.bottom - bounds.top + 12
+  const canvas = document.createElement('canvas')
+  const scale = Math.min(3, 1800 / bounds.width)
+  canvas.width = Math.ceil(bounds.width * scale)
+  canvas.height = Math.ceil(height * scale)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('No se pudo crear la imagen.')
+  ctx.scale(scale, scale)
+  const relative = rect => ({ x: rect.left - bounds.left, y: rect.top - bounds.top, w: rect.width, h: rect.height })
+  const rounded = (r, radius) => { ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, radius) }
+  const boxes = [card, ...card.querySelectorAll('.photocall-photo-wrapper, .photocall-score, .photocall-logo')].map(el => {
+    const style = getComputedStyle(el)
+    return { rect: el === card ? { x: 0, y: 0, w: bounds.width, h: height } : relative(el.getBoundingClientRect()), color: style.backgroundColor, radius: parseFloat(style.borderRadius) || 0 }
+  })
+  const images = [...card.querySelectorAll('img')].map(el => ({
+    url: el.classList.contains('photocall-photo-img') ? originalPhotoUrl : el.currentSrc || el.src,
+    rect: relative(el.getBoundingClientRect()),
+  }))
+  // Snapshot text before awaiting network requests; a live score may update.
+  const letters = []
+  const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT)
+  while (walker.nextNode()) {
+    const node = walker.currentNode
+    if (!node.textContent.trim() || node.parentElement.closest('.photocall-actions, .photocall-expand')) continue
+    const style = getComputedStyle(node.parentElement)
+    for (let i = 0; i < node.length; i++) {
+      const range = document.createRange()
+      range.setStart(node, i); range.setEnd(node, i + 1)
+      const rect = range.getBoundingClientRect()
+      letters.push({ text: node.textContent[i], rect: relative(rect), color: style.color, font: `${style.fontWeight} ${style.fontSize} ${style.fontFamily}` })
+    }
+  }
+  const loaded = await Promise.all(images.map(async item => {
+    const response = await fetch(item.url, { signal: AbortSignal.timeout(20000) })
+    if (!response.ok) throw new Error('No se pudieron cargar todas las imágenes. Intenta nuevamente.')
+    const url = URL.createObjectURL(await response.blob())
+    try {
+      const image = new Image()
+      image.src = url
+      await image.decode()
+      return { ...item, image }
+    } finally { URL.revokeObjectURL(url) }
+  }))
+  for (const box of boxes) { rounded(box.rect, box.radius); ctx.fillStyle = box.color; ctx.fill() }
+  for (const { image, rect } of loaded) {
+    const ratio = Math.min(rect.w / image.naturalWidth, rect.h / image.naturalHeight)
+    const w = image.naturalWidth * ratio, h = image.naturalHeight * ratio
+    ctx.drawImage(image, rect.x + (rect.w - w) / 2, rect.y + (rect.h - h) / 2, w, h)
+  }
+  ctx.textBaseline = 'middle'
+  for (const letter of letters) {
+    ctx.font = letter.font; ctx.fillStyle = letter.color
+    ctx.fillText(letter.text, letter.rect.x, letter.rect.y + letter.rect.h / 2)
+  }
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+  if (!blob) throw new Error('No se pudo generar la imagen. Intenta nuevamente.')
+  return blob
+}
