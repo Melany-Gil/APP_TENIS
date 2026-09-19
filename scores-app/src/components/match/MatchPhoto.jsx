@@ -1,49 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Download, Maximize2 } from 'lucide-react'
 import { useMatchRealtime } from '../../hooks/useMatchRealtime'
 import { getPhoto, photoUrl } from '../../services/matchPhotoService'
 import { PHOTOCALL_SPONSORS } from '../../data/photocallSponsors'
+import { getParticipantName } from '../../utils/matchParticipants'
 import './matchPhoto.css'
 
-export function partitionSponsors(sponsors = []) {
-  const total = sponsors.length
-  if (total === 0) return { left: [], right: [] }
-
-  const half = Math.ceil(total / 2)
-  const left = sponsors.slice(0, half)
-  const right = sponsors.slice(half)
-
-  return { left, right }
-}
-
-export function chunkHoneycomb(items = []) {
-  const total = items.length
-  // Si son más de 16 por lado (más de 32 patrocinadores en total),
-  // se activa el modo de alta capacidad con filas alternadas de 4 y 3
-  const isDense = total > 16
-  const baseCounts = isDense ? [4, 3] : [3, 2]
-
-  const rows = []
-  let i = 0
-  let rowIdx = 0
-  while (i < items.length) {
-    const count = baseCounts[rowIdx % baseCounts.length]
-    const slice = items.slice(i, i + count)
-    rows.push({
-      id: `row-${rowIdx}`,
-      count: slice.length,
-      items: slice,
-    })
-    i += count
-    rowIdx++
-  }
-  return { rows, isDense }
-}
-
-
-
-
-export default function MatchPhoto({ matchId, dark = false }) {
+export default function MatchPhoto({ matchId, match, dark = false }) {
   const [photo, setPhoto] = useState(null)
   const [expanded, setExpanded] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -86,10 +49,6 @@ export default function MatchPhoto({ matchId, dark = false }) {
     ),
   )
 
-  const { left, right } = useMemo(() => partitionSponsors(PHOTOCALL_SPONSORS), [])
-  const leftHoneycomb = useMemo(() => chunkHoneycomb(left), [left])
-  const rightHoneycomb = useMemo(() => chunkHoneycomb(right), [right])
-
   const handleDownload = async () => {
     if (!photo || downloading) return
     setDownloading(true)
@@ -116,124 +75,35 @@ export default function MatchPhoto({ matchId, dark = false }) {
 
   if (!photo) return null
 
+  const marker = match?.marcador_actual
+  const sets = marker?.sets || []
+  const finished = match?.estado === 'finalizado'
   return (
-    <section
-      className='match-photocall-card'
-      aria-label='Foto del partido'
-      style={dark ? { borderColor: 'rgba(255,255,255,.16)' } : undefined}
-    >
-      <div className='match-photocall-header'>
-        <div className='match-photocall-title-wrap'>
-          <span className='match-photocall-dot' />
-          <h2 className='match-photocall-title'>Foto oficial del partido</h2>
-        </div>
-        <span className='match-photocall-badge'>
-          {photo.momento === 'inicio' ? 'Inicio del encuentro' : 'Final del encuentro'}
-        </span>
+    <section className='match-photocall-card' aria-label='Foto del partido' data-dark={dark || undefined}>
+      <header className='match-photocall-header'>
+        <div><span className='photocall-kicker'>CLUB UNIÓN · TENIS</span><h2 className='match-photocall-title'>Foto oficial del partido</h2></div>
+        <span className='match-photocall-badge'>{photo.momento === 'inicio' ? 'Foto de inicio' : 'Foto de cierre'}</span>
+      </header>
+      <div className='photocall-photo-wrapper'>
+        {failed ? <p role='status'>No se pudo cargar la fotografía. <button onClick={refresh}>Reintentar</button></p> :
+          <button type='button' className='photocall-photo-btn' onClick={() => setExpanded(!expanded)} aria-label={expanded ? 'Reducir foto' : 'Ampliar foto'}>
+            <img src={photoUrl(matchId, photo.version, !expanded)} alt='Jugadores del partido' loading='lazy' decoding='async' onError={() => setFailed(true)} className='photocall-photo-img' style={expanded ? { maxHeight: '80vh' } : undefined} />
+            <span className='photocall-expand' aria-hidden='true'><Maximize2 size={15} /></span>
+          </button>}
       </div>
-
-      {failed ? (
-        <p className='text-sm py-4 text-center text-slate-300'>
-          No se pudo cargar la fotografía.{' '}
-          <button className='underline font-semibold' onClick={refresh}>
-            Reintentar
-          </button>
-        </p>
-      ) : (
-        <>
-          {/* Escenario Central: Lateral Izquierdo + Foto + Lateral Derecho */}
-          <div className='photocall-stage'>
-            {/* Costado Izquierdo */}
-            <div className='photocall-flank photocall-flank-left' aria-label='Patrocinadores oficiales'>
-              <div className='photocall-flank-tag'>
-                <span className='photocall-flank-tag-dot' />
-                <span>Patrocinadores ({left.length})</span>
-              </div>
-              <div className={`photocall-honeycomb ${leftHoneycomb.isDense ? 'photocall-honeycomb-dense' : ''}`}>
-                {leftHoneycomb.rows.map((row) => (
-                  <div
-                    key={`left-${row.id}`}
-                    className={`photocall-honeycomb-row photocall-honeycomb-row-${row.count}`}
-                  >
-                    {row.items.map((sponsor, idx) => (
-                      <div
-                        key={`left-${row.id}-${idx}`}
-                        className='photocall-sponsor-tile photocall-tile-pill'
-                        title={sponsor.name}
-                      >
-                        <img src={sponsor.image} alt={sponsor.name} loading='lazy' decoding='async' />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Centro: Fotografía */}
-            <div className='photocall-photo-wrapper'>
-              <button
-                type='button'
-                className='photocall-photo-btn'
-                onClick={() => setExpanded(!expanded)}
-                aria-label={expanded ? 'Reducir foto' : 'Ampliar foto'}
-              >
-                <img
-                  src={photoUrl(matchId, photo.version, !expanded)}
-                  alt='Jugadores del partido'
-                  loading='lazy'
-                  decoding='async'
-                  onError={() => setFailed(true)}
-                  className='photocall-photo-img'
-                  style={{ maxHeight: expanded ? '80vh' : 420 }}
-                />
-                <span className='photocall-photo-caption'>
-                  <Maximize2 size={13} /> {expanded ? 'Toca para reducir' : 'Toca para ampliar'}
-                </span>
-              </button>
-            </div>
-
-            {/* Costado Derecho */}
-            <div className='photocall-flank photocall-flank-right' aria-label='Patrocinadores oficiales'>
-              <div className='photocall-flank-tag photocall-flank-tag-right'>
-                <span>Patrocinadores ({right.length})</span>
-                <span className='photocall-flank-tag-dot' />
-              </div>
-              <div className={`photocall-honeycomb ${rightHoneycomb.isDense ? 'photocall-honeycomb-dense' : ''}`}>
-                {rightHoneycomb.rows.map((row) => (
-                  <div
-                    key={`right-${row.id}`}
-                    className={`photocall-honeycomb-row photocall-honeycomb-row-${row.count}`}
-                  >
-                    {row.items.map((sponsor, idx) => (
-                      <div
-                        key={`right-${row.id}-${idx}`}
-                        className='photocall-sponsor-tile photocall-tile-pill'
-                        title={sponsor.name}
-                      >
-                        <img src={sponsor.image} alt={sponsor.name} loading='lazy' decoding='async' />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-
-
-
-          <div className='photocall-actions'>
-            <button
-              type='button'
-              className='photocall-download-btn'
-              disabled={downloading}
-              onClick={handleDownload}
-            >
-              <Download size={14} /> {downloading ? 'Generando…' : 'Descargar foto original'}
-            </button>
-          </div>
-        </>
-      )}
+      {match && <div className='photocall-score'>
+        <div className='photocall-score-meta'><span>{match.torneo?.nombre || 'Encuentro de tenis'}</span><strong>{finished ? 'Resultado final' : match.estado === 'cancelado' ? 'Cancelado' : match.estado === 'en_vivo' ? 'Marcador actual' : 'Programado'}</strong></div>
+        <table aria-label='Marcador de la foto'>
+          <thead><tr><th>Jugador / pareja</th>{sets.map((set, i) => <th key={i}>{set.type === 'match_tiebreak' ? 'STB' : `S${i + 1}`}</th>)}{!finished && marker && <th>Pts</th>}</tr></thead>
+          <tbody>{[1, 2].map((side, i) => <tr key={side}><th scope='row'>{getParticipantName(match, side)}</th>{sets.map((set, index) => <td key={index}>{set.games?.[i] ?? '—'}{set.type !== 'match_tiebreak' && set.tiebreak?.some(Boolean) && <sup>{set.tiebreak[i]}</sup>}</td>)}{!finished && marker && <td>{marker.displayPoints?.[i] ?? '—'}</td>}</tr>)}</tbody>
+        </table>
+        {!marker && <p className='photocall-score-note'>Marcador no disponible</p>}
+        {!finished && marker && <p className='photocall-score-note'>Marcador actual, no necesariamente el del momento de la foto.</p>}
+      </div>}
+      <div className='photocall-sponsors' aria-label='Patrocinadores oficiales'>
+        {PHOTOCALL_SPONSORS.map(sponsor => <div className='photocall-logo' key={sponsor.image} title={sponsor.name}><img src={sponsor.image} alt={sponsor.name} loading='eager' decoding='async' /></div>)}
+      </div>
+      <div className='photocall-actions'><button type='button' className='photocall-download-btn' disabled={downloading} onClick={handleDownload}><Download size={14} /> {downloading ? 'Descargando…' : 'Descargar foto original'}</button></div>
     </section>
   )
 }

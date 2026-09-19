@@ -219,7 +219,7 @@ export default function Match() {
           finished={match.estado === 'finalizado'}
         />
       )}
-      <MatchPhoto key={match.id} matchId={match.id} />
+      <MatchPhoto key={match.id} matchId={match.id} match={match} />
       {(isLive || match.estado === 'finalizado') && match.deporte === 'tenis' && (
         <section className='card p-4 sm:p-5'>
           <h2

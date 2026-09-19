@@ -233,6 +233,14 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await publicPage.getByRole('button', { name: 'Ver este partido a detalle' }).first().click()
     await publicPage.getByRole('heading', { name: 'Estadísticas de los jugadores' }).waitFor()
     await publicPage.getByRole('heading', { name: 'Foto oficial del partido' }).waitFor()
+    await publicPage.getByRole('table', { name: 'Marcador de la foto' }).waitFor()
+    for (const width of [320, 390, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 900 })
+      assert.equal(await publicPage.locator('.match-photocall-card').evaluate(el => el.scrollWidth <= el.clientWidth), true, `Photo frame fits at ${width}`)
+    }
+    await publicPage.setViewportSize({ width: 390, height: 844 })
+    await publicPage.locator('.photocall-logo img').evaluateAll(images => Promise.all(images.map(image => image.decode())))
+    await publicPage.locator('.match-photocall-card').screenshot({ path: path.join(os.tmpdir(), 'tenis-photocall-mobile.png') })
     await publicPage.getByRole('button', { name: 'Ampliar foto', exact: true }).click()
     await publicPage.getByRole('button', { name: 'Reducir foto', exact: true }).waitFor()
     assert.equal(await publicPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
