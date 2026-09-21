@@ -6,18 +6,27 @@ const PLAYER_STATS_QUERY = `
     cat.orden AS categoria_orden,
     p.jugador1_id,
     p.jugador2_id,
+    e1.jugador1_id AS e1_j1_id,
+    e1.jugador2_id AS e1_j2_id,
+    e2.jugador1_id AS e2_j1_id,
+    e2.jugador2_id AS e2_j2_id,
     p.ganador,
     s.numero_set,
     s.games_j1,
     s.games_j2
   FROM partidos p
   INNER JOIN categorias cat ON cat.id = p.categoria_id
+  LEFT JOIN equipos_padel e1 ON e1.id = p.equipo1_id
+  LEFT JOIN equipos_padel e2 ON e2.id = p.equipo2_id
   LEFT JOIN sets_partido s ON s.partido_id = p.id
   WHERE p.estado = 'finalizado'
     AND p.deporte = 'tenis'
-    AND p.jugador1_id IS NOT NULL
-    AND p.jugador2_id IS NOT NULL
     AND p.ganador IN ('jugador1', 'jugador2')
+    AND (
+      (p.jugador1_id IS NOT NULL AND p.jugador2_id IS NOT NULL)
+      OR
+      (e1.jugador1_id IS NOT NULL AND e2.jugador1_id IS NOT NULL)
+    )
 `
 
 async function getPlayerStats(db, { categoriaId } = {}) {
@@ -39,12 +48,22 @@ function calculatePlayerStats(rows) {
 
   for (const row of rows) {
     if (!matches.has(row.partido_id)) {
+      const p1Ids = []
+      if (row.jugador1_id) p1Ids.push(Number(row.jugador1_id))
+      if (row.e1_j1_id) p1Ids.push(Number(row.e1_j1_id))
+      if (row.e1_j2_id) p1Ids.push(Number(row.e1_j2_id))
+
+      const p2Ids = []
+      if (row.jugador2_id) p2Ids.push(Number(row.jugador2_id))
+      if (row.e2_j1_id) p2Ids.push(Number(row.e2_j1_id))
+      if (row.e2_j2_id) p2Ids.push(Number(row.e2_j2_id))
+
       matches.set(row.partido_id, {
         categoria_id: Number(row.categoria_id),
         categoria_nombre: row.categoria_nombre,
         categoria_orden: Number(row.categoria_orden) || 0,
-        jugador1_id: Number(row.jugador1_id),
-        jugador2_id: Number(row.jugador2_id),
+        p1Ids: [...new Set(p1Ids)],
+        p2Ids: [...new Set(p2Ids)],
         ganador: row.ganador,
         sets: [],
       })
@@ -62,39 +81,54 @@ function calculatePlayerStats(rows) {
 
   for (const match of matches.values()) {
     const categoryStats = getOrCreateCategory(statsByCategory, match)
-    const player1 = getOrCreatePlayer(categoryStats.players, match.jugador1_id, match)
-    const player2 = getOrCreatePlayer(categoryStats.players, match.jugador2_id, match)
-
-    player1.partidos_jugados += 1
-    player2.partidos_jugados += 1
+    const p1Players = match.p1Ids.map((id) => getOrCreatePlayer(categoryStats.players, id, match))
+    const p2Players = match.p2Ids.map((id) => getOrCreatePlayer(categoryStats.players, id, match))
 
     let setsWonByPlayer1 = 0
     let setsWonByPlayer2 = 0
+    let gamesWonJ1 = 0
+    let gamesWonJ2 = 0
+
     for (const set of match.sets) {
-      player1.games_ganados += set.games_j1
-      player1.games_perdidos += set.games_j2
-      player2.games_ganados += set.games_j2
-      player2.games_perdidos += set.games_j1
+      gamesWonJ1 += set.games_j1
+      gamesWonJ2 += set.games_j2
 
       if (set.games_j1 > set.games_j2) {
         setsWonByPlayer1 += 1
-        player1.sets_ganados += 1
-        player2.sets_perdidos += 1
       } else if (set.games_j2 > set.games_j1) {
         setsWonByPlayer2 += 1
-        player2.sets_ganados += 1
-        player1.sets_perdidos += 1
       }
     }
 
-    const winner = match.ganador === 'jugador1' ? player1 : player2
-    const loser = match.ganador === 'jugador1' ? player2 : player1
-    const loserWonASet = match.ganador === 'jugador1' ? setsWonByPlayer2 > 0 : setsWonByPlayer1 > 0
+    for (const p of p1Players) {
+      p.partidos_jugados += 1
+      p.games_ganados += gamesWonJ1
+      p.games_perdidos += gamesWonJ2
+      p.sets_ganados += setsWonByPlayer1
+      p.sets_perdidos += setsWonByPlayer2
+    }
 
-    winner.victorias += 1
-    loser.derrotas += 1
-    winner.puntos += loserWonASet ? 2 : 3
-    loser.puntos += loserWonASet ? 1 : 0
+    for (const p of p2Players) {
+      p.partidos_jugados += 1
+      p.games_ganados += gamesWonJ2
+      p.games_perdidos += gamesWonJ1
+      p.sets_ganados += setsWonByPlayer2
+      p.sets_perdidos += setsWonByPlayer1
+    }
+
+    const winnerIs1 = match.ganador === 'jugador1'
+    const winnerPlayers = winnerIs1 ? p1Players : p2Players
+    const loserPlayers = winnerIs1 ? p2Players : p1Players
+    const loserWonASet = winnerIs1 ? setsWonByPlayer2 > 0 : setsWonByPlayer1 > 0
+
+    for (const p of winnerPlayers) {
+      p.victorias += 1
+      p.puntos += loserWonASet ? 2 : 3
+    }
+    for (const p of loserPlayers) {
+      p.derrotas += 1
+      p.puntos += loserWonASet ? 1 : 0
+    }
   }
 
   const result = []

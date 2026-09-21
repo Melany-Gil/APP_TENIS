@@ -27,6 +27,9 @@ import { getParticipantName } from '../../utils/matchParticipants'
 import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import ModalReasignarJuez from '../../components/match/ModalReasignarJuez'
+import ModalAsignarCancha from '../../components/match/ModalAsignarCancha'
+import ModalFinalizarW from '../../components/match/ModalFinalizarW'
+import ModalCancelarPartido from '../../components/match/ModalCancelarPartido'
 import ModalSustitucionParticipante from '../../components/match/ModalSustitucionParticipante'
 import ModalCorregirMarcador from '../../components/match/ModalCorregirMarcador'
 
@@ -44,8 +47,11 @@ export default function DirectorDashboard() {
 
   // Modales
   const [matchToReassign, setMatchToReassign] = useState(null)
+  const [matchToCourt, setMatchToCourt] = useState(null)
   const [matchToSubstitute, setMatchToSubstitute] = useState(null)
   const [matchToScore, setMatchToScore] = useState(null)
+  const [matchToCancel, setMatchToCancel] = useState(null)
+  const [matchToWalkover, setMatchToWalkover] = useState(null)
 
   // Filtros
   const [search, setSearch] = useState('')
@@ -222,37 +228,9 @@ export default function DirectorDashboard() {
     })
   }, [matches, search, sportFilter, statusFilter, courtFilter, categoryFilter])
 
-  // Bajar / Cancelar partido
-  const handleCancelMatch = async (match) => {
-    if (busyId !== null) return
-    const p1 = getParticipantName(match, 1)
-    const p2 = getParticipantName(match, 2)
-    const ok = await confirm({
-      title: 'Bajar / Cancelar Partido',
-      message: `¿Estás seguro de que deseas bajar el partido entre ${p1} y ${p2}? El partido pasará a estado cancelado y se retirará de los marcadores en vivo.`,
-      confirmLabel: 'Sí, bajar partido',
-      danger: true,
-    })
-    if (!ok) return
-
-    try {
-      setBusyId(match.id)
-      await matchService.cancelMatch(match.id, match.control_version)
-      addToast({
-        type: 'success',
-        title: 'Partido cancelado',
-        message: 'El partido ha sido bajado de la programación en vivo.',
-      })
-      fetchMatches()
-    } catch (err) {
-      addToast({
-        type: 'error',
-        title: 'Error al cancelar',
-        message: err.message || 'No se pudo bajar el partido',
-      })
-    } finally {
-      setBusyId(null)
-    }
+  // Bajar / Cancelar partido (abre modal con motivo)
+  const handleCancelMatch = (match) => {
+    setMatchToCancel(match)
   }
 
   // Reactivar partido
@@ -637,7 +615,7 @@ export default function DirectorDashboard() {
                   </div>
                 </div>
 
-                <MatchAuditButton match={match} />
+                <MatchAuditButton match={match} responsive={false} />
                 {/* Participantes */}
                 <div
                   className='p-3 rounded-xl space-y-1.5'
@@ -709,6 +687,18 @@ export default function DirectorDashboard() {
                     <span>{hasJudge ? 'Cambiar juez' : 'Asignar juez'}</span>
                   </button>
 
+                  {/* Asignar o Reasignar Cancha */}
+                  <button
+                    type='button'
+                    onClick={() => setMatchToCourt(match)}
+                    disabled={isCancelled || isFinished || busyId !== null}
+                    className='btn-secondary text-xs px-2.5 py-1.5 flex items-center gap-1'
+                    title='Asignar o reasignar la cancha de este partido'
+                  >
+                    <MapPin size={13} />
+                    <span>{match.cancha_id || match.cancha?.id ? 'Reasignar cancha' : 'Asignar cancha'}</span>
+                  </button>
+
                   {/* Sustituir Jugador / Pareja */}
                   <button
                     type='button'
@@ -734,6 +724,20 @@ export default function DirectorDashboard() {
                     <span>Marcador</span>
                   </button>
 
+                  {/* Dar Victoria por W */}
+                  {!isCancelled && !isFinished && (
+                    <button
+                      type='button'
+                      onClick={() => setMatchToWalkover(match)}
+                      disabled={busyId !== null}
+                      className='btn-secondary text-xs px-2.5 py-1.5 flex items-center gap-1 text-amber-500 hover:bg-amber-500/10'
+                      title='Declarar victoria por W (Walkover o Retiro)'
+                    >
+                      <Trophy size={13} />
+                      <span>Dar W</span>
+                    </button>
+                  )}
+
                   {/* Bajar / Cancelar o Reactivar */}
                   {!isCancelled && !isFinished ? (
                     <button
@@ -741,10 +745,10 @@ export default function DirectorDashboard() {
                       onClick={() => handleCancelMatch(match)}
                       disabled={busyId !== null}
                       className='btn-ghost text-xs px-2.5 py-1.5 flex items-center gap-1 text-red-500 hover:bg-red-500/10'
-                      title='Bajar partido de la programación en vivo'
+                      title='Bajar o cancelar partido con motivo'
                     >
                       <Ban size={13} />
-                      <span>Bajar</span>
+                      <span>Cancelar</span>
                     </button>
                   ) : isCancelled ? (
                     <button
@@ -782,9 +786,22 @@ export default function DirectorDashboard() {
           isOpen={Boolean(matchToReassign)}
           onClose={() => setMatchToReassign(null)}
           match={matchToReassign}
-          onSuccess={(updated) => {
+          onSuccess={() => {
             fetchMatches()
             setMatchToReassign(null)
+          }}
+        />
+      )}
+
+      {/* Modal Asignar / Reasignar Cancha */}
+      {matchToCourt && (
+        <ModalAsignarCancha
+          isOpen={Boolean(matchToCourt)}
+          onClose={() => setMatchToCourt(null)}
+          match={matchToCourt}
+          onSuccess={() => {
+            fetchMatches()
+            setMatchToCourt(null)
           }}
         />
       )}
@@ -795,7 +812,7 @@ export default function DirectorDashboard() {
           isOpen={Boolean(matchToSubstitute)}
           onClose={() => setMatchToSubstitute(null)}
           match={matchToSubstitute}
-          onSuccess={(updated) => {
+          onSuccess={() => {
             fetchMatches()
             setMatchToSubstitute(null)
           }}
@@ -808,9 +825,35 @@ export default function DirectorDashboard() {
           isOpen={Boolean(matchToScore)}
           onClose={() => setMatchToScore(null)}
           match={matchToScore}
-          onSuccess={(updated) => {
+          onSuccess={() => {
             fetchMatches()
             setMatchToScore(null)
+          }}
+        />
+      )}
+
+      {/* Modal Victoria por W */}
+      {matchToWalkover && (
+        <ModalFinalizarW
+          isOpen={Boolean(matchToWalkover)}
+          onClose={() => setMatchToWalkover(null)}
+          match={matchToWalkover}
+          onSuccess={() => {
+            fetchMatches()
+            setMatchToWalkover(null)
+          }}
+        />
+      )}
+
+      {/* Modal Cancelar Partido */}
+      {matchToCancel && (
+        <ModalCancelarPartido
+          isOpen={Boolean(matchToCancel)}
+          onClose={() => setMatchToCancel(null)}
+          match={matchToCancel}
+          onSuccess={() => {
+            fetchMatches()
+            setMatchToCancel(null)
           }}
         />
       )}

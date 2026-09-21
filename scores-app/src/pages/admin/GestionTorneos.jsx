@@ -18,6 +18,7 @@ import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import Modal from '../../components/ui/Modal'
 import { formatDate } from '../../utils/formatDate'
 
 const ESTADOS = [
@@ -192,28 +193,36 @@ export default function GestionTorneos() {
         <GuideStep number='3' title='Programa partidos' text='Elige el torneo y arma sus cruces.' />
       </section>
 
-      {showForm && (
-        <section className='card p-5 sm:p-6 animate-fade-up'>
-          <div className='flex items-start justify-between gap-3 mb-5'>
-            <div>
-              <h2 className='text-lg font-bold' style={{ color: 'var(--text-primary)' }}>
-                {editing ? 'Editar torneo' : 'Nuevo torneo'}
-              </h2>
-              <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
-                Los campos avanzados del marcador se configuran después, en cada partido.
-              </p>
-            </div>
-            <button
+      {/* Modal Torneo */}
+      <Modal
+        isOpen={showForm}
+        onClose={closeForm}
+        title={editing ? 'Editar torneo' : 'Nuevo torneo'}
+        subtitle={
+          editing
+            ? `${editing.nombre} · Modifica las fechas, modalidad o sistema de competición`
+            : 'Crea un torneo oficial para gestionar cruces, grupos y marcadores'
+        }
+        icon={editing ? Pencil : Trophy}
+        busy={isSubmitting}
+        onSubmit={handleSubmit(onSubmit)}
+        footer={
+          <>
+            <Button
               type='button'
+              variant='secondary'
               onClick={closeForm}
-              className='btn-ghost p-2'
-              aria-label='Cerrar formulario'
+              disabled={isSubmitting}
             >
-              <X className='w-4 h-4' />
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+              Cancelar
+            </Button>
+            <Button type='submit' loading={isSubmitting}>
+              {editing ? 'Guardar cambios' : 'Crear torneo'}
+            </Button>
+          </>
+        }
+      >
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             <div className='sm:col-span-2'>
               <Input
                 label='Nombre del torneo *'
@@ -289,17 +298,8 @@ export default function GestionTorneos() {
               </select>
             </Field>
 
-            <div className='sm:col-span-2 flex flex-wrap gap-3 pt-1'>
-              <Button type='submit' loading={isSubmitting}>
-                {editing ? 'Guardar cambios' : 'Crear torneo'}
-              </Button>
-              <Button type='button' variant='secondary' onClick={closeForm}>
-                Cancelar
-              </Button>
-            </div>
-          </form>
-        </section>
-      )}
+        </div>
+      </Modal>
 
       <section className='space-y-3'>
         <BulkDelete

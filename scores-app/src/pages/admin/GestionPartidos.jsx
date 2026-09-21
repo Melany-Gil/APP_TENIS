@@ -1,5 +1,5 @@
 import BulkDelete from '../../components/ui/BulkDelete'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { Plus, Pencil, Trash2, X, Radio, Gavel, SlidersHorizontal, MapPin } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -15,6 +15,7 @@ import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import Modal from '../../components/ui/Modal'
 import Tabs from '../../components/ui/Tabs'
 import LiveBadge from '../../components/match/LiveBadge'
 import { formatClockTime, formatDate } from '../../utils/formatDate'
@@ -48,7 +49,6 @@ export default function GestionPartidos() {
   const [editing, setEditing] = useState(null)
   const [filterTab, setFilterTab] = useState('todos')
   const [setNumbers, setSetNumbers] = useState([1, 2, 3])
-  const marcadorRef = useRef(null)
   const { addToast } = useUIStore()
   const [searchParams] = useSearchParams()
 
@@ -59,7 +59,7 @@ export default function GestionPartidos() {
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm({ shouldUnregister: true })
+  } = useForm({ shouldUnregister: false })
   const {
     register: regM,
     handleSubmit: handleM,
@@ -87,19 +87,28 @@ export default function GestionPartidos() {
       selectedTournamentId &&
       selectedTournament?.sistema === 'grupos_eliminacion' &&
       selectedModality === 'dobles'
-    )
+    ) {
       tournamentService
         .getGroups(selectedTournamentId)
         .then((r) => {
-          if (active) setDistribution(r.data)
+          if (!active) return
+          setDistribution(r.data)
+          if (editing && String(editing.torneo?.id || '') === selectedTournamentId) {
+            if (editing.grupo) setValue('grupo', editing.grupo)
+            if (editing.equipo1?.id) setValue('equipo1_id', String(editing.equipo1.id))
+            if (editing.equipo2?.id) setValue('equipo2_id', String(editing.equipo2.id))
+          }
         })
         .catch((e) => {
           if (active) setGroupError(e.message || 'No se pudieron cargar los grupos')
         })
+    } else {
+      setDistribution(null)
+    }
     return () => {
       active = false
     }
-  }, [selectedTournamentId, selectedTournament?.sistema, selectedModality])
+  }, [selectedTournamentId, selectedTournament?.sistema, selectedModality, editing])
   const selectedGroup = watch('grupo') || ''
   const useGroups =
     selectedTournament?.sistema === 'grupos_eliminacion' && selectedModality === 'dobles'
@@ -117,21 +126,28 @@ export default function GestionPartidos() {
   const categoriasDisponibles = categorias.filter(
     (categoria) => categoria.deporte === selectedDeporte || categoria.deporte === 'ambos'
   )
-  const jugadoresDisponibles = jugadores.filter(
-    (jugador) => jugador.deporte === selectedDeporte || jugador.deporte === 'ambos'
-  )
-  const equiposDisponibles = equipos.filter(
-    (equipo) =>
-      equipo.deporte === selectedDeporte &&
-      (useGroups
-        ? distribution?.parejas.some(
-            (p) =>
-              Number(p.equipo_id) === Number(equipo.id) &&
-              String(p.categoria_id) === selectedCategoryId &&
-              (selectedPhase !== 'grupos' || p.grupo === selectedGroup)
-          )
-        : String(equipo.categoria?.id || '') === selectedCategoryId)
-  )
+  const jugadoresDisponibles = useMemo(() => {
+    const list = jugadores.filter(
+      (jugador) => jugador.deporte === selectedDeporte || jugador.deporte === 'ambos'
+    )
+    return list
+  }, [jugadores, selectedDeporte, editing])
+
+  const equiposDisponibles = useMemo(() => {
+    const list = equipos.filter(
+      (equipo) =>
+        equipo.deporte === selectedDeporte &&
+        (useGroups
+          ? distribution?.parejas.some(
+              (p) =>
+                Number(p.equipo_id) === Number(equipo.id) &&
+                String(p.categoria_id) === selectedCategoryId &&
+                (selectedPhase !== 'grupos' || p.grupo === selectedGroup)
+            )
+          : String(equipo.categoria?.id || '') === selectedCategoryId)
+    )
+    return list
+  }, [equipos, selectedDeporte, useGroups, distribution, selectedCategoryId, selectedPhase, selectedGroup, editing])
   const [marcadorParticipante1, marcadorParticipante2] = getParticipantNames(showMarcador)
 
   const fetchAll = () => {
@@ -177,12 +193,6 @@ export default function GestionPartidos() {
     fetchAll()
   }, [])
 
-  useEffect(() => {
-    if (showMarcador) {
-      marcadorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [showMarcador])
-
   const openCreate = () => {
     reset({
       torneo_id: searchParams.get('torneo') || '',
@@ -213,29 +223,30 @@ export default function GestionPartidos() {
 
   const openEdit = (partido) => {
     setEditing(partido)
+    const tId = partido.torneo?.id ? String(partido.torneo.id) : ''
     reset({
-      torneo_id: partido.torneo?.id || '',
+      torneo_id: tId,
       deporte: partido.deporte || 'tenis',
       modalidad:
         partido.modalidad || (partido.equipo1?.id || partido.equipo2?.id ? 'dobles' : 'individual'),
-      categoria_id: partido.categoria?.id || '',
+      categoria_id: partido.categoria?.id ? String(partido.categoria.id) : '',
       estado: partido.estado,
       fecha_inicio: partido.fecha_inicio ? partido.fecha_inicio.slice(0, 10) : '',
       hora_inicio: partido.hora_inicio ? partido.hora_inicio.slice(0, 5) : '',
       fase: partido.fase || 'grupos',
       grupo: partido.grupo || '',
       ronda: partido.ronda || '',
-      jugador1_id: partido.jugador1?.id || '',
-      jugador2_id: partido.jugador2?.id || '',
-      equipo1_id: partido.equipo1?.id || '',
-      equipo2_id: partido.equipo2?.id || '',
+      jugador1_id: partido.jugador1?.id ? String(partido.jugador1.id) : '',
+      jugador2_id: partido.jugador2?.id ? String(partido.jugador2.id) : '',
+      equipo1_id: partido.equipo1?.id ? String(partido.equipo1.id) : '',
+      equipo2_id: partido.equipo2?.id ? String(partido.equipo2.id) : '',
       participante1_tipo: partido.origen_partido1 ? 'ganador' : 'fijo',
       participante2_tipo: partido.origen_partido2 ? 'ganador' : 'fijo',
-      origen_partido1_id: partido.origen_partido1?.id || '',
-      origen_partido2_id: partido.origen_partido2?.id || '',
+      origen_partido1_id: partido.origen_partido1?.id ? String(partido.origen_partido1.id) : '',
+      origen_partido2_id: partido.origen_partido2?.id ? String(partido.origen_partido2.id) : '',
       notas: partido.notas || '',
-      juez_id: partido.juez?.id || '',
-      cancha_id: partido.cancha?.id || '',
+      juez_id: partido.juez?.id ? String(partido.juez.id) : '',
+      cancha_id: partido.cancha?.id ? String(partido.cancha.id) : '',
       mejor_de_sets: String(partido.formato?.mejor_de_sets || 3),
       juegos_por_set: String(partido.formato?.juegos_por_set || 6),
       diferencia_juegos: String(partido.formato?.diferencia_juegos || 2),
@@ -398,33 +409,53 @@ export default function GestionPartidos() {
         </Button>
       </div>
 
-      {/* Formulario nuevo/editar */}
-      {showForm && (
-        <div className='card p-5 animate-fade-up'>
-          <div className='flex items-center justify-between mb-4'>
-            <h2 className='text-base font-semibold' style={{ color: 'var(--text-primary)' }}>
-              {editing ? 'Editar partido' : 'Nuevo partido'}
-            </h2>
-            <button onClick={() => setShowForm(false)} className='btn-ghost p-1'>
-              <X className='w-4 h-4' />
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-            <div className='form-group sm:col-span-2'>
-              <label className='form-label'>Torneo (opcional)</label>
-              <select
-                className='form-input'
-                {...register('torneo_id', {
-                  onChange: () => {
-                    setValue('categoria_id', '')
-                    setValue('deporte', 'tenis')
-                    setValue('modalidad', 'individual')
-                    setValue('participante1_tipo', 'fijo')
-                    setValue('participante2_tipo', 'fijo')
-                  },
-                })}
-              >
+      {/* Modal nuevo/editar */}
+      <Modal
+        isOpen={showForm}
+        onClose={() => setShowForm(false)}
+        title={editing ? 'Editar partido' : 'Nuevo partido'}
+        subtitle={
+          editing
+            ? (editing.torneo?.nombre ? `${editing.torneo.nombre} · Modifica los datos del encuentro` : 'Partido libre · Modifica los datos del encuentro')
+            : 'Programa un nuevo partido libre o asociado a un torneo'
+        }
+        icon={editing ? Pencil : Plus}
+        maxWidth='max-w-3xl'
+        busy={isSubmitting}
+        onSubmit={handleSubmit(onSubmit)}
+        footer={
+          <>
+            <Button
+              type='button'
+              variant='secondary'
+              onClick={() => setShowForm(false)}
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' loading={isSubmitting}>
+              {editing ? 'Guardar cambios' : 'Crear partido'}
+            </Button>
+          </>
+        }
+      >
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+              <div className='form-group sm:col-span-2'>
+                <label className='form-label'>Torneo (opcional)</label>
+                <select
+                  className='form-input'
+                  {...register('torneo_id', {
+                    onChange: () => {
+                      if (!editing) {
+                        setValue('categoria_id', '')
+                        setValue('deporte', 'tenis')
+                        setValue('modalidad', 'individual')
+                        setValue('participante1_tipo', 'fijo')
+                        setValue('participante2_tipo', 'fijo')
+                      }
+                    },
+                  })}
+                >
                 <option value=''>Partido libre (sin torneo)</option>
                 {torneos.map((tournament) => (
                   <option key={tournament.id} value={tournament.id}>
@@ -839,49 +870,38 @@ export default function GestionPartidos() {
                 {...register('notas')}
               />
             </div>
-
-            <div className='sm:col-span-2 flex gap-3'>
-              <Button type='submit' loading={isSubmitting}>
-                {editing ? 'Guardar cambios' : 'Crear partido'}
-              </Button>
-              <Button type='button' variant='secondary' onClick={() => setShowForm(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </form>
         </div>
-      )}
+      </Modal>
 
-      {/* Editor de marcador */}
-      {showMarcador && (
-        <div
-          ref={marcadorRef}
-          className='card p-5 animate-fade-up scroll-mt-20'
-          style={{ borderColor: 'var(--color-live)', borderWidth: '1px' }}
-        >
-          <div className='flex items-center justify-between mb-4'>
-            <div>
-              <div className='flex items-center gap-2'>
-                <Radio className='w-4 h-4' style={{ color: 'var(--club-clay)' }} />
-                <h2 className='text-base font-semibold' style={{ color: 'var(--text-primary)' }}>
-                  Editar marcador
-                </h2>
-              </div>
-              <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
-                {marcadorParticipante1} vs {marcadorParticipante2}
-              </p>
-            </div>
-            <button
+      {/* Modal Editor de marcador */}
+      <Modal
+        isOpen={Boolean(showMarcador)}
+        onClose={() => setShowMarcador(null)}
+        title='Editar marcador manual'
+        subtitle={`${marcadorParticipante1} vs ${marcadorParticipante2}`}
+        icon={Radio}
+        iconColor='var(--club-clay)'
+        iconBg='rgba(234, 88, 12, 0.15)'
+        maxWidth='max-w-xl'
+        busy={isSubmittingM}
+        onSubmit={handleM(onMarcador)}
+        footer={
+          <>
+            <Button
               type='button'
+              variant='secondary'
               onClick={() => setShowMarcador(null)}
-              className='btn-ghost p-1'
-              aria-label='Cerrar editor de marcador'
+              disabled={isSubmittingM}
             >
-              <X className='w-4 h-4' />
-            </button>
-          </div>
-
-          <form onSubmit={handleM(onMarcador)} className='space-y-4'>
+              Cancelar
+            </Button>
+            <Button type='submit' loading={isSubmittingM}>
+              Guardar marcador
+            </Button>
+          </>
+        }
+      >
+        <div className='space-y-4'>
             <div className='grid grid-cols-2 gap-4'>
               <div className='form-group'>
                 <label className='form-label'>Estado</label>
@@ -978,18 +998,8 @@ export default function GestionPartidos() {
                 )}
               </div>
             </div>
-
-            <div className='flex gap-3'>
-              <Button type='submit' loading={isSubmittingM}>
-                Guardar marcador
-              </Button>
-              <Button type='button' variant='secondary' onClick={() => setShowMarcador(null)}>
-                Cancelar
-              </Button>
-            </div>
-          </form>
         </div>
-      )}
+      </Modal>
 
       {/* Filtros */}
       <Tabs tabs={FILTER_TABS} activeTab={filterTab} onChange={setFilterTab} />

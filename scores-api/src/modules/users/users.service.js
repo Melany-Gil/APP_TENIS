@@ -269,11 +269,12 @@ exports.updateAvatar = async (id, avatarPath) => {
   const [existing] = await db.query('SELECT id FROM users WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Usuario no encontrado' }
 
-  await db.query('UPDATE users SET avatar = ?, updated_at = NOW() WHERE id = ?', [avatarPath, id])
+  await db.query('UPDATE users u LEFT JOIN jugadores j ON j.user_id = u.id SET u.avatar = ?, u.updated_at = NOW(), j.foto = ? WHERE u.id = ?', [avatarPath, avatarPath, id])
   return exports.getById(id)
 }
 
 function formatUser(row) {
+  const avatar = row.avatar || row.jugador_foto || null
   return {
     id: row.id,
     numero_documento: row.numero_documento,
@@ -283,7 +284,7 @@ function formatUser(row) {
     email: row.email,
     telefono: row.telefono || null,
     acceso_celular: Boolean(row.telefono_acceso),
-    avatar: row.avatar || null,
+    avatar,
     rol: row.rol,
     activo: Boolean(row.activo),
     created_at: row.created_at,
@@ -292,7 +293,7 @@ function formatUser(row) {
           id: row.jugador_id,
           nombre: row.jugador_nombre,
           apellido: row.jugador_apellido,
-          foto: row.jugador_foto || null,
+          foto: row.jugador_foto || avatar,
         }
       : null,
   }

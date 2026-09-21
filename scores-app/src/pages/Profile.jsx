@@ -11,6 +11,7 @@ import {
   Trash2,
   Trophy,
   User,
+  Users,
 } from 'lucide-react'
 import useAuthStore from '../store/useAuthStore'
 import { authService } from '../services/authService'
@@ -40,6 +41,7 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false)
   const [matches, setMatches] = useState(EMPTY_MATCHES)
   const [matchesLoading, setMatchesLoading] = useState(true)
+  const [modalityFilter, setModalityFilter] = useState('todas')
   const [isLinkedPlayer, setIsLinkedPlayer] = useState(Boolean(user?.jugador))
   const [form, setForm] = useState({
     nombre: user?.nombre || '',
@@ -149,13 +151,33 @@ export default function Profile() {
 
   const fullName = `${user?.nombre || ''} ${user?.apellido || ''}`.trim()
 
+  const userAllMatches = [
+    ...(matches.en_vivo || []),
+    ...(matches.proximos || []),
+    ...(matches.historial || []),
+  ]
+  const userDoublesMatches = userAllMatches.filter(
+    (m) => m.modalidad === 'dobles' || m.torneo?.modalidad === 'dobles'
+  )
+  const userSinglesMatches = userAllMatches.filter(
+    (m) => m.modalidad !== 'dobles' && m.torneo?.modalidad !== 'dobles'
+  )
+
+  const filterByModality = (list = []) => {
+    if (modalityFilter === 'todas') return list
+    return list.filter((m) => {
+      const isDoubles = m.modalidad === 'dobles' || m.torneo?.modalidad === 'dobles'
+      return modalityFilter === 'dobles' ? isDoubles : !isDoubles
+    })
+  }
+
   return (
     <div className='space-y-5 animate-fade-up'>
       <h1 className='text-xl font-bold text-text-primary'>Mi perfil</h1>
 
       <div className='card p-5 flex flex-col gap-4 sm:flex-row sm:items-center'>
         <div className='relative self-start'>
-          <Avatar src={user?.avatar} name={fullName} size='lg' />
+          <Avatar src={user?.avatar || user?.jugador?.foto} name={fullName} size='lg' />
           <button
             type='button'
             onClick={() => fileInputRef.current?.click()}
@@ -185,7 +207,7 @@ export default function Profile() {
           )}
         </div>
         <div className='flex gap-2 self-start'>
-          {user?.avatar && (
+          {(user?.avatar || user?.jugador?.foto) && (
             <Button
               variant='ghost'
               size='icon'
@@ -237,33 +259,105 @@ export default function Profile() {
         </form>
       )}
 
-      {user?.rol !== 'juez' && <section className='space-y-4'>
-        <div>
-          <h2 className='font-bold flex items-center gap-2' style={{ color: 'var(--text-primary)' }}>
-            <Trophy className='w-4 h-4' /> Mis partidos
-          </h2>
-          <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
-            Agenda, marcadores en vivo e historial asociados a tu perfil de jugador.
-          </p>
-        </div>
+      {user?.rol !== 'juez' && (
+        <section className='space-y-4'>
+          <div className='flex items-center justify-between flex-wrap gap-2'>
+            <div>
+              <h2 className='font-bold flex items-center gap-2' style={{ color: 'var(--text-primary)' }}>
+                <Trophy className='w-4 h-4' style={{ color: 'var(--color-brand)' }} /> Mis partidos
+              </h2>
+              <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
+                Agenda, marcadores en vivo e historial asociados a tu perfil de jugador.
+              </p>
+            </div>
 
-        {matchesLoading ? (
-          <div className='skeleton h-32 rounded-xl' />
-        ) : !isLinkedPlayer ? (
-          <div className='card p-6 text-center'>
-            <p className='font-semibold' style={{ color: 'var(--text-primary)' }}>Cuenta sin jugador vinculado</p>
-            <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
-              Un administrador puede asociar esta cuenta con tu ficha de jugador.
-            </p>
+            {isLinkedPlayer && !matchesLoading && userAllMatches.length > 0 && (
+              <div className='flex items-center gap-1.5 flex-wrap'>
+                <button
+                  type='button'
+                  onClick={() => setModalityFilter('todas')}
+                  className={cn(
+                    'px-2.5 py-1 text-xs rounded-full font-medium transition-colors',
+                    modalityFilter === 'todas'
+                      ? 'bg-[var(--color-brand)] text-white'
+                      : 'hover:bg-[var(--bg-hover)]'
+                  )}
+                  style={
+                    modalityFilter !== 'todas'
+                      ? {
+                          backgroundColor: 'var(--bg-card)',
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--border-color)',
+                        }
+                      : {}
+                  }
+                >
+                  Todas ({userAllMatches.length})
+                </button>
+                <button
+                  type='button'
+                  onClick={() => setModalityFilter('dobles')}
+                  className={cn(
+                    'px-2.5 py-1 text-xs rounded-full font-medium transition-colors flex items-center gap-1.5',
+                    modalityFilter === 'dobles'
+                      ? 'bg-[var(--color-brand)] text-white'
+                      : 'hover:bg-[var(--bg-hover)]'
+                  )}
+                  style={
+                    modalityFilter !== 'dobles'
+                      ? {
+                          backgroundColor: 'var(--bg-card)',
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--border-color)',
+                        }
+                      : {}
+                  }
+                >
+                  <Users className='w-3 h-3' /> En pareja ({userDoublesMatches.length})
+                </button>
+                <button
+                  type='button'
+                  onClick={() => setModalityFilter('individual')}
+                  className={cn(
+                    'px-2.5 py-1 text-xs rounded-full font-medium transition-colors flex items-center gap-1.5',
+                    modalityFilter === 'individual'
+                      ? 'bg-[var(--color-brand)] text-white'
+                      : 'hover:bg-[var(--bg-hover)]'
+                  )}
+                  style={
+                    modalityFilter !== 'individual'
+                      ? {
+                          backgroundColor: 'var(--bg-card)',
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--border-color)',
+                        }
+                      : {}
+                  }
+                >
+                  <User className='w-3 h-3' /> En solitario ({userSinglesMatches.length})
+                </button>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className='space-y-5'>
-            <MatchSection title='En vivo' matches={matches.en_vivo} live empty='No tienes partidos en vivo.' />
-            <MatchSection title='Próximos' matches={matches.proximos} empty='No tienes próximos partidos.' />
-            <MatchSection title='Historial' matches={matches.historial} history empty='Aún no tienes resultados.' />
-          </div>
-        )}
-      </section>}
+
+          {matchesLoading ? (
+            <div className='skeleton h-32 rounded-xl' />
+          ) : !isLinkedPlayer ? (
+            <div className='card p-6 text-center'>
+              <p className='font-semibold' style={{ color: 'var(--text-primary)' }}>Cuenta sin jugador vinculado</p>
+              <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
+                Un administrador puede asociar esta cuenta con tu ficha de jugador.
+              </p>
+            </div>
+          ) : (
+            <div className='space-y-5'>
+              <MatchSection title='En vivo' matches={filterByModality(matches.en_vivo)} live empty='No tienes partidos en vivo.' />
+              <MatchSection title='Próximos' matches={filterByModality(matches.proximos)} empty='No tienes próximos partidos.' />
+              <MatchSection title='Historial' matches={filterByModality(matches.historial)} history empty='Aún no tienes resultados.' />
+            </div>
+          )}
+        </section>
+      )}
 
       <div className='card overflow-hidden'>
         {passwordOpen && <ChangePassword onClose={() => setPasswordOpen(false)} />}
@@ -338,8 +432,25 @@ function ProfileMatchRow({ match, history, bordered }) {
       className='block px-4 py-3 transition-colors hover:bg-[var(--bg-hover)]'
       style={{ borderBottom: bordered ? '1px solid var(--border-color)' : 'none' }}
     >
-      <div className='flex items-center justify-between gap-3 mb-2'>
-        <span className='badge-brand'>{match.categoria?.nombre || 'Sin categoría'}</span>
+      <div className='flex items-center justify-between gap-3 mb-2 flex-wrap'>
+        <div className='flex items-center gap-2 flex-wrap'>
+          <span className='badge-brand'>{match.categoria?.nombre || 'Sin categoría'}</span>
+          {match.modalidad === 'dobles' || match.torneo?.modalidad === 'dobles' ? (
+            <span
+              className='text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full inline-flex items-center gap-1'
+              style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+            >
+              <Users className='w-3 h-3 text-[var(--color-brand)]' /> Dobles
+            </span>
+          ) : (
+            <span
+              className='text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full inline-flex items-center gap-1'
+              style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+            >
+              <User className='w-3 h-3 text-sky-500' /> Individual
+            </span>
+          )}
+        </div>
         <div className='flex items-center gap-2'>
           {history && match.resultado && (
             <span

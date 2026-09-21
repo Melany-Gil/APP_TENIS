@@ -144,10 +144,24 @@ exports.getAll = async ({
   juez_id,
   cancha_id,
   torneo_id,
+  jugador_id,
+  equipo_id,
 }) => {
   let query = `${MATCH_SELECT} WHERE 1 = 1`
   const params = []
 
+  if (jugador_id) {
+    query += ` AND (
+      p.jugador1_id = ? OR p.jugador2_id = ?
+      OR e1.jugador1_id = ? OR e1.jugador2_id = ?
+      OR e2.jugador1_id = ? OR e2.jugador2_id = ?
+    )`
+    params.push(jugador_id, jugador_id, jugador_id, jugador_id, jugador_id, jugador_id)
+  }
+  if (equipo_id) {
+    query += ' AND (p.equipo1_id = ? OR p.equipo2_id = ?)'
+    params.push(equipo_id, equipo_id)
+  }
   if (estado) {
     query += ' AND p.estado = ?'
     params.push(estado)
@@ -1091,7 +1105,8 @@ async function propagateWinner(connection, match, estado, ganador) {
 }
 
 function formatSummary(row) {
-  const snapshot = parseScoreSnapshot(row.marcador_actual)
+  let snapshot = parseScoreSnapshot(row.marcador_actual)
+  if (snapshot && row.estado === 'finalizado') snapshot = { ...snapshot, winner: row.ganador || null }
   const matchConfig = {
     mejor_de_sets: Number(row.mejor_de_sets || 3),
     juegos_por_set: Number(row.juegos_por_set || 6),

@@ -15,11 +15,12 @@ exports.getAll = async ({ deporte, categoria_id, activo, includeAccount = false 
       j.activo,
       j.foto,
       j.user_id,
-      c.nombre AS categoria_nombre
+      c.nombre AS categoria_nombre,
+      u.avatar AS usuario_avatar
       ${includeAccount ? ', u.nombre AS usuario_nombre, u.apellido AS usuario_apellido, u.email AS usuario_email' : ''}
     FROM jugadores j
       LEFT JOIN categorias c ON c.id = j.categoria_id
-    ${includeAccount ? 'LEFT JOIN users u ON u.id = j.user_id' : ''}
+      LEFT JOIN users u ON u.id = j.user_id
     WHERE 1 = 1
   `
   const params = []
@@ -43,15 +44,17 @@ exports.getAll = async ({ deporte, categoria_id, activo, includeAccount = false 
 
   return rows
     .map((row) => formatListItem(row, statsByPlayer.get(row.id), includeAccount))
-    .filter((player) => !categoryId || player.stats)
+    .filter((player) => !categoryId || (Number(player.categoria?.id) === Number(categoryId) || Boolean(player.stats)))
 }
 
 exports.getById = async (id) => {
   const [rows] = await db.query(
-    `SELECT j.id, j.nombre, j.apellido, j.deporte, j.categoria_id, j.activo, j.foto,
-            c.nombre AS categoria_nombre
+    `SELECT j.id, j.nombre, j.apellido, j.deporte, j.categoria_id, j.activo, j.foto, j.user_id,
+            c.nombre AS categoria_nombre,
+            u.avatar AS usuario_avatar
      FROM jugadores j
        LEFT JOIN categorias c ON c.id = j.categoria_id
+       LEFT JOIN users u ON u.id = j.user_id
      WHERE j.id = ?
      LIMIT 1`,
     [id]
@@ -64,9 +67,41 @@ exports.getById = async (id) => {
   const allStats = await getPlayerStats(db)
   const playerStats = allStats.filter((entry) => entry.jugador_id === Number(id))
 
+  let parejas = []
+  try {
+    const [parejasRows] = await db.query(
+      `SELECT e.id, e.nombre, e.deporte, e.categoria_id, cat.nombre AS categoria_nombre,
+              j1.id AS j1_id, j1.nombre AS j1_nombre, j1.apellido AS j1_apellido, j1.foto AS j1_foto,
+              j2.id AS j2_id, j2.nombre AS j2_nombre, j2.apellido AS j2_apellido, j2.foto AS j2_foto
+       FROM equipos_padel e
+         LEFT JOIN categorias cat ON cat.id = e.categoria_id
+         LEFT JOIN jugadores j1 ON j1.id = e.jugador1_id
+         LEFT JOIN jugadores j2 ON j2.id = e.jugador2_id
+       WHERE (e.jugador1_id = ? OR e.jugador2_id = ?) AND e.activo = 1
+       ORDER BY e.nombre ASC`,
+      [id, id]
+    )
+    parejas = (parejasRows || []).map((r) => {
+      const isJ1 = Number(r.j1_id) === Number(id)
+      const partner = isJ1
+        ? { id: r.j2_id, nombre: r.j2_nombre, apellido: r.j2_apellido, foto: r.j2_foto }
+        : { id: r.j1_id, nombre: r.j1_nombre, apellido: r.j1_apellido, foto: r.j1_foto }
+      return {
+        id: r.id,
+        nombre: r.nombre,
+        deporte: r.deporte,
+        categoria: r.categoria_id ? { id: r.categoria_id, nombre: r.categoria_nombre } : null,
+        companero: partner.id ? partner : null,
+      }
+    })
+  } catch {
+    parejas = []
+  }
+
   return {
     ...formatListItem(rows[0]),
     estadisticas: playerStats,
+    parejas,
   }
 }
 
@@ -163,10 +198,10 @@ exports.remove = async (id, actorId = null) => {
 }
 
 exports.updateFoto = async (id, fotoPath) => {
-  const [existing] = await db.query('SELECT id FROM jugadores WHERE id = ?', [id])
+  const [existing] = await db.query('SELECT id, user_id FROM jugadores WHERE id = ?', [id])
   if (!existing.length) throw { status: 404, message: 'Jugador no encontrado' }
 
-  await db.query('UPDATE jugadores SET foto = ? WHERE id = ?', [fotoPath, id])
+  await db.query('UPDATE jugadores j LEFT JOIN users u ON u.id = j.user_id SET j.foto = ?, u.avatar = ?, u.updated_at = NOW() WHERE j.id = ?', [fotoPath, fotoPath, id])
   return exports.getById(id)
 }
 
@@ -174,10 +209,10 @@ exports.linkUser = async (id, userId) => {
   const normalizedUserId = positiveId(userId)
   if (!normalizedUserId) throw { status: 400, message: 'Selecciona una cuenta válida' }
 
-  const [players] = await db.query('SELECT id FROM jugadores WHERE id = ?', [id])
+  const [players] = await db.query('SELECT id, foto FROM jugadores WHERE id = ?', [id])
   if (!players.length) throw { status: 404, message: 'Jugador no encontrado' }
 
-  const [users] = await db.query('SELECT id FROM users WHERE id = ? AND activo = TRUE', [
+  const [users] = await db.query('SELECT id, avatar FROM users WHERE id = ? AND activo = TRUE', [
     normalizedUserId,
   ])
   if (!users.length) throw { status: 404, message: 'Usuario no encontrado o inactivo' }
@@ -192,6 +227,9 @@ exports.linkUser = async (id, userId) => {
         status: 409,
         message: 'El jugador ya tiene otra cuenta. Desvincúlala explícitamente antes de reasignar.',
       }
+
+    // Existing photos are not overwritten by linking accounts. Read fallbacks
+    // display them; the next explicit photo update synchronizes both atomically.
   } catch (linkError) {
     if (linkError.code === 'ER_DUP_ENTRY') {
       throw { status: 409, message: 'Esa cuenta ya está vinculada a otro jugador' }
@@ -217,7 +255,7 @@ function formatListItem(row, stats, includeAccount = false) {
     deporte: row.deporte,
     categoria: row.categoria_id ? { id: row.categoria_id, nombre: row.categoria_nombre } : null,
     activo: !!row.activo,
-    foto: row.foto || null,
+    foto: row.foto || row.usuario_avatar || null,
     stats: stats || null,
   }
   if (includeAccount) {

@@ -10,6 +10,7 @@ import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Avatar from '../../components/ui/Avatar'
+import Modal from '../../components/ui/Modal'
 
 const DEPORTES = ['tenis', 'padel', 'ambos']
 
@@ -198,19 +199,36 @@ export default function GestionJugadores() {
         </Button>
       </div>
 
-      {/* Formulario */}
-      {showForm && (
-        <div className='card p-5 animate-fade-up'>
-          <div className='flex items-center justify-between mb-4'>
-            <h2 className='text-base font-semibold' style={{ color: 'var(--text-primary)' }}>
-              {editing ? 'Editar jugador' : 'Nuevo jugador'}
-            </h2>
-            <button onClick={() => setShowForm(false)} className='btn-ghost p-1'>
-              <X className='w-4 h-4' />
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+      {/* Modal Jugador */}
+      <Modal
+        isOpen={showForm}
+        onClose={() => setShowForm(false)}
+        title={editing ? 'Editar jugador' : 'Nuevo jugador'}
+        subtitle={
+          editing
+            ? `${editing.nombre} ${editing.apellido} · Actualiza sus datos o vinculación`
+            : 'Completa la información para registrar un nuevo jugador'
+        }
+        icon={editing ? Pencil : Plus}
+        busy={isSubmitting || mediaBusy}
+        onSubmit={handleSubmit(onSubmit)}
+        footer={
+          <>
+            <Button
+              type='button'
+              variant='secondary'
+              onClick={() => setShowForm(false)}
+              disabled={isSubmitting || mediaBusy}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' loading={isSubmitting} disabled={mediaBusy}>
+              {editing ? 'Guardar cambios' : 'Crear jugador'}
+            </Button>
+          </>
+        }
+      >
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             <Input
               label='Nombre *'
               placeholder='Carlos'
@@ -268,7 +286,7 @@ export default function GestionJugadores() {
                 }}
               >
                 <Avatar
-                  src={editing.foto}
+                  src={editing.foto || editing.usuario?.avatar}
                   name={`${editing.nombre || ''} ${editing.apellido || ''}`}
                   size='xl'
                   className='rounded-2xl'
@@ -287,7 +305,7 @@ export default function GestionJugadores() {
                           className='hidden'
                         />
                       </label>
-                      {editing.foto && (
+                      {(editing.foto || editing.usuario?.avatar) && (
                         <Button
                           type='button'
                           variant='ghost'
@@ -332,17 +350,8 @@ export default function GestionJugadores() {
               </div>
             )}
 
-            <div className='sm:col-span-2 flex gap-3 pt-2'>
-              <Button type='submit' loading={isSubmitting}>
-                {editing ? 'Guardar cambios' : 'Crear jugador'}
-              </Button>
-              <Button type='button' variant='secondary' onClick={() => setShowForm(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </form>
         </div>
-      )}
+      </Modal>
 
       {/* Buscador */}
       <div className='relative'>
@@ -386,7 +395,7 @@ export default function GestionJugadores() {
                 borderBottom: i < filtered.length - 1 ? '1px solid var(--border-color)' : 'none',
               }}
             >
-              <Avatar src={j.foto} name={`${j.nombre || ''} ${j.apellido || ''}`} size='sm' />
+              <Avatar src={j.foto || j.usuario?.avatar} name={`${j.nombre || ''} ${j.apellido || ''}`} size='sm' />
               <div className='flex-1 min-w-0'>
                 <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
                   {j.nombre} {j.apellido}

@@ -1,7 +1,7 @@
 import BulkDelete from '../../components/ui/BulkDelete'
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Users } from 'lucide-react'
 import { teamService } from '../../services/teamService'
 import { playerService } from '../../services/playerService'
 import { categoriaService } from '../../services/categoriaService'
@@ -9,6 +9,7 @@ import { confirm } from '../../utils/confirm'
 import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import Modal from '../../components/ui/Modal'
 
 export default function GestionEquipos() {
   const [equipos, setEquipos] = useState([])
@@ -135,19 +136,36 @@ export default function GestionEquipos() {
         </Button>
       </div>
 
-      {/* Formulario */}
-      {showForm && (
-        <div className='card p-5 animate-fade-up'>
-          <div className='flex items-center justify-between mb-4'>
-            <h2 className='text-base font-semibold' style={{ color: 'var(--text-primary)' }}>
-              {editing ? 'Editar pareja' : 'Nueva pareja'}
-            </h2>
-            <button onClick={() => setShowForm(false)} className='btn-ghost p-1'>
-              <X className='w-4 h-4' />
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+      {/* Modal Pareja */}
+      <Modal
+        isOpen={showForm}
+        onClose={() => setShowForm(false)}
+        title={editing ? 'Editar pareja' : 'Nueva pareja'}
+        subtitle={
+          editing
+            ? `${editing.nombre} · Modifica los integrantes o categoría`
+            : 'Selecciona los jugadores para conformar la pareja'
+        }
+        icon={editing ? Pencil : Users}
+        busy={isSubmitting}
+        onSubmit={handleSubmit(onSubmit)}
+        footer={
+          <>
+            <Button
+              type='button'
+              variant='secondary'
+              onClick={() => setShowForm(false)}
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' loading={isSubmitting}>
+              {editing ? 'Guardar cambios' : 'Crear pareja'}
+            </Button>
+          </>
+        }
+      >
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             <div className='sm:col-span-2'>
               <Input
                 label='Nombre de la pareja *'
@@ -224,17 +242,8 @@ export default function GestionEquipos() {
               {errors.categoria_id && <p className='form-error'>{errors.categoria_id.message}</p>}
             </div>
 
-            <div className='sm:col-span-2 flex gap-3 pt-2'>
-              <Button type='submit' loading={isSubmitting}>
-                {editing ? 'Guardar cambios' : 'Crear pareja'}
-              </Button>
-              <Button type='button' variant='secondary' onClick={() => setShowForm(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </form>
         </div>
-      )}
+      </Modal>
 
       <BulkDelete
         records={equipos}

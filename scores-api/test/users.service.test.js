@@ -85,8 +85,8 @@ test('updateAvatar permite establecer y retirar la foto', async () => {
 
   await loadService(fakeDb).updateAvatar(4, null)
 
-  const update = calls.find((call) => /UPDATE users SET avatar/.test(call.sql))
-  assert.deepEqual(update.params, [null, 4])
+    const update = calls.find((call) => /UPDATE users u LEFT JOIN jugadores/.test(call.sql))
+    assert.deepEqual(update.params, [null, null, 4])
 })
 
 test('crear usuario guarda el alias y valida que no esté repetido', async () => {

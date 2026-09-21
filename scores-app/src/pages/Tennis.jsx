@@ -29,7 +29,8 @@ export default function Tennis() {
   const [upcomingCategoryId, setUpcomingCategoryId] = useState('')
   const [categories, setCategories] = useState([])
   const [playerCategoryId, setPlayerCategoryId] = useState('')
-  const [playerOrder, setPlayerOrder] = useState('ranking')
+  const [playerSearchQuery, setPlayerSearchQuery] = useState('')
+  const [playerOrder, setPlayerOrder] = useState('alphabetical')
   const debouncedPlayer = useDebounce(playerSearch.trim(), 350)
   const debouncedUpcomingPlayer = useDebounce(upcomingPlayerSearch.trim(), 350)
 
@@ -39,7 +40,6 @@ export default function Tennis() {
       .then((response) => {
         const loadedCategories = response.data || []
         setCategories(loadedCategories)
-        setPlayerCategoryId((current) => current || String(loadedCategories[0]?.id || ''))
       })
       .catch(() => setCategories([]))
   }, [])
@@ -81,16 +81,20 @@ export default function Tennis() {
       )
 
     return [...players].sort((a, b) => {
-      if (playerOrder === 'ranking') {
-        return (
-          (a.stats?.ranking || Number.MAX_SAFE_INTEGER) -
-            (b.stats?.ranking || Number.MAX_SAFE_INTEGER) || byName(a, b)
-        )
-      }
       if (playerOrder === 'alphabetical_desc') return byName(b, a)
       return byName(a, b)
     })
   }, [players, playerOrder])
+
+  const displayedPlayers = useMemo(() => {
+    const q = playerSearchQuery.trim().toLowerCase()
+    if (!q) return sortedPlayers
+    return sortedPlayers.filter((p) => {
+      const full = `${p.nombre || ''} ${p.apellido || ''}`.toLowerCase()
+      return full.includes(q)
+    })
+  }, [sortedPlayers, playerSearchQuery])
+
   const hasFilters = Boolean(playerSearch || date || categoryId)
   const hasUpcomingFilters = Boolean(upcomingPlayerSearch || upcomingDate || upcomingCategoryId)
 
@@ -304,33 +308,55 @@ export default function Tennis() {
           <div className='card p-4 space-y-3'>
             <div>
               <p className='text-sm font-semibold' style={{ color: 'var(--text-primary)' }}>
-                Estadísticas por categoría
+                Directorio de jugadores
               </p>
               <p className='text-xs mt-1' style={{ color: 'var(--text-muted)' }}>
-                Puntos de clasificación: 3 para el ganador y 0 para el perdedor si no cede sets; 2 y
-                1, respectivamente, si el perdedor gana al menos un set.
+                Busca a cualquier jugador por nombre o apellido para consultar su perfil, estadísticas e historial.
               </p>
             </div>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+            <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
+              <div className='relative'>
+                <Search size={16} className='absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]' />
+                <input
+                  type='text'
+                  className='form-input pl-9 text-xs sm:text-sm'
+                  placeholder='Buscar por nombre o apellido…'
+                  value={playerSearchQuery}
+                  onChange={(e) => setPlayerSearchQuery(e.target.value)}
+                  aria-label='Buscar jugador'
+                />
+                {playerSearchQuery && (
+                  <button
+                    type='button'
+                    onClick={() => setPlayerSearchQuery('')}
+                    className='absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-white'
+                    aria-label='Limpiar búsqueda'
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
               <select
-                className='form-input'
+                className='form-input text-xs sm:text-sm'
                 value={playerCategoryId}
                 onChange={(event) => setPlayerCategoryId(event.target.value)}
-                aria-label='Filtrar estadísticas por categoría'
+                aria-label='Filtrar por categoría'
               >
+                <option value=''>Todas las categorías</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.nombre}
                   </option>
                 ))}
               </select>
+
               <select
-                className='form-input'
+                className='form-input text-xs sm:text-sm'
                 value={playerOrder}
                 onChange={(event) => setPlayerOrder(event.target.value)}
                 aria-label='Ordenar jugadores'
               >
-                <option value='ranking'>Ranking</option>
                 <option value='alphabetical'>Alfabético A–Z</option>
                 <option value='alphabetical_desc'>Alfabético Z–A</option>
               </select>
@@ -340,13 +366,13 @@ export default function Tennis() {
             Array(4)
               .fill(0)
               .map((_, i) => <div key={i} className='skeleton h-16 rounded-xl' />)
-          ) : sortedPlayers.length > 0 ? (
-            sortedPlayers.map((p) => (
+          ) : displayedPlayers.length > 0 ? (
+            displayedPlayers.map((p) => (
               <PlayerCard key={p.id} player={p} categoryId={playerCategoryId} />
             ))
           ) : (
             <p className='card p-8 text-center text-sm' style={{ color: 'var(--text-muted)' }}>
-              Aún no hay partidos finalizados en esta categoría.
+              No se encontraron jugadores para los filtros seleccionados.
             </p>
           )}
         </div>

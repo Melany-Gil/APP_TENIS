@@ -249,7 +249,18 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await frameDownload.saveAs(framePath)
     const frameMetadata = await sharp(framePath).metadata()
     assert.equal(frameMetadata.format, 'png')
-    assert.ok(frameMetadata.height > frameMetadata.width, 'Includes sponsors below the photo')
+    assert.equal(frameMetadata.width, 1080)
+    assert.equal(frameMetadata.height, 1920)
+    await publicPage.setViewportSize({ width: 1440, height: 900 })
+    const desktopDownloadPromise = publicPage.waitForEvent('download')
+    await publicPage.getByRole('button', { name: 'Descargar foto con marco', exact: true }).click()
+    const desktopDownload = await desktopDownloadPromise
+    const desktopPath = path.join(os.tmpdir(), 'tenis-frame-export-desktop.png')
+    await desktopDownload.saveAs(desktopPath)
+    const desktopMetadata = await sharp(desktopPath).metadata()
+    assert.equal(desktopMetadata.width, 1080)
+    assert.equal(desktopMetadata.height, 1920)
+    await publicPage.setViewportSize({ width: 390, height: 844 })
     await publicPage.getByRole('button', { name: 'Ampliar foto', exact: true }).click()
     await publicPage.getByRole('button', { name: 'Reducir foto', exact: true }).waitFor()
     assert.equal(await publicPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
@@ -259,6 +270,28 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     assert.deepEqual(failures, [])
     // Exercise the real React hooks with delayed responses and an SSE burst.
     const hooksPage = await browser.newPage()
+    const adminPage = await browser.newPage({ viewport: { width: 390, height: 844 } })
+    adminPage.on('pageerror', error => failures.push(error.message))
+    const admin = { ...user, id: 99, rol: 'admin' }
+    await adminPage.addInitScript(u => localStorage.setItem('auth-storage-v2', JSON.stringify({ state: { isAuthenticated: true, user: u }, version: 0 })), admin)
+    await adminPage.route('**/*', route => {
+      const url = new URL(route.request().url())
+      if (url.pathname.startsWith('/api/')) {
+        assert.equal(route.request().method(), 'GET', 'Admin smoke test must not mutate data')
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data: url.pathname.endsWith('/me') ? admin : [] }) })
+      }
+      return url.hostname === '127.0.0.1' ? route.continue() : route.abort()
+    })
+    for (const [route, label] of [['categorias', 'Nueva categoría'], ['equipos', 'Nueva pareja'], ['jugadores', 'Nuevo jugador'], ['torneos', 'Nuevo torneo'], ['partidos', 'Nuevo partido']]) {
+      await adminPage.goto(`http://127.0.0.1:4173/admin/${route}`)
+      await adminPage.getByRole('button', { name: route === 'torneos' ? 'Crear torneo' : label, exact: true }).first().click()
+      const dialog = adminPage.getByRole('dialog', { name: label, exact: true })
+      await dialog.waitFor()
+      assert.equal(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth), true, `Admin modal fits: ${route}`)
+      await dialog.getByRole('button', { name: 'Cerrar modal' }).click()
+      await dialog.waitFor({ state: 'detached' })
+    }
+    await adminPage.close()
     await hooksPage.route('**/*', route => {
       const url = new URL(route.request().url())
       if (url.pathname === '/qa-hooks') return route.fulfill({ contentType: 'text/html', body: '<html><body><div id="root"></div></body></html>' })
@@ -275,8 +308,14 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
       const React = reactModule.default || reactModule
       const domModule = await import('/node_modules/.vite/deps/react-dom_client.js')
       const { createRoot } = domModule.default || domModule
-      const { matchService } = await import('/src/services/matchService.js')
-      const { matchRealtimeService } = await import('/src/services/matchRealtimeService.js')
+      // Vite appends HMR timestamps: mock the exact modules imported by the hooks.
+      const hookSource = await (await fetch('/src/hooks/useMatches.js')).text()
+      const apiPath = hookSource.match(/from\s+["']([^"']*\/services\/matchService\.js[^"']*)/)[1]
+      const realtimeHookPath = hookSource.match(/from\s+["']([^"']*useMatchRealtime\.js[^"']*)/)[1]
+      const realtimeSource = await (await fetch(realtimeHookPath)).text()
+      const realtimePath = realtimeSource.match(/from\s+["']([^"']*\/services\/matchRealtimeService\.js[^"']*)/)[1]
+      const { matchService } = await import(apiPath)
+      const { matchRealtimeService } = await import(realtimePath)
       const callbacks = new Set()
       matchRealtimeService.subscribe = cb => { callbacks.add(cb); return () => callbacks.delete(cb) }
       window.listReads = 0
@@ -296,6 +335,8 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
       createRoot(document.getElementById('root')).render(React.createElement(Harness))
     })
     await hooksPage.waitForFunction(() => window.listReads === 1 && window.changeMatch)
+    await hooksPage.bringToFront()
+    await hooksPage.waitForFunction(() => document.visibilityState === 'visible')
     await hooksPage.evaluate(() => window.notifyBurst())
     await hooksPage.waitForFunction(() => window.listReads === 2)
     await hooksPage.waitForTimeout(300)
@@ -306,6 +347,7 @@ const { createInitialState, applyEvent, serializeState } = require('../scores-ap
     await hooksPage.waitForTimeout(100)
     assert.equal(await hooksPage.evaluate(() => window.hookMatch?.id), 2, 'Old match response cannot overwrite current detail')
     await hooksPage.close()
+    assert.deepEqual(failures, [], 'No browser runtime errors')
     console.log('PASS: mobile scoring, offline photo queue/reload, explicit replacement, public photo detail, network recovery and restricted routes')
     console.log('Screenshot:', path.join(os.tmpdir(), 'tenis-judge-mobile.png'))
   } finally { await browser.close() }

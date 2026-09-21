@@ -75,6 +75,23 @@ test('editar jugador permite cambiar y retirar la categoría', async () => {
   assert.deepEqual(writes.map((params) => params[3]), [3, null])
 })
 
+test('updateFoto actualiza la foto del jugador y sincroniza el avatar del usuario vinculado', async () => {
+  const calls = []
+  const service = loadService({ async query(sql, params) {
+    calls.push({ sql, params })
+    if (/SELECT id, user_id FROM jugadores/.test(sql)) return [[{ id: 8, user_id: 4 }]]
+    if (/UPDATE jugadores SET foto/.test(sql)) return [{ affectedRows: 1 }]
+    if (/UPDATE users SET avatar/.test(sql)) return [{ affectedRows: 1 }]
+    if (/WHERE j.id = \?/.test(sql)) return [[{ ...playerRow, foto: params[0] }]]
+    return [[]]
+  } })
+
+  await service.updateFoto(8, '/uploads/players/new_photo.jpg')
+
+  const playerUpdate = calls.find((c) => /UPDATE jugadores j LEFT JOIN users/.test(c.sql))
+  assert.deepEqual(playerUpdate.params, ['/uploads/players/new_photo.jpg', '/uploads/players/new_photo.jpg', 8])
+})
+
 test('el detalle público contiene solo datos básicos y estadísticas por categoría', async () => {
   let call = 0
   const fakeDb = {

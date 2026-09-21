@@ -29,10 +29,16 @@ router.post('/', requireAuth, requireOfficial, controller.create)
 router.put('/:id', requireAuth, requireScorer, controller.update)
 // PUT  /api/partidos/:id/participantes  — renombrar o reasignar participantes
 router.put('/:id/participantes', requireAuth, requireOfficial, controller.updateParticipants)
+// PUT  /api/partidos/:id/reasignar-cancha — reasignar cancha
+router.put('/:id/reasignar-cancha', requireAuth, requireDirector, controller.reassignCourt)
 // PUT  /api/partidos/:id/reasignar-juez — reasignar juez
 router.put('/:id/reasignar-juez', requireAuth, requireDirector, controller.reassignJudge)
-// PUT  /api/partidos/:id/cancelar — bajar o cancelar partido
+// PUT  /api/partidos/:id/walkover — declarar walkover (W)
+router.put('/:id/walkover', requireAuth, requireOfficial, controller.walkover)
+// PUT  /api/partidos/:id/cancelar — bajar o cancelar partido (supervisión director)
 router.put('/:id/cancelar', requireAuth, requireDirector, controller.cancelMatch)
+// PUT  /api/partidos/:id/cancelar-partido — cancelar partido por juez oficial asignado o director
+router.put('/:id/cancelar-partido', requireAuth, requireOfficial, controller.judgeCancelMatch)
 // PUT  /api/partidos/:id/reactivar — reactivar partido cancelado
 router.put('/:id/reactivar', requireAuth, requireDirector, controller.reactivateMatch)
 // PUT  /api/partidos/:id/marcador  — actualizar sets en vivo

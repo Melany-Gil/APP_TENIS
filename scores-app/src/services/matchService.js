@@ -22,8 +22,11 @@ export const matchService = {
   create: (data) => api.post('/partidos', data),
   update: (id, data) => api.put(`/partidos/${id}`, data),
   updateParticipants: (id, data) => api.put(`/partidos/${id}/participantes`, data),
+  reassignCourt: (id, cancha_id, expected_control_version) => api.put(`/partidos/${id}/reasignar-cancha`, { cancha_id, expected_control_version }),
   reassignJudge: (id, juez_id, expected_control_version) => api.put(`/partidos/${id}/reasignar-juez`, { juez_id, expected_control_version }),
-  cancelMatch: (id, expected_control_version) => api.put(`/partidos/${id}/cancelar`, { expected_control_version }),
+  walkoverMatch: (id, expected_control_version, ganador, motivo, extra = {}) =>
+    api.put(`/partidos/${id}/walkover`, { expected_control_version, ganador, motivo, ...extra }),
+  cancelMatch: (id, expected_control_version, motivo = '', extra = {}) => api.put(`/partidos/${id}/cancelar-partido`, { expected_control_version, motivo, ...extra }),
   reactivateMatch: (id, expected_control_version) => api.put(`/partidos/${id}/reactivar`, { expected_control_version }),
   correctScore: (id, data) => api.put(`/partidos/${id}/correccion`, data),
   substitute: (id, data) => api.put(`/partidos/${id}/sustitucion`, data),

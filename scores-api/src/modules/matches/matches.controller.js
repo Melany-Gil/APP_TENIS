@@ -64,6 +64,15 @@ exports.updateParticipants = async (req, res) => {
   }
 }
 
+// PUT /api/partidos/:id/reasignar-cancha — reasignar cancha por juez_director o admin
+exports.reassignCourt = async (req, res) => {
+  try {
+    return changed(res, await director.reassignCourt(req.params.id, req.body, req.user), req.params.id)
+  } catch (err) {
+    return directorError(res, err)
+  }
+}
+
 // PUT /api/partidos/:id/reasignar-juez — reasignar juez por juez_director o admin
 exports.reassignJudge = async (req, res) => {
   try {
@@ -73,12 +82,32 @@ exports.reassignJudge = async (req, res) => {
   }
 }
 
-// PUT /api/partidos/:id/cancelar — bajar / cancelar partido
+// PUT /api/partidos/:id/walkover — declarar walkover por juez de mesa o director
+exports.walkover = async (req, res) => {
+  try {
+    const eventService = require('./match-events.service')
+    return changed(res, await eventService.walkover(req.params.id, req.body, req.user), req.params.id, 200, 'finalized')
+  } catch (err) {
+    return error(res, err.message, err.status || 500)
+  }
+}
+
+// PUT /api/partidos/:id/cancelar — bajar / cancelar partido (supervisión director)
 exports.cancelMatch = async (req, res) => {
   try {
     return changed(res, await director.cancelMatch(req.params.id, req.body, req.user), req.params.id)
   } catch (err) {
     return directorError(res, err)
+  }
+}
+
+// PUT /api/partidos/:id/cancelar-partido — cancelar partido por juez oficial asignado o director
+exports.judgeCancelMatch = async (req, res) => {
+  try {
+    const eventService = require('./match-events.service')
+    return changed(res, await eventService.cancelMatch(req.params.id, req.body, req.user), req.params.id, 200, 'cancelled')
+  } catch (err) {
+    return error(res, err.message, err.status || 500)
   }
 }
 

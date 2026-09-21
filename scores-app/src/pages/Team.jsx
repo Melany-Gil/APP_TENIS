@@ -1,10 +1,11 @@
 import { useParams, Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Star } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Star } from 'lucide-react'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { teamService } from '../services/teamService'
 import { cn } from '../utils/cn'
 import { useLoginRequired } from '../hooks/useLoginRequired'
+import Avatar from '../components/ui/Avatar'
 
 export default function Team() {
   const { id } = useParams()
@@ -35,11 +36,11 @@ export default function Team() {
     <div className='space-y-5 animate-fade-up'>
       <div className='flex items-center justify-between'>
         <Link
-          to='/padel'
+          to={team.deporte === 'tenis' ? '/tennis' : '/padel'}
           className='flex items-center gap-2 text-sm transition-colors'
           style={{ color: 'var(--text-secondary)' }}
         >
-          <ArrowLeft className='w-4 h-4' /> Pádel
+          <ArrowLeft className='w-4 h-4' /> {team.deporte === 'tenis' ? 'Tenis' : 'Pádel'}
         </Link>
         <button
           onClick={() => {
@@ -111,24 +112,33 @@ export default function Team() {
         </div>
 
         {/* Jugadores */}
-        <div className='space-y-3 pt-4' style={{ borderTop: '1px solid var(--border-color)' }}>
-          {[team.jugador1, team.jugador2].map((j, i) => (
-            <div key={i} className='flex items-center gap-3'>
-              <div
-                className='w-10 h-10 rounded-full flex items-center justify-center text-xl shrink-0'
-                style={{ backgroundColor: 'var(--bg-hover)' }}
-              >
-                {j?.country?.flag || '👤'}
+        <div className='space-y-2 pt-4' style={{ borderTop: '1px solid var(--border-color)' }}>
+          <p className='text-xs font-semibold uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
+            Integrantes de la pareja
+          </p>
+          {[team.jugador1, team.jugador2].filter(Boolean).map((j) => (
+            <Link
+              key={j.id}
+              to={`/player/${j.id}`}
+              className='card-hover p-2.5 rounded-xl flex items-center justify-between gap-3 transition-colors'
+            >
+              <div className='flex items-center gap-3 min-w-0'>
+                <Avatar
+                  src={j.foto || j.avatar || j.usuario?.avatar}
+                  name={`${j.nombre || ''} ${j.apellido || ''}`}
+                  size='sm'
+                />
+                <div className='min-w-0'>
+                  <p className='font-semibold text-sm truncate' style={{ color: 'var(--text-primary)' }}>
+                    {j.nombre} {j.apellido}
+                  </p>
+                  <p className='text-xs truncate' style={{ color: 'var(--text-muted)' }}>
+                    {j.country?.name ? `${j.country.name} · ` : ''}Ver perfil e historial
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className='font-semibold text-sm' style={{ color: 'var(--text-primary)' }}>
-                  {j?.nombre} {j?.apellido}
-                </p>
-                <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                  {j?.country?.name} {j?.mano ? `· ${j.mano}` : ''}
-                </p>
-              </div>
-            </div>
+              <ChevronRight className='w-4 h-4 shrink-0' style={{ color: 'var(--text-muted)' }} />
+            </Link>
           ))}
         </div>
       </div>

@@ -4,7 +4,7 @@ export default function ParticipantAvatar({ team, player, name, size = 'xs' }) {
   if (!team)
     return (
       <Avatar
-        src={player?.foto}
+        src={player?.foto || player?.avatar || player?.usuario?.avatar}
         name={name || [player?.nombre, player?.apellido].filter(Boolean).join(' ')}
         size={size}
       />
@@ -24,7 +24,7 @@ export default function ParticipantAvatar({ team, player, name, size = 'xs' }) {
           }
         >
           <Avatar
-            src={p?.foto}
+            src={p?.foto || p?.avatar || p?.usuario?.avatar}
             name={p ? [p.nombre, p.apellido].filter(Boolean).join(' ') : `Integrante ${i + 1}`}
             size={size}
           />

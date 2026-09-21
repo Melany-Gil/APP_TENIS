@@ -54,9 +54,9 @@ export default function UserEditor({ user, mode, onClose, onSaved }) {
         <form onSubmit={save} className='space-y-4'>
           {error && <p role='alert' className='rounded-lg p-3 bg-red-500/10 text-red-500 text-sm'>{error}</p>}
           {photo ? <div className='space-y-3'>
-            <Avatar src={user.avatar} name={`${user.nombre} ${user.apellido}`} size='lg' />
+            <Avatar src={user.avatar || user.jugador?.foto} name={`${user.nombre} ${user.apellido}`} size='lg' />
             <label className='form-group'><span className='form-label'>Seleccionar foto (JPG, PNG o WebP)</span><input type='file' accept='image/jpeg,image/png,image/webp' onChange={(e) => { setFile(e.target.files?.[0] || null); setRemovePhoto(false) }} /></label>
-            {user.avatar && <label className='flex items-center gap-2 text-sm'><input type='checkbox' checked={removePhoto} onChange={(e) => { setRemovePhoto(e.target.checked); setFile(null) }} />Quitar foto actual</label>}
+            {(user.avatar || user.jugador?.foto) && <label className='flex items-center gap-2 text-sm'><input type='checkbox' checked={removePhoto} onChange={(e) => { setRemovePhoto(e.target.checked); setFile(null) }} />Quitar foto actual</label>}
           </div> : reset ? <>
             <p className='text-sm'>Se cerrarán las sesiones actuales de esta cuenta. Comunica la nueva contraseña a su titular por un medio seguro.</p>
             <label className='form-group'><span className='form-label'>Nueva contraseña</span><input className='form-input' type='password' autoComplete='new-password' minLength={8} maxLength={72} pattern='(?=.*[A-Z])(?=.*[0-9]).+' required value={password} onChange={(e) => setPassword(e.target.value)} /></label>

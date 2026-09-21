@@ -6,6 +6,7 @@ import useUIStore from '../../store/useUIStore'
 import { confirm } from '../../utils/confirm'
 import Button from '../../components/ui/Button'
 import Tabs from '../../components/ui/Tabs'
+import Modal from '../../components/ui/Modal'
 
 const DEPORTE_TABS = [
   { value: 'todos', label: 'Todas' },
@@ -105,59 +106,66 @@ export default function GestionCategorias() {
         </Button>
       </div>
 
-      {/* Formulario */}
-      {showForm && (
-        <div className='card p-5 animate-fade-up'>
-          <div className='flex items-center justify-between mb-4'>
-            <h2 className='text-base font-semibold' style={{ color: 'var(--text-primary)' }}>
-              {editing ? 'Editar categoría' : 'Nueva categoría'}
-            </h2>
-            <button onClick={() => setShowForm(false)} className='btn-ghost p-1'>
-              <X className='w-4 h-4' />
-            </button>
+      {/* Modal Categoría */}
+      <Modal
+        isOpen={showForm}
+        onClose={() => setShowForm(false)}
+        title={editing ? 'Editar categoría' : 'Nueva categoría'}
+        subtitle={
+          editing
+            ? `${editing.nombre} · Ajusta el nombre, deporte o prioridad`
+            : 'Define un nivel o división de juego para los torneos'
+        }
+        icon={editing ? Pencil : Plus}
+        busy={isSubmitting}
+        onSubmit={handleSubmit(onSubmit)}
+        footer={
+          <>
+            <Button
+              type='button'
+              variant='secondary'
+              onClick={() => setShowForm(false)}
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' loading={isSubmitting}>
+              {editing ? 'Guardar cambios' : 'Crear categoría'}
+            </Button>
+          </>
+        }
+      >
+        <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
+          <div className='form-group'>
+            <label className='form-label'>Nombre *</label>
+            <input
+              className={`form-input ${errors.nombre ? 'error' : ''}`}
+              placeholder='Categoría A'
+              {...register('nombre', { required: 'Requerido' })}
+            />
+            {errors.nombre && <p className='form-error'>{errors.nombre.message}</p>}
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
-            <div className='form-group'>
-              <label className='form-label'>Nombre *</label>
-              <input
-                className={`form-input ${errors.nombre ? 'error' : ''}`}
-                placeholder='Categoría A'
-                {...register('nombre', { required: 'Requerido' })}
-              />
-              {errors.nombre && <p className='form-error'>{errors.nombre.message}</p>}
-            </div>
+          <div className='form-group'>
+            <label className='form-label'>Deporte</label>
+            <select className='form-input' {...register('deporte')}>
+              <option value='tenis'>Tenis</option>
+              <option value='padel'>Pádel</option>
+              <option value='ambos'>Ambos</option>
+            </select>
+          </div>
 
-            <div className='form-group'>
-              <label className='form-label'>Deporte</label>
-              <select className='form-input' {...register('deporte')}>
-                <option value='tenis'>Tenis</option>
-                <option value='padel'>Pádel</option>
-                <option value='ambos'>Ambos</option>
-              </select>
-            </div>
-
-            <div className='form-group'>
-              <label className='form-label'>Orden</label>
-              <input
-                type='number'
-                className='form-input'
-                placeholder='1'
-                {...register('orden', { min: 1 })}
-              />
-            </div>
-
-            <div className='sm:col-span-3 flex gap-3'>
-              <Button type='submit' loading={isSubmitting}>
-                {editing ? 'Guardar cambios' : 'Crear categoría'}
-              </Button>
-              <Button type='button' variant='secondary' onClick={() => setShowForm(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </form>
+          <div className='form-group'>
+            <label className='form-label'>Orden</label>
+            <input
+              type='number'
+              className='form-input'
+              placeholder='1'
+              {...register('orden', { min: 1 })}
+            />
+          </div>
         </div>
-      )}
+      </Modal>
 
       {/* Filtros */}
       <Tabs tabs={DEPORTE_TABS} activeTab={tab} onChange={setTab} />

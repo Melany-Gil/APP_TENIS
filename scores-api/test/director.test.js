@@ -36,6 +36,8 @@ function load(options = {}) {
       if (sql.startsWith('SELECT id FROM torneos')) return [[{ id: match.torneo_id }]]
       if (sql.startsWith('SELECT * FROM partidos')) return [[match]]
       if (sql.includes('FROM users')) return [options.judges ?? [{ id: 8 }]]
+      if (sql.includes('FROM canchas')) return [options.courts ?? [{ id: 4, deporte: 'tenis' }]]
+      if (sql.includes('WHERE cancha_id = ?')) return [options.occupied ?? []]
       if (sql.includes('AS sequence')) return [[{ sequence: 5, active: 5 }]]
       if (sql.includes('SELECT pausado_at'))
         return [[{ pausado_at: options.paused === false ? null : new Date() }]]
@@ -81,6 +83,18 @@ function load(options = {}) {
   }
 }
 const writes = (ctx) => ctx.calls.filter(({ sql }) => /^(INSERT|UPDATE|DELETE)/.test(sql))
+test('cancha exige deporte compatible, disponibilidad y versión actual', async () => {
+  const body = { cancha_id: 4, expected_control_version: 0 }
+  const wrongSport = load({ courts: [{ id: 4, deporte: 'padel' }] })
+  await assert.rejects(wrongSport.service.reassignCourt(10, body, director), e => e.status === 400)
+  assert.equal(writes(wrongSport).length, 0)
+  const occupied = load({ occupied: [{ id: 20 }] })
+  await assert.rejects(occupied.service.reassignCourt(10, body, director), e => e.status === 409)
+  const good = load()
+  await good.service.reassignCourt(10, body, director)
+  assert.equal(good.committed, true)
+  assert.ok(good.calls.some(c => c.sql.includes('FROM canchas') && c.sql.includes('FOR UPDATE')))
+})
 test('reasignar registra auditoría, incrementa versión y usa bloqueo transaccional', async () => {
   const ctx = load()
   await ctx.service.reassignJudge(10, { juez_id: 8, expected_control_version: 0 }, director)

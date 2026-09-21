@@ -2,6 +2,20 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const { calculatePlayerStats } = require('../src/utils/playerStats')
 
+test('dobles atribuye el resultado a los cuatro integrantes sin duplicar jugadores', () => {
+  const stats = calculatePlayerStats([{ partido_id: 50, categoria_id: 2, categoria_nombre: '3ra', categoria_orden: 2,
+    jugador1_id: 10, e1_j1_id: 10, e1_j2_id: 11, e2_j1_id: 12, e2_j2_id: 13,
+    ganador: 'jugador1', numero_set: 1, games_j1: 6, games_j2: 2 }])
+  assert.equal(stats.length, 4)
+  for (const id of [10, 11]) {
+    const player = stats.find(p => p.jugador_id === id)
+    assert.equal(player.victorias, 1)
+    assert.equal(player.partidos_jugados, 1)
+    assert.equal(player.games_ganados, 6)
+  }
+  for (const id of [12, 13]) assert.equal(stats.find(p => p.jugador_id === id).derrotas, 1)
+})
+
 const row = ({
   partido,
   categoria = 2,

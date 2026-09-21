@@ -93,7 +93,71 @@ exports.getById = async (id) => {
     throw { status: 404, message: 'Equipo no encontrado' }
   }
 
-  return formatEquipo(rows[0])
+  const equipo = formatEquipo(rows[0])
+
+  try {
+    const [matches] = await db.query(
+      `SELECT p.id, p.ganador, p.equipo1_id, p.equipo2_id,
+              s.numero_set, s.games_j1, s.games_j2
+       FROM partidos p
+       LEFT JOIN sets_partido s ON s.partido_id = p.id
+       WHERE (p.equipo1_id = ? OR p.equipo2_id = ?) AND p.estado = 'finalizado'
+       ORDER BY p.id, s.numero_set`,
+      [id, id]
+    )
+    const matchMap = new Map()
+    for (const m of matches) {
+      if (!matchMap.has(m.id)) {
+        matchMap.set(m.id, {
+          id: m.id,
+          ganador: m.ganador,
+          mySide: Number(m.equipo1_id) === Number(id) ? 'jugador1' : 'jugador2',
+          sets: [],
+        })
+      }
+      if (m.numero_set !== null && m.numero_set !== undefined) {
+        matchMap.get(m.id).sets.push({
+          games_favor: Number(m.equipo1_id) === Number(id) ? Number(m.games_j1) : Number(m.games_j2),
+          games_contra: Number(m.equipo1_id) === Number(id) ? Number(m.games_j2) : Number(m.games_j1),
+        })
+      }
+    }
+
+    let victorias = 0
+    let derrotas = 0
+    let sets_ganados = 0
+    let sets_perdidos = 0
+    let games_ganados = 0
+    let games_perdidos = 0
+
+    for (const m of matchMap.values()) {
+      if (m.ganador === m.mySide) victorias += 1
+      else if (m.ganador) derrotas += 1
+
+      for (const s of m.sets) {
+        games_ganados += s.games_favor
+        games_perdidos += s.games_contra
+        if (s.games_favor > s.games_contra) sets_ganados += 1
+        else if (s.games_contra > s.games_favor) sets_perdidos += 1
+      }
+    }
+
+    const pj = matchMap.size
+    equipo.stats = {
+      partidos_jugados: pj,
+      victorias,
+      derrotas,
+      sets_ganados,
+      sets_perdidos,
+      games_ganados,
+      games_perdidos,
+      porcentaje_victorias: pj ? Math.round((victorias / pj) * 100) : 0,
+    }
+  } catch {
+    equipo.stats = null
+  }
+
+  return equipo
 }
 
 // ── Crear ────────────────────────────────────────────────────────────────────────

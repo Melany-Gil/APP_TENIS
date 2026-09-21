@@ -52,6 +52,7 @@ exports.getControl = async (id, user, { lightweight = false } = {}) => {
      FROM eventos_partido WHERE partido_id = ?`, [id, id]
   )
   if (revisionRows[0] && 'latest_state' in revisionRows[0]) state = parseJson(revisionRows[0].latest_state) || createInitialState(matchRow)
+  if (matchRow.estado === 'finalizado') state = { ...state, winner: matchRow.ganador || null }
   const breakpoint = computeBreakpoint(state, matchRow)
   let doublesOrder = null
   if (matchRow.equipo1_id && matchRow.equipo2_id) {
@@ -519,4 +520,140 @@ function formatLiveState(row) {
     segundos_pausa: Number(row.segundos_pausa || 0),
     finalizado_at: row.finalizado_at || null,
   }
+}
+
+async function validateClosure(connection, match, body) {
+  if (!Number.isSafeInteger(body?.expected_control_version) || !/^\d+:\d+$/.test(body?.expected_revision || '') || typeof body?.expected_configuration !== 'string')
+    throw { status: 400, message: 'Actualiza el partido antes de confirmar el cierre' }
+  const [versions] = await connection.query('SELECT COALESCE(MAX(secuencia), 0) AS sequence, COUNT(CASE WHEN anulado_at IS NULL THEN 1 END) AS active FROM eventos_partido WHERE partido_id = ?', [match.id])
+  if (Number(match.control_version || 0) !== body.expected_control_version || revisionOf(versions[0]) !== body.expected_revision || configurationOf(match) !== body.expected_configuration)
+    throw { status: 409, message: 'El partido cambió. Cierra y vuelve a abrir la acción para revisar el estado actual.' }
+  if (typeof body.motivo !== 'string' || body.motivo.trim().length < 3 || body.motivo.trim().length > 500)
+    throw { status: 400, message: 'Indica un motivo de entre 3 y 500 caracteres' }
+  const [dependents] = await connection.query(`SELECT p.id, p.estado,
+    EXISTS (SELECT 1 FROM eventos_partido e WHERE e.partido_id = p.id) AS has_history
+    FROM partidos p WHERE p.origen_partido1_id = ? OR p.origen_partido2_id = ? FOR UPDATE`, [match.id, match.id])
+  if (dependents.some(p => p.estado !== 'programado' || Number(p.has_history)))
+    throw { status: 409, message: 'Un partido dependiente ya comenzó. Solicita la revisión del director.' }
+}
+
+exports.walkover = async (id, body, user) => {
+  const connection = await db.getConnection()
+  try {
+    await connection.beginTransaction()
+    const [matches] = await connection.query('SELECT * FROM partidos WHERE id = ? FOR UPDATE', [id])
+    if (!matches.length) throw { status: 404, message: 'Partido no encontrado' }
+    assertCanManage(matches[0], user)
+    await validateClosure(connection, matches[0], body)
+    if (!['programado', 'en_vivo'].includes(matches[0].estado)) {
+      throw { status: 409, message: 'Solo puedes finalizar por W partidos programados o en vivo' }
+    }
+    const isDoubleWalkover = body.retirado === 'ambos' || body.ganador === 'ninguno' || body.ganador === null
+    const winner = isDoubleWalkover ? null : body.ganador
+    const retired = winner === 'jugador1' ? 'jugador2' : winner === 'jugador2' ? 'jugador1' : 'ambos'
+    if (body.retirado !== retired || (isDoubleWalkover && body.ganador != null && body.ganador !== 'ninguno'))
+      throw { status: 400, message: 'El ganador y el participante retirado no coinciden' }
+    for (const field of ['persona_retirada', 'tipo_incidencia']) {
+      if (body[field] != null && (typeof body[field] !== 'string' || body[field].length > 250))
+        throw { status: 400, message: 'El detalle de la incidencia no es válido' }
+    }
+    if (!(matches[0].jugador1_id && matches[0].jugador2_id) && !(matches[0].equipo1_id && matches[0].equipo2_id))
+      throw { status: 409, message: 'El partido debe tener ambos participantes registrados' }
+    if (winner !== null && !['jugador1', 'jugador2'].includes(winner)) {
+      throw { status: 400, message: 'Selecciona el participante ganador por W.O. (jugador1 o jugador2) o indica si es doble W' }
+    }
+    const motivo = typeof body.motivo === 'string' ? body.motivo.trim() : ''
+    if (motivo.length < 3) {
+      throw { status: 400, message: 'Indica el motivo del W.O. (mínimo 3 caracteres)' }
+    }
+    await ensureLiveState(connection, id)
+    await connection.query(
+      `UPDATE estado_en_vivo_partido SET
+       segundos_pausa = segundos_pausa + IF(pausado_at IS NULL, 0, TIMESTAMPDIFF(SECOND, pausado_at, NOW())),
+       pausado_at = IF(pausado_at IS NULL, NOW(), pausado_at),
+       finalizado_at = NOW() WHERE partido_id = ?`,
+      [id]
+    )
+    const personaDetalle = body.persona_retirada ? ` (${body.persona_retirada})` : ''
+    const incidencia = body.tipo_incidencia ? ` [${body.tipo_incidencia}]` : ''
+    const quienSeRetiro = isDoubleWalkover
+      ? 'Ambos participantes'
+      : body.retirado === 'jugador1'
+        ? `Lado 1${personaDetalle}`
+        : body.retirado === 'jugador2'
+          ? `Lado 2${personaDetalle}`
+          : (winner === 'jugador1' ? 'Lado 2' : 'Lado 1')
+
+    const notaWo = winner
+      ? `[Victoria por W.O. - Retiro/Incomparecencia: ${quienSeRetiro}${incidencia} - Ganador: ${winner === 'jugador1' ? 'Lado 1' : 'Lado 2'} - Motivo: ${motivo}]`
+      : `[Doble W.O. - Incomparecencia de ambos participantes${incidencia} - Sin ganador - Motivo: ${motivo}]`
+
+    const updatedNotas = matches[0].notas ? `${matches[0].notas}\n${notaWo}` : notaWo
+    await connection.query(
+      "UPDATE partidos SET estado = 'finalizado', ganador = ?, notas = ?, control_version = control_version + 1 WHERE id = ?",
+      [winner, updatedNotas, id]
+    )
+    await connection.query(
+      "INSERT INTO auditoria_control_partido (partido_id, created_by, accion, detalle) VALUES (?, ?, 'walkover', ?)",
+      [id, user.id, JSON.stringify({
+        ganador: winner,
+        retirado: retired,
+        persona_retirada: body.persona_retirada || null,
+        tipo_incidencia: body.tipo_incidencia || null,
+        motivo
+      })]
+    )
+    await propagateWinner(connection, matches[0], 'finalizado', winner)
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+  return exports.getControl(id, user)
+}
+
+exports.cancelMatch = async (id, body, user) => {
+  const connection = await db.getConnection()
+  try {
+    await connection.beginTransaction()
+    const [matches] = await connection.query('SELECT * FROM partidos WHERE id = ? FOR UPDATE', [id])
+    if (!matches.length) throw { status: 404, message: 'Partido no encontrado' }
+    assertCanManage(matches[0], user)
+    await validateClosure(connection, matches[0], body)
+    if (!['programado', 'en_vivo'].includes(matches[0].estado)) {
+      throw { status: 409, message: 'Solo puedes cancelar partidos programados o en vivo' }
+    }
+    const motivo = typeof body?.motivo === 'string' ? body.motivo.trim() : ''
+    if (motivo.length < 3) {
+      throw { status: 400, message: 'Indica el motivo de la cancelación (mínimo 3 caracteres)' }
+    }
+    await ensureLiveState(connection, id)
+    await connection.query(
+      `UPDATE estado_en_vivo_partido SET
+       segundos_pausa = segundos_pausa + IF(pausado_at IS NULL, 0, TIMESTAMPDIFF(SECOND, pausado_at, NOW())),
+       pausado_at = NOW(),
+       finalizado_at = NOW() WHERE partido_id = ?`,
+      [id]
+    )
+    const notaCancel = `[Cancelado - Motivo: ${motivo}]`
+    const updatedNotas = matches[0].notas ? `${matches[0].notas}\n${notaCancel}` : notaCancel
+    await connection.query(
+      "UPDATE partidos SET estado = 'cancelado', ganador = NULL, notas = ?, control_version = control_version + 1 WHERE id = ?",
+      [updatedNotas, id]
+    )
+    await connection.query(
+      "INSERT INTO auditoria_control_partido (partido_id, created_by, accion, detalle) VALUES (?, ?, 'cancelar', ?)",
+      [id, user.id, JSON.stringify({ motivo })]
+    )
+    await propagateWinner(connection, matches[0], 'cancelado', null)
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+  return exports.getControl(id, user)
 }

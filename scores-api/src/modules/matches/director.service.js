@@ -46,6 +46,34 @@ async function change(id, user, body, action, work) {
   return require('./matches.service').getById(id)
 }
 
+exports.reassignCourt = (id, body, user) =>
+  change(id, user, body, 'reasignar_cancha', async (conn, match) => {
+    if (!['programado', 'en_vivo'].includes(match.estado))
+      fail(409, 'Solo puedes reasignar canchas en partidos programados o en vivo')
+    const courtId = (body.cancha_id === null || body.cancha_id === '' || body.cancha_id === undefined)
+      ? null
+      : Number(body.cancha_id)
+    if (courtId !== null && (!Number.isSafeInteger(courtId) || courtId <= 0))
+      fail(400, 'Selecciona una cancha válida o Sin asignar')
+    if (courtId !== null) {
+      const [courts] = await conn.query(
+        "SELECT id, deporte FROM canchas WHERE id = ? AND activa = TRUE LIMIT 1 FOR UPDATE",
+        [courtId]
+      )
+      if (!courts.length) fail(400, 'La cancha seleccionada no está disponible')
+      if (courts[0].deporte !== 'ambos' && match.deporte && courts[0].deporte !== match.deporte) {
+        fail(400, `La cancha seleccionada es de ${courts[0].deporte} y el partido es de ${match.deporte}`)
+      }
+      const [occupied] = await conn.query(`SELECT id FROM partidos WHERE cancha_id = ? AND id <> ?
+        AND estado IN ('programado', 'en_vivo')
+        AND ((estado = 'en_vivo' AND ? = 'en_vivo') OR (fecha_inicio = ? AND hora_inicio = ?)) LIMIT 1`,
+        [courtId, id, match.estado, match.fecha_inicio, match.hora_inicio])
+      if (occupied.length) fail(409, 'La cancha ya tiene otro partido en vivo o en el mismo horario')
+    }
+    await conn.query('UPDATE partidos SET cancha_id = ? WHERE id = ?', [courtId, id])
+    return { anterior: match.cancha_id, nuevo: courtId }
+  })
+
 exports.reassignJudge = (id, body, user) =>
   change(id, user, body, 'reasignar_juez', async (conn, match) => {
     if (!['programado', 'en_vivo'].includes(match.estado))
@@ -64,6 +92,7 @@ exports.reassignJudge = (id, body, user) =>
     return { anterior: match.juez_id, nuevo: judgeId }
   })
 
+
 exports.cancelMatch = (id, body, user) =>
   change(id, user, body, 'cancelar', async (conn, match) => {
     if (!['programado', 'en_vivo'].includes(match.estado))
@@ -71,14 +100,17 @@ exports.cancelMatch = (id, body, user) =>
         409,
         'Solo puedes cancelar partidos programados o en vivo; no se modifican resultados finalizados'
       )
+    const motivo = typeof body?.motivo === 'string' ? body.motivo.trim() : ''
     await conn.query(
       `UPDATE estado_en_vivo_partido SET
     segundos_pausa = segundos_pausa + IF(pausado_at IS NULL, 0, TIMESTAMPDIFF(SECOND, pausado_at, NOW())),
     pausado_at = NOW(), finalizado_at = NOW() WHERE partido_id = ?`,
       [id]
     )
-    await conn.query("UPDATE partidos SET estado = 'cancelado', ganador = NULL WHERE id = ?", [id])
-    return { estado_anterior: match.estado }
+    const notaCancel = motivo ? `[Cancelado - Motivo: ${motivo}]` : '[Cancelado]'
+    const updatedNotas = match.notas ? `${match.notas}\n${notaCancel}` : notaCancel
+    await conn.query("UPDATE partidos SET estado = 'cancelado', ganador = NULL, notas = ? WHERE id = ?", [updatedNotas, id])
+    return { estado_anterior: match.estado, motivo: motivo || null }
   })
 
 exports.reactivateMatch = (id, body, user) =>
