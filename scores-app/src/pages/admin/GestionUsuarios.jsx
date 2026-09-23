@@ -52,8 +52,8 @@ export default function GestionUsuarios() {
   const createUser = async (data) => {
     setCreateError(null)
     try {
-      if (playerLink.modo === 'existente' && !playerLink.id) throw new Error('Selecciona el jugador que corresponde a esta cuenta')
-      await userService.create({ ...data, usuario: data.usuario?.trim() || undefined, jugador: playerLink })
+      if (data.rol === 'miembro' && playerLink.modo === 'existente' && !playerLink.id) throw new Error('Selecciona el jugador que corresponde a esta cuenta')
+      await userService.create({ ...data, usuario: data.usuario?.trim() || undefined, jugador: data.rol === 'miembro' ? playerLink : undefined })
       addToast({ type: 'success', title: 'Usuario creado correctamente' })
       reset({ rol: 'miembro' })
       setPlayerLink({ modo: 'ninguno', deporte: 'tenis' })
@@ -277,7 +277,7 @@ export default function GestionUsuarios() {
               </select>
             </label>
           </div>
-          <MemberPlayerFields value={playerLink} onChange={setPlayerLink} nombre={watch('nombre')} apellido={watch('apellido')} onSelectPlayer={(p) => { setValue('nombre', p.nombre, { shouldValidate: true }); setValue('apellido', p.apellido, { shouldValidate: true }) }} />
+          {creatingMember && <MemberPlayerFields value={playerLink} onChange={setPlayerLink} nombre={watch('nombre')} apellido={watch('apellido')} onSelectPlayer={(p) => { setValue('nombre', p.nombre, { shouldValidate: true }); setValue('apellido', p.apellido, { shouldValidate: true }) }} />}
           <div className='flex justify-end'>
             <Button type='submit' loading={isSubmitting}>
               Crear usuario
@@ -422,7 +422,6 @@ export default function GestionUsuarios() {
                   {u.numero_documento ? `CC: ${u.numero_documento}` : 'Sin cédula'} · {u.email || 'Sin correo'}
                 </p>
                 <p className='text-xs' style={{ color: 'var(--text-muted)' }}>Celular: {u.telefono || 'Sin registrar'}</p>
-                {(u.es_caddie || u.jugador) && <p className='text-xs text-[var(--color-brand)]'>{[u.es_caddie && 'Caddie', u.jugador && 'Jugador vinculado'].filter(Boolean).join(' · ')}</p>}
                 {u.rol === 'miembro' && !u.usuario && <p className='text-xs text-amber-600'>Asigna un usuario en «Editar datos» para habilitar ese acceso.</p>}
                 {['miembro', 'juez', 'juez_director', 'admin'].includes(u.rol) &&
                   (editingUsuarioId === u.id ? (

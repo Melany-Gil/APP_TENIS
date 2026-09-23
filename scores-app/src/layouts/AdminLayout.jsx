@@ -34,7 +34,6 @@ const NAV = [
   { to: '/admin/sedes', icon: MapPin, label: 'Sedes' },
   { to: '/admin/categorias', icon: Tag, label: 'Categorías' },
   { to: '/admin/usuarios', icon: UserCog, label: 'Usuarios' },
-  { to: '/admin/caddies', icon: Users, label: 'Caddies' },
 ]
 
 export default function AdminLayout() {

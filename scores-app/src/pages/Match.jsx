@@ -1,5 +1,4 @@
 import { useParams, Link } from 'react-router-dom'
-import CaddieInvite from '../components/match/CaddieInvite'
 import {
   ArrowLeft,
   BarChart3,
@@ -83,7 +82,6 @@ export default function Match() {
 
   return (
     <div className='space-y-5 animate-fade-up'>
-      {user && match.estado === 'finalizado' && <CaddieInvite matchId={match.id}/>}
       <div className='flex items-center justify-between'>
         <Link
           to='/'

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import CaddieInvite from '../components/match/CaddieInvite'
 import ChangePassword from '../components/profile/ChangePassword'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -68,10 +67,11 @@ export default function Profile() {
   }, [updateUser])
 
   const loadMatches = useCallback(async () => {
+    if (user?.rol === 'juez') { setMatchesLoading(false); return }
     try {
       const response = await matchService.getMyMatches()
       setMatches(response.data || EMPTY_MATCHES)
-      setIsLinkedPlayer(Boolean(response.data?.jugador))
+      setIsLinkedPlayer(true)
     } catch (error) {
       if (error.status === 404) {
         setMatches(EMPTY_MATCHES)
@@ -173,7 +173,6 @@ export default function Profile() {
 
   return (
     <div className='space-y-5 animate-fade-up'>
-      {isLinkedPlayer ? <CaddieInvite/> : <Link to='/caddies' className='card p-4 flex items-center justify-between gap-3'><strong>Mis calificaciones como caddie</strong><ChevronRight size={20}/></Link>}
       <h1 className='text-xl font-bold text-text-primary'>Mi perfil</h1>
 
       <div className='card p-5 flex flex-col gap-4 sm:flex-row sm:items-center'>
@@ -260,7 +259,7 @@ export default function Profile() {
         </form>
       )}
 
-      {(user?.rol !== 'juez' || isLinkedPlayer) && (
+      {user?.rol !== 'juez' && (
         <section className='space-y-4'>
           <div className='flex items-center justify-between flex-wrap gap-2'>
             <div>

@@ -86,8 +86,7 @@ export default function GestionPartidos() {
     setDistribution(null)
     setGroupError('')
     if (
-      showForm &&
-      selectedTournamentId &&
+      showForm && selectedTournamentId &&
       selectedTournament?.sistema === 'grupos_eliminacion' &&
       selectedModality === 'dobles'
     ) {
@@ -113,16 +112,6 @@ export default function GestionPartidos() {
   const selectedPhase = watch('fase') || 'grupos'
   const participant1Mode = watch('participante1_tipo') || 'fijo'
   const participant2Mode = watch('participante2_tipo') || 'fijo'
-  const player1Id = watch('jugador1_id')
-  const player2Id = watch('jugador2_id')
-  const team1Id = watch('equipo1_id')
-  const team2Id = watch('equipo2_id')
-  const source1Id = watch('origen_partido1_id')
-  const source2Id = watch('origen_partido2_id')
-  const excludingOpponent = (options, opponentMode, opponentId) =>
-    options.filter(
-      (option) => opponentMode !== 'fijo' || !opponentId || String(option.id) !== String(opponentId)
-    )
   const sourceMatches = partidos.filter(
     (partido) =>
       !(useGroups && selectedPhase === 'grupos') &&
@@ -155,16 +144,7 @@ export default function GestionPartidos() {
           : String(equipo.categoria?.id || '') === selectedCategoryId)
     )
     return list
-  }, [
-    equipos,
-    selectedDeporte,
-    useGroups,
-    distribution,
-    selectedCategoryId,
-    selectedPhase,
-    selectedGroup,
-    editing,
-  ])
+  }, [equipos, selectedDeporte, useGroups, distribution, selectedCategoryId, selectedPhase, selectedGroup, editing])
   const [marcadorParticipante1, marcadorParticipante2] = getParticipantNames(showMarcador)
 
   const fetchAll = () => {
@@ -297,14 +277,8 @@ export default function GestionPartidos() {
     setSubmitError('')
     try {
       if (useGroups) {
-        if (!distribution || groupError)
-          throw new Error(groupError || 'Espera a que se carguen los grupos antes de guardar.')
-        if (
-          selectedPhase === 'grupos' &&
-          !distribution.grupos.some(
-            (g) => String(g.categoria_id) === selectedCategoryId && g.nombre === data.grupo
-          )
-        ) {
+        if (!distribution || groupError) throw new Error(groupError || 'Espera a que se carguen los grupos antes de guardar.')
+        if (selectedPhase === 'grupos' && !distribution.grupos.some(g => String(g.categoria_id) === selectedCategoryId && g.nombre === data.grupo)) {
           throw new Error('Selecciona un grupo válido de esta categoría.')
         }
       }
@@ -312,10 +286,8 @@ export default function GestionPartidos() {
         if (data[`participante${side}_tipo`] === 'ganador') continue
         const options = selectedModality === 'dobles' ? equiposDisponibles : jugadoresDisponibles
         const id = data[`${selectedModality === 'dobles' ? 'equipo' : 'jugador'}${side}_id`]
-        if (!options.some((option) => String(option.id) === String(id))) {
-          throw new Error(
-            `El participante ${side} no pertenece a la selección actual. Revisa categoría y grupo.`
-          )
+        if (!options.some(option => String(option.id) === String(id))) {
+          throw new Error(`El participante ${side} no pertenece a la selección actual. Revisa categoría y grupo.`)
         }
       }
       const payload = {
@@ -365,9 +337,7 @@ export default function GestionPartidos() {
       setShowForm(false)
       await fetchAll()
     } catch (err) {
-      setSubmitError(
-        err.message || 'No se pudo guardar el partido. Tus datos se conservan; vuelve a intentarlo.'
-      )
+      setSubmitError(err.message || 'No se pudo guardar el partido. Tus datos se conservan; vuelve a intentarlo.')
       addToast({ type: 'error', title: 'Error', message: err.message })
     }
   }
@@ -461,9 +431,7 @@ export default function GestionPartidos() {
         title={editing ? 'Editar partido' : 'Nuevo partido'}
         subtitle={
           editing
-            ? editing.torneo?.nombre
-              ? `${editing.torneo.nombre} · Modifica los datos del encuentro`
-              : 'Partido libre · Modifica los datos del encuentro'
+            ? (editing.torneo?.nombre ? `${editing.torneo.nombre} · Modifica los datos del encuentro` : 'Partido libre · Modifica los datos del encuentro')
             : 'Programa un nuevo partido libre o asociado a un torneo'
         }
         icon={editing ? Pencil : Plus}
@@ -480,85 +448,116 @@ export default function GestionPartidos() {
             >
               Cancelar
             </Button>
-            <Button
-              type='submit'
-              loading={isSubmitting}
-              disabled={useGroups && (!distribution || !!groupError)}
-            >
+            <Button type='submit' loading={isSubmitting} disabled={useGroups && (!distribution || !!groupError)}>
               {editing ? 'Guardar cambios' : 'Crear partido'}
             </Button>
           </>
         }
       >
         <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-          {submitError && (
-            <p role='alert' className='form-error sm:col-span-2'>
-              {submitError}
-            </p>
-          )}
-          <div className='form-group sm:col-span-2'>
-            <label className='form-label'>Torneo (opcional)</label>
-            <select
-              className='form-input'
-              {...register('torneo_id', {
-                onChange: () => {
-                  if (!editing) {
-                    setValue('categoria_id', '')
-                    setValue('deporte', 'tenis')
-                    setValue('modalidad', 'individual')
-                    setValue('participante1_tipo', 'fijo')
-                    setValue('participante2_tipo', 'fijo')
-                  }
-                },
-              })}
-            >
-              <option value=''>Partido libre (sin torneo)</option>
-              {torneos.map((tournament) => (
-                <option key={tournament.id} value={tournament.id}>
-                  {tournament.nombre} ·{' '}
-                  {tournament.modalidad === 'dobles' ? 'Dobles' : 'Individual'} ·{' '}
-                  {tournament.categoria?.nombre || 'Todas las categorías'}
-                </option>
-              ))}
-            </select>
-            {errors.torneo_id && <p className='form-error'>{errors.torneo_id.message}</p>}
-          </div>
-
-          <div className='form-group'>
-            <label className='form-label'>Estado</label>
-            <select className='form-input' {...register('estado')}>
-              {ESTADOS.map((e) => (
-                <option key={e.value} value={e.value}>
-                  {e.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {!selectedTournament && (
-            <>
-              <div className='form-group'>
-                <label className='form-label'>Deporte *</label>
-                <select className='form-input' {...register('deporte', { required: 'Requerido' })}>
-                  <option value='tenis'>Tenis</option>
-                  <option value='padel'>Pádel</option>
-                </select>
-              </div>
-              <div className='form-group'>
-                <label className='form-label'>Modalidad *</label>
+              {submitError && <p role='alert' className='form-error sm:col-span-2'>{submitError}</p>}
+              <div className='form-group sm:col-span-2'>
+                <label className='form-label'>Torneo (opcional)</label>
                 <select
                   className='form-input'
-                  {...register('modalidad', { required: 'Requerido' })}
+                  {...register('torneo_id', {
+                    onChange: () => {
+                      if (!editing) {
+                        setValue('categoria_id', '')
+                        setValue('deporte', 'tenis')
+                        setValue('modalidad', 'individual')
+                        setValue('participante1_tipo', 'fijo')
+                        setValue('participante2_tipo', 'fijo')
+                      }
+                    },
+                  })}
                 >
-                  <option value='individual'>Individual</option>
-                  <option value='dobles'>Dobles</option>
-                </select>
+                <option value=''>Partido libre (sin torneo)</option>
+                {torneos.map((tournament) => (
+                  <option key={tournament.id} value={tournament.id}>
+                    {tournament.nombre} ·{' '}
+                    {tournament.modalidad === 'dobles' ? 'Dobles' : 'Individual'} ·{' '}
+                    {tournament.categoria?.nombre || 'Todas las categorías'}
+                  </option>
+                ))}
+              </select>
+              {errors.torneo_id && <p className='form-error'>{errors.torneo_id.message}</p>}
+            </div>
+
+            <div className='form-group'>
+              <label className='form-label'>Estado</label>
+              <select className='form-input' {...register('estado')}>
+                {ESTADOS.map((e) => (
+                  <option key={e.value} value={e.value}>
+                    {e.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {!selectedTournament && (
+              <>
+                <div className='form-group'>
+                  <label className='form-label'>Deporte *</label>
+                  <select
+                    className='form-input'
+                    {...register('deporte', { required: 'Requerido' })}
+                  >
+                    <option value='tenis'>Tenis</option>
+                    <option value='padel'>Pádel</option>
+                  </select>
+                </div>
+                <div className='form-group'>
+                  <label className='form-label'>Modalidad *</label>
+                  <select
+                    className='form-input'
+                    {...register('modalidad', { required: 'Requerido' })}
+                  >
+                    <option value='individual'>Individual</option>
+                    <option value='dobles'>Dobles</option>
+                  </select>
+                </div>
+                <div className='form-group'>
+                  <label className='form-label'>Categoría *</label>
+                  <select
+                    className='form-input'
+                    {...register('categoria_id', { required: 'Selecciona la categoría' })}
+                  >
+                    <option value=''>Seleccionar categoría</option>
+                    {categoriasDisponibles.map((categoria) => (
+                      <option key={categoria.id} value={categoria.id}>
+                        {categoria.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.categoria_id && (
+                    <p className='form-error'>{errors.categoria_id.message}</p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {selectedTournament && (
+              <div
+                className='rounded-xl p-3 text-sm flex flex-wrap items-center gap-x-3 gap-y-1'
+                style={{ backgroundColor: 'var(--color-brand-dim)', color: 'var(--text-primary)' }}
+              >
+                <span className='font-semibold'>
+                  {selectedDeporte === 'padel' ? 'Pádel' : 'Tenis'}
+                </span>
+                <span>·</span>
+                <span>{selectedTournament.categoria?.nombre || 'Todas las categorías'}</span>
+                <span>·</span>
+                <span>{selectedModality === 'dobles' ? 'Parejas' : 'Individual'}</span>
               </div>
+            )}
+
+            {selectedTournament && !selectedTournament.categoria && (
               <div className='form-group'>
-                <label className='form-label'>Categoría *</label>
+                <label className='form-label'>Categoría del partido *</label>
                 <select
                   className='form-input'
-                  {...register('categoria_id', { required: 'Selecciona la categoría' })}
+                  {...register('categoria_id', { required: 'Selecciona la categoría del partido' })}
                 >
                   <option value=''>Seleccionar categoría</option>
                   {categoriasDisponibles.map((categoria) => (
@@ -569,386 +568,330 @@ export default function GestionPartidos() {
                 </select>
                 {errors.categoria_id && <p className='form-error'>{errors.categoria_id.message}</p>}
               </div>
-            </>
-          )}
+            )}
 
-          {selectedTournament && (
-            <div
-              className='rounded-xl p-3 text-sm flex flex-wrap items-center gap-x-3 gap-y-1'
-              style={{ backgroundColor: 'var(--color-brand-dim)', color: 'var(--text-primary)' }}
-            >
-              <span className='font-semibold'>
-                {selectedDeporte === 'padel' ? 'Pádel' : 'Tenis'}
-              </span>
-              <span>·</span>
-              <span>{selectedTournament.categoria?.nombre || 'Todas las categorías'}</span>
-              <span>·</span>
-              <span>{selectedModality === 'dobles' ? 'Parejas' : 'Individual'}</span>
-            </div>
-          )}
+            {selectedTournament?.sistema === 'grupos_eliminacion' && (
+              <div className='form-group'>
+                <label className='form-label'>Fase *</label>
+                <select className='form-input' {...register('fase')}>
+                  <option value='grupos'>Fase de grupos</option>
+                  <option value='eliminacion'>Fase eliminatoria</option>
+                </select>
+              </div>
+            )}
 
-          {selectedTournament && !selectedTournament.categoria && (
-            <div className='form-group'>
-              <label className='form-label'>Categoría del partido *</label>
-              <select
-                className='form-input'
-                {...register('categoria_id', { required: 'Selecciona la categoría del partido' })}
-              >
-                <option value=''>Seleccionar categoría</option>
-                {categoriasDisponibles.map((categoria) => (
-                  <option key={categoria.id} value={categoria.id}>
-                    {categoria.nombre}
-                  </option>
-                ))}
-              </select>
-              {errors.categoria_id && <p className='form-error'>{errors.categoria_id.message}</p>}
-            </div>
-          )}
-
-          {selectedTournament?.sistema === 'grupos_eliminacion' && (
-            <div className='form-group'>
-              <label className='form-label'>Fase *</label>
-              <select className='form-input' {...register('fase')}>
-                <option value='grupos'>Fase de grupos</option>
-                <option value='eliminacion'>Fase eliminatoria</option>
-              </select>
-            </div>
-          )}
-
-          {selectedTournament?.sistema === 'grupos_eliminacion' && selectedPhase === 'grupos' && (
-            <div>
-              <label className='form-label'>Grupo *</label>
-              {useGroups ? (
-                <>
-                  <FormSelect
-                    control={control}
-                    name='grupo'
-                    rules={{ required: 'Selecciona un grupo' }}
-                    disabled={!distribution}
-                    className='form-input'
-                  >
-                    <option value=''>
-                      {!distribution && !groupError ? 'Cargando grupos…' : 'Selecciona un grupo…'}
-                    </option>
-                    {(distribution?.grupos || [])
-                      .filter((g) => String(g.categoria_id) === selectedCategoryId)
-                      .map((g) => (
-                        <option key={g.nombre} value={g.nombre}>
-                          {g.nombre} · {g.equipo_ids.length} parejas
-                        </option>
-                      ))}
-                  </FormSelect>
-                  {errors.grupo && <p className='form-error'>{errors.grupo.message}</p>}
-                  <p className='text-xs mt-1'>
-                    {groupError || 'Solo podrás seleccionar parejas de esta categoría y grupo.'}{' '}
-                    <Link className='underline' to={'/torneo/' + selectedTournamentId}>
-                      Organizar grupos
-                    </Link>
-                  </p>
-                </>
-              ) : (
-                <Input maxLength={20} {...register('grupo')} />
-              )}
-            </div>
-          )}
-
-          {selectedTournament && selectedTournament.sistema !== 'todos_contra_todos' && (
-            <Input
-              label='Ronda (opcional)'
-              placeholder={
-                selectedTournament.sistema === 'eliminacion_directa' ||
-                selectedPhase === 'eliminacion'
-                  ? 'Ej.: Cuartos de final'
-                  : 'Ej.: Fecha 1'
-              }
-              maxLength={50}
-              {...register('ronda')}
-            />
-          )}
-
-          <Input label='Fecha' type='date' {...register('fecha_inicio')} />
-          <Input label='Hora' type='time' {...register('hora_inicio')} />
-
-          <div className='form-group'>
-            <label className='form-label'>Juez asignado</label>
-            <select className='form-input' {...register('juez_id')}>
-              <option value=''>Sin asignar</option>
-              {jueces.map((juez) => (
-                <option key={juez.id} value={juez.id}>
-                  {juez.nombre} {juez.apellido}{' '}
-                  {juez.rol === 'juez_director'
-                    ? '(director)'
-                    : juez.rol === 'admin'
-                      ? '(admin)'
-                      : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className='form-group'>
-            <label className='form-label'>Cancha (opcional)</label>
-            <select className='form-input' {...register('cancha_id')}>
-              <option value=''>Sin asignar</option>
-              {canchas
-                .filter((court) => court.deporte === selectedDeporte || court.deporte === 'ambos')
-                .map((court) => (
-                  <option key={court.id} value={court.id}>
-                    {court.nombre} · {court.sede_nombre}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div
-            className='sm:col-span-2 rounded-xl p-4 space-y-3'
-            style={{ backgroundColor: 'var(--bg-hover)' }}
-          >
-            <div className='flex items-center gap-2'>
-              <SlidersHorizontal className='w-4 h-4' style={{ color: 'var(--color-brand)' }} />
+            {selectedTournament?.sistema === 'grupos_eliminacion' && selectedPhase === 'grupos' && (
               <div>
-                <p className='form-label m-0'>Formato de puntuación</p>
-                <p className='text-[11px] mt-0.5' style={{ color: 'var(--text-muted)' }}>
-                  Configurable por partido. El control del juez aplicará estas reglas.
-                </p>
+                <label className='form-label'>Grupo *</label>
+                {useGroups ? (
+                  <>
+                    <FormSelect
+                      control={control}
+                      name='grupo'
+                      rules={{ required: 'Selecciona un grupo' }}
+                      disabled={!distribution}
+                      className='form-input'
+                    >
+                      <option value=''>{!distribution && !groupError ? 'Cargando grupos…' : 'Selecciona un grupo…'}</option>
+                      {(distribution?.grupos || [])
+                        .filter((g) => String(g.categoria_id) === selectedCategoryId)
+                        .map((g) => (
+                          <option key={g.nombre} value={g.nombre}>
+                            {g.nombre} · {g.equipo_ids.length} parejas
+                          </option>
+                        ))}
+                    </FormSelect>
+                    {errors.grupo && <p className='form-error'>{errors.grupo.message}</p>}
+                    <p className='text-xs mt-1'>
+                      {groupError || 'Solo podrás seleccionar parejas de esta categoría y grupo.'}{' '}
+                      <Link className='underline' to={'/torneo/' + selectedTournamentId}>
+                        Organizar grupos
+                      </Link>
+                    </p>
+                  </>
+                ) : (
+                  <Input maxLength={20} {...register('grupo')} />
+                )}
+              </div>
+            )}
+
+            {selectedTournament && selectedTournament.sistema !== 'todos_contra_todos' && (
+              <Input
+                label='Ronda (opcional)'
+                placeholder={
+                  selectedTournament.sistema === 'eliminacion_directa' ||
+                  selectedPhase === 'eliminacion'
+                    ? 'Ej.: Cuartos de final'
+                    : 'Ej.: Fecha 1'
+                }
+                maxLength={50}
+                {...register('ronda')}
+              />
+            )}
+
+            <Input label='Fecha' type='date' {...register('fecha_inicio')} />
+            <Input label='Hora' type='time' {...register('hora_inicio')} />
+
+            <div className='form-group'>
+              <label className='form-label'>Juez asignado</label>
+              <select className='form-input' {...register('juez_id')}>
+                <option value=''>Sin asignar</option>
+                {jueces.map((juez) => (
+                  <option key={juez.id} value={juez.id}>
+                    {juez.nombre} {juez.apellido}{' '}
+                    {juez.rol === 'juez_director'
+                      ? '(director)'
+                      : juez.rol === 'admin'
+                        ? '(admin)'
+                        : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className='form-group'>
+              <label className='form-label'>Cancha (opcional)</label>
+              <select className='form-input' {...register('cancha_id')}>
+                <option value=''>Sin asignar</option>
+                {canchas
+                  .filter((court) => court.deporte === selectedDeporte || court.deporte === 'ambos')
+                  .map((court) => (
+                    <option key={court.id} value={court.id}>
+                      {court.nombre} · {court.sede_nombre}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div
+              className='sm:col-span-2 rounded-xl p-4 space-y-3'
+              style={{ backgroundColor: 'var(--bg-hover)' }}
+            >
+              <div className='flex items-center gap-2'>
+                <SlidersHorizontal className='w-4 h-4' style={{ color: 'var(--color-brand)' }} />
+                <div>
+                  <p className='form-label m-0'>Formato de puntuación</p>
+                  <p className='text-[11px] mt-0.5' style={{ color: 'var(--text-muted)' }}>
+                    Configurable por partido. El control del juez aplicará estas reglas.
+                  </p>
+                </div>
+              </div>
+
+              <div className='flex gap-2'>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setValue('set_decisivo', 'match_tiebreak')
+                    setValue('tiebreak_en', '6')
+                    setValue('tiebreak_puntos', '7')
+                    setValue('match_tiebreak_puntos', '10')
+                  }}
+                  className='flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all'
+                  style={{
+                    backgroundColor:
+                      watch('set_decisivo') === 'match_tiebreak'
+                        ? 'var(--color-brand-dim)'
+                        : 'var(--bg-primary)',
+                    color:
+                      watch('set_decisivo') === 'match_tiebreak'
+                        ? 'var(--color-brand)'
+                        : 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
+                  }}
+                >
+                  Normal (3er set = Supertiebreak)
+                </button>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setValue('set_decisivo', 'set_completo')
+                    setValue('tiebreak_en', '6')
+                    setValue('tiebreak_puntos', '7')
+                    setValue('match_tiebreak_puntos', '10')
+                  }}
+                  className='flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all'
+                  style={{
+                    backgroundColor:
+                      watch('set_decisivo') === 'set_completo'
+                        ? 'var(--color-brand-dim)'
+                        : 'var(--bg-primary)',
+                    color:
+                      watch('set_decisivo') === 'set_completo'
+                        ? 'var(--color-brand)'
+                        : 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
+                  }}
+                >
+                  Super Game (3er set completo)
+                </button>
+              </div>
+
+              <div className='grid grid-cols-2 sm:grid-cols-3 gap-3'>
+                <label className='form-group'>
+                  <span className='form-label'>Mejor de</span>
+                  <select className='form-input' {...register('mejor_de_sets')}>
+                    <option value='1'>1 set</option>
+                    <option value='3'>3 sets</option>
+                    <option value='5'>5 sets</option>
+                  </select>
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Juegos por set</span>
+                  <input
+                    type='number'
+                    min='1'
+                    max='12'
+                    className='form-input'
+                    {...register('juegos_por_set')}
+                  />
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Diferencia de juegos</span>
+                  <input
+                    type='number'
+                    min='1'
+                    max='6'
+                    className='form-input'
+                    {...register('diferencia_juegos')}
+                  />
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Games</span>
+                  <select className='form-input' {...register('modo_game')}>
+                    <option value='ventaja'>Con ventaja</option>
+                    <option value='sin_ventaja'>Punto decisivo</option>
+                  </select>
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Set decisivo</span>
+                  <select className='form-input' {...register('set_decisivo')}>
+                    <option value='set_completo'>Set completo</option>
+                    <option value='match_tiebreak'>Match tiebreak</option>
+                  </select>
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Tiebreak en</span>
+                  <input
+                    type='number'
+                    min='0'
+                    max='12'
+                    className='form-input'
+                    {...register('tiebreak_en')}
+                  />
+                  <span className='text-[11px]' style={{ color: 'var(--text-muted)' }}>
+                    Usa 0 para jugar sin tiebreak.
+                  </span>
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Tiebreak a</span>
+                  <input
+                    type='number'
+                    min='5'
+                    max='99'
+                    className='form-input'
+                    {...register('tiebreak_puntos')}
+                  />
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Match tiebreak a</span>
+                  <input
+                    type='number'
+                    min='5'
+                    max='99'
+                    className='form-input'
+                    {...register('match_tiebreak_puntos')}
+                  />
+                </label>
+                <label className='form-group'>
+                  <span className='form-label'>Primer servidor</span>
+                  <select className='form-input' {...register('servidor_inicial')}>
+                    <option value='jugador1'>Participante 1</option>
+                    <option value='jugador2'>Participante 2</option>
+                  </select>
+                </label>
               </div>
             </div>
 
-            <div className='flex gap-2'>
-              <button
-                type='button'
-                onClick={() => {
-                  setValue('set_decisivo', 'match_tiebreak')
-                  setValue('tiebreak_en', '6')
-                  setValue('tiebreak_puntos', '7')
-                  setValue('match_tiebreak_puntos', '10')
-                }}
-                className='flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all'
-                style={{
-                  backgroundColor:
-                    watch('set_decisivo') === 'match_tiebreak'
-                      ? 'var(--color-brand-dim)'
-                      : 'var(--bg-primary)',
-                  color:
-                    watch('set_decisivo') === 'match_tiebreak'
-                      ? 'var(--color-brand)'
-                      : 'var(--text-muted)',
-                  border: '1px solid var(--border-color)',
-                }}
-              >
-                Normal (3er set = Supertiebreak)
-              </button>
-              <button
-                type='button'
-                onClick={() => {
-                  setValue('set_decisivo', 'set_completo')
-                  setValue('tiebreak_en', '6')
-                  setValue('tiebreak_puntos', '7')
-                  setValue('match_tiebreak_puntos', '10')
-                }}
-                className='flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all'
-                style={{
-                  backgroundColor:
-                    watch('set_decisivo') === 'set_completo'
-                      ? 'var(--color-brand-dim)'
-                      : 'var(--bg-primary)',
-                  color:
-                    watch('set_decisivo') === 'set_completo'
-                      ? 'var(--color-brand)'
-                      : 'var(--text-muted)',
-                  border: '1px solid var(--border-color)',
-                }}
-              >
-                Super Game (3er set completo)
-              </button>
-            </div>
-
-            <div className='grid grid-cols-2 sm:grid-cols-3 gap-3'>
-              <label className='form-group'>
-                <span className='form-label'>Mejor de</span>
-                <select className='form-input' {...register('mejor_de_sets')}>
-                  <option value='1'>1 set</option>
-                  <option value='3'>3 sets</option>
-                  <option value='5'>5 sets</option>
-                </select>
-              </label>
-              <label className='form-group'>
-                <span className='form-label'>Juegos por set</span>
-                <input
-                  type='number'
-                  min='1'
-                  max='12'
-                  className='form-input'
-                  {...register('juegos_por_set')}
+            {/* Participantes según la modalidad definida por el torneo */}
+            {selectedModality === 'individual' ? (
+              <>
+                <ParticipantSelector
+                  label='Participante 1'
+                  mode={participant1Mode}
+                  modeField='participante1_tipo'
+                  fixedField='jugador1_id'
+                  sourceField='origen_partido1_id'
+                  fixedLabel='Jugador'
+                  fixedOptions={jugadoresDisponibles.map((jugador) => ({
+                    id: jugador.id,
+                    label: `${jugador.nombre} ${jugador.apellido}`,
+                  }))}
+                  sourceMatches={sourceMatches}
+                  control={control}
+                  error={errors.jugador1_id || errors.origen_partido1_id}
                 />
-              </label>
-              <label className='form-group'>
-                <span className='form-label'>Diferencia de juegos</span>
-                <input
-                  type='number'
-                  min='1'
-                  max='6'
-                  className='form-input'
-                  {...register('diferencia_juegos')}
+                <ParticipantSelector
+                  label='Participante 2'
+                  mode={participant2Mode}
+                  modeField='participante2_tipo'
+                  fixedField='jugador2_id'
+                  sourceField='origen_partido2_id'
+                  fixedLabel='Jugador'
+                  fixedOptions={jugadoresDisponibles.map((jugador) => ({
+                    id: jugador.id,
+                    label: `${jugador.nombre} ${jugador.apellido}`,
+                  }))}
+                  sourceMatches={sourceMatches}
+                  control={control}
+                  error={errors.jugador2_id || errors.origen_partido2_id}
                 />
-              </label>
-              <label className='form-group'>
-                <span className='form-label'>Games</span>
-                <select className='form-input' {...register('modo_game')}>
-                  <option value='ventaja'>Con ventaja</option>
-                  <option value='sin_ventaja'>Punto decisivo</option>
-                </select>
-              </label>
-              <label className='form-group'>
-                <span className='form-label'>Set decisivo</span>
-                <select className='form-input' {...register('set_decisivo')}>
-                  <option value='set_completo'>Set completo</option>
-                  <option value='match_tiebreak'>Match tiebreak</option>
-                </select>
-              </label>
-              <label className='form-group'>
-                <span className='form-label'>Tiebreak en</span>
-                <input
-                  type='number'
-                  min='0'
-                  max='12'
-                  className='form-input'
-                  {...register('tiebreak_en')}
-                />
-                <span className='text-[11px]' style={{ color: 'var(--text-muted)' }}>
-                  Usa 0 para jugar sin tiebreak.
-                </span>
-              </label>
-              <label className='form-group'>
-                <span className='form-label'>Tiebreak a</span>
-                <input
-                  type='number'
-                  min='5'
-                  max='99'
-                  className='form-input'
-                  {...register('tiebreak_puntos')}
-                />
-              </label>
-              <label className='form-group'>
-                <span className='form-label'>Match tiebreak a</span>
-                <input
-                  type='number'
-                  min='5'
-                  max='99'
-                  className='form-input'
-                  {...register('match_tiebreak_puntos')}
-                />
-              </label>
-              <label className='form-group'>
-                <span className='form-label'>Primer servidor</span>
-                <select className='form-input' {...register('servidor_inicial')}>
-                  <option value='jugador1'>Participante 1</option>
-                  <option value='jugador2'>Participante 2</option>
-                </select>
-              </label>
-            </div>
-          </div>
-
-          {/* Participantes según la modalidad definida por el torneo */}
-          {selectedModality === 'individual' ? (
-            <>
-              <ParticipantSelector
-                label='Participante 1'
-                mode={participant1Mode}
-                modeField='participante1_tipo'
-                fixedField='jugador1_id'
-                sourceField='origen_partido1_id'
-                fixedLabel='Jugador'
-                fixedOptions={excludingOpponent(
-                  jugadoresDisponibles,
-                  participant2Mode,
-                  player2Id
-                ).map((jugador) => ({
-                  id: jugador.id,
-                  label: `${jugador.nombre} ${jugador.apellido}`,
-                }))}
-                sourceMatches={sourceMatches.filter(
-                  (m) => participant2Mode !== 'ganador' || String(m.id) !== String(source2Id)
-                )}
-                control={control}
-                error={errors.jugador1_id || errors.origen_partido1_id}
-              />
-              <ParticipantSelector
-                label='Participante 2'
-                mode={participant2Mode}
-                modeField='participante2_tipo'
-                fixedField='jugador2_id'
-                sourceField='origen_partido2_id'
-                fixedLabel='Jugador'
-                fixedOptions={excludingOpponent(
-                  jugadoresDisponibles,
-                  participant1Mode,
-                  player1Id
-                ).map((jugador) => ({
-                  id: jugador.id,
-                  label: `${jugador.nombre} ${jugador.apellido}`,
-                }))}
-                sourceMatches={sourceMatches.filter(
-                  (m) => participant1Mode !== 'ganador' || String(m.id) !== String(source1Id)
-                )}
-                control={control}
-                error={errors.jugador2_id || errors.origen_partido2_id}
-              />
-            </>
-          ) : (
-            <>
-              <ParticipantSelector
-                label='Participante 1'
-                mode={participant1Mode}
-                modeField='participante1_tipo'
-                fixedField='equipo1_id'
-                sourceField='origen_partido1_id'
-                fixedLabel='Pareja'
-                fixedOptions={excludingOpponent(equiposDisponibles, participant2Mode, team2Id).map(
-                  (equipo) => ({
+              </>
+            ) : (
+              <>
+                <ParticipantSelector
+                  label='Participante 1'
+                  mode={participant1Mode}
+                  modeField='participante1_tipo'
+                  fixedField='equipo1_id'
+                  sourceField='origen_partido1_id'
+                  fixedLabel='Pareja'
+                  fixedOptions={equiposDisponibles.map((equipo) => ({
                     id: equipo.id,
                     label: equipo.nombre,
-                  })
-                )}
-                sourceMatches={sourceMatches.filter(
-                  (m) => participant2Mode !== 'ganador' || String(m.id) !== String(source2Id)
-                )}
-                control={control}
-                disabled={useGroups && !distribution}
-                error={errors.equipo1_id || errors.origen_partido1_id}
-              />
-              <ParticipantSelector
-                label='Participante 2'
-                mode={participant2Mode}
-                modeField='participante2_tipo'
-                fixedField='equipo2_id'
-                sourceField='origen_partido2_id'
-                fixedLabel='Pareja'
-                fixedOptions={excludingOpponent(equiposDisponibles, participant1Mode, team1Id).map(
-                  (equipo) => ({
+                  }))}
+                  sourceMatches={sourceMatches}
+                  control={control}
+                  disabled={useGroups && !distribution}
+                  error={errors.equipo1_id || errors.origen_partido1_id}
+                />
+                <ParticipantSelector
+                  label='Participante 2'
+                  mode={participant2Mode}
+                  modeField='participante2_tipo'
+                  fixedField='equipo2_id'
+                  sourceField='origen_partido2_id'
+                  fixedLabel='Pareja'
+                  fixedOptions={equiposDisponibles.map((equipo) => ({
                     id: equipo.id,
                     label: equipo.nombre,
-                  })
-                )}
-                sourceMatches={sourceMatches.filter(
-                  (m) => participant1Mode !== 'ganador' || String(m.id) !== String(source1Id)
-                )}
-                control={control}
-                disabled={useGroups && !distribution}
-                error={errors.equipo2_id || errors.origen_partido2_id}
-              />
-            </>
-          )}
+                  }))}
+                  sourceMatches={sourceMatches}
+                  control={control}
+                  disabled={useGroups && !distribution}
+                  error={errors.equipo2_id || errors.origen_partido2_id}
+                />
+              </>
+            )}
 
-          <div className='sm:col-span-2 form-group'>
-            <label className='form-label'>Observaciones</label>
-            <textarea
-              className='form-input resize-none'
-              rows={3}
-              placeholder='Ej.: partido suspendido por lluvia, retiro por lesión...'
-              {...register('notas')}
-            />
-          </div>
+            <div className='sm:col-span-2 form-group'>
+              <label className='form-label'>Observaciones</label>
+              <textarea
+                className='form-input resize-none'
+                rows={3}
+                placeholder='Ej.: partido suspendido por lluvia, retiro por lesión...'
+                {...register('notas')}
+              />
+            </div>
         </div>
       </Modal>
 
@@ -981,102 +924,102 @@ export default function GestionPartidos() {
         }
       >
         <div className='space-y-4'>
-          <div className='grid grid-cols-2 gap-4'>
-            <div className='form-group'>
-              <label className='form-label'>Estado</label>
-              <select className='form-input' {...regM('estado')}>
-                {ESTADOS.map((e) => (
-                  <option key={e.value} value={e.value}>
-                    {e.label}
-                  </option>
-                ))}
-              </select>
+            <div className='grid grid-cols-2 gap-4'>
+              <div className='form-group'>
+                <label className='form-label'>Estado</label>
+                <select className='form-input' {...regM('estado')}>
+                  {ESTADOS.map((e) => (
+                    <option key={e.value} value={e.value}>
+                      {e.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='form-group'>
+                <label className='form-label'>Ganador</label>
+                <select className='form-input' {...regM('ganador')}>
+                  <option value=''>Sin ganador</option>
+                  <option value='jugador1'>{marcadorParticipante1}</option>
+                  <option value='jugador2'>{marcadorParticipante2}</option>
+                </select>
+              </div>
             </div>
-            <div className='form-group'>
-              <label className='form-label'>Ganador</label>
-              <select className='form-input' {...regM('ganador')}>
-                <option value=''>Sin ganador</option>
-                <option value='jugador1'>{marcadorParticipante1}</option>
-                <option value='jugador2'>{marcadorParticipante2}</option>
-              </select>
-            </div>
-          </div>
 
-          {/* Sets */}
-          <div>
-            <p className='form-label mb-1'>Puntos por set</p>
-            <p className='text-xs mb-3' style={{ color: 'var(--text-muted)' }}>
-              Ingresa los games de cada jugador o equipo. Los tres primeros sets son fijos; los sets
-              adicionales se pueden agregar o quitar.
-            </p>
-            <div className='space-y-2'>
-              {setNumbers.map((num) => (
-                <div key={num} className='flex items-center gap-3'>
-                  <span
-                    className='text-xs font-medium w-12 shrink-0'
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    Set {num}
-                  </span>
-                  <input
-                    type='number'
-                    min='0'
-                    max='99'
-                    placeholder={num > 2 ? '/' : '0'}
-                    className='form-input w-20 text-center'
-                    aria-label={`${marcadorParticipante1}, set ${num}`}
-                    {...regM(`set_${num}_j1`)}
-                  />
-                  <span style={{ color: 'var(--text-muted)' }}>–</span>
-                  <input
-                    type='number'
-                    min='0'
-                    max='99'
-                    placeholder={num > 2 ? '/' : '0'}
-                    className='form-input w-20 text-center'
-                    aria-label={`${marcadorParticipante2}, set ${num}`}
-                    {...regM(`set_${num}_j2`)}
-                  />
-                  <div className='form-group flex-row items-center gap-2 m-0'>
-                    <input
-                      type='checkbox'
-                      id={`comp_${num}`}
-                      value='true'
-                      className='rounded'
-                      {...regM(`set_${num}_completado`)}
-                    />
-                    <label
-                      htmlFor={`comp_${num}`}
-                      className='text-xs cursor-pointer'
+            {/* Sets */}
+            <div>
+              <p className='form-label mb-1'>Puntos por set</p>
+              <p className='text-xs mb-3' style={{ color: 'var(--text-muted)' }}>
+                Ingresa los games de cada jugador o equipo. Los tres primeros sets son fijos; los
+                sets adicionales se pueden agregar o quitar.
+              </p>
+              <div className='space-y-2'>
+                {setNumbers.map((num) => (
+                  <div key={num} className='flex items-center gap-3'>
+                    <span
+                      className='text-xs font-medium w-12 shrink-0'
                       style={{ color: 'var(--text-muted)' }}
                     >
-                      Completado
-                    </label>
+                      Set {num}
+                    </span>
+                    <input
+                      type='number'
+                      min='0'
+                      max='99'
+                      placeholder={num > 2 ? '/' : '0'}
+                      className='form-input w-20 text-center'
+                      aria-label={`${marcadorParticipante1}, set ${num}`}
+                      {...regM(`set_${num}_j1`)}
+                    />
+                    <span style={{ color: 'var(--text-muted)' }}>–</span>
+                    <input
+                      type='number'
+                      min='0'
+                      max='99'
+                      placeholder={num > 2 ? '/' : '0'}
+                      className='form-input w-20 text-center'
+                      aria-label={`${marcadorParticipante2}, set ${num}`}
+                      {...regM(`set_${num}_j2`)}
+                    />
+                    <div className='form-group flex-row items-center gap-2 m-0'>
+                      <input
+                        type='checkbox'
+                        id={`comp_${num}`}
+                        value='true'
+                        className='rounded'
+                        {...regM(`set_${num}_completado`)}
+                      />
+                      <label
+                        htmlFor={`comp_${num}`}
+                        className='text-xs cursor-pointer'
+                        style={{ color: 'var(--text-muted)' }}
+                      >
+                        Completado
+                      </label>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-            <div className='flex flex-wrap gap-2 mt-3'>
-              <button
-                type='button'
-                onClick={addSet}
-                disabled={setNumbers.length >= MAX_SETS}
-                className='btn-secondary text-sm'
-              >
-                <Plus className='w-4 h-4' /> Agregar set
-              </button>
-              {setNumbers.length > 3 && (
+                ))}
+              </div>
+              <div className='flex flex-wrap gap-2 mt-3'>
                 <button
                   type='button'
-                  onClick={removeLastSet}
+                  onClick={addSet}
+                  disabled={setNumbers.length >= MAX_SETS}
                   className='btn-secondary text-sm'
-                  style={{ color: '#dc2626' }}
                 >
-                  <Trash2 className='w-4 h-4' /> Quitar último set
+                  <Plus className='w-4 h-4' /> Agregar set
                 </button>
-              )}
+                {setNumbers.length > 3 && (
+                  <button
+                    type='button'
+                    onClick={removeLastSet}
+                    className='btn-secondary text-sm'
+                    style={{ color: '#dc2626' }}
+                  >
+                    <Trash2 className='w-4 h-4' /> Quitar último set
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
         </div>
       </Modal>
 
@@ -1212,18 +1155,9 @@ function getParticipantNames(partido) {
 
 // Controlled selects retain reset values while their asynchronous options arrive.
 function FormSelect({ control, name, rules, children, ...props }) {
-  return (
-    <Controller
-      control={control}
-      name={name}
-      rules={rules}
-      render={({ field }) => (
-        <select {...props} {...field} value={field.value ?? ''}>
-          {children}
-        </select>
-      )}
-    />
-  )
+  return <Controller control={control} name={name} rules={rules} render={({ field }) => (
+    <select {...props} {...field} value={field.value ?? ''}>{children}</select>
+  )} />
 }
 
 function ParticipantSelector({

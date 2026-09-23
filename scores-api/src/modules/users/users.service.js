@@ -33,7 +33,6 @@ const hasUsuarioColumn = async () => {
 
 const userWithPlayer = (withUsuario) => `
   SELECT ${withUsuario ? `${BASE_FIELDS}, u.usuario` : BASE_FIELDS},
-         EXISTS(SELECT 1 FROM caddie_roles cr WHERE cr.user_id = u.id AND cr.activo = TRUE) AS es_caddie,
          j.id AS jugador_id,
          j.nombre AS jugador_nombre,
          j.apellido AS jugador_apellido,
@@ -129,6 +128,7 @@ const createAccount = async ({
 exports.create = async (data) => {
   const player = data.jugador
   if (!player || player.modo === 'ninguno') return exports.getById(await createAccount(data))
+  if ((data.rol || 'miembro') !== 'miembro') throw { status: 400, message: 'La vinculación de jugador en este formulario es para miembros' }
   if (!['existente', 'nuevo'].includes(player.modo)) throw { status: 400, message: 'Selecciona cómo vincular el jugador' }
   const aliasReady = await hasUsuarioColumn()
   const conn = await db.getConnection()
@@ -286,8 +286,6 @@ function formatUser(row) {
     acceso_celular: Boolean(row.telefono_acceso),
     avatar,
     rol: row.rol,
-    roles: [row.rol, ...(Number(row.es_caddie) ? ['caddie'] : [])],
-    es_caddie: Boolean(Number(row.es_caddie)),
     activo: Boolean(row.activo),
     created_at: row.created_at,
     jugador: row.jugador_id
