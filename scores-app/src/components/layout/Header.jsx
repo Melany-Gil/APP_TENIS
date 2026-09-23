@@ -33,6 +33,7 @@ const NAV_ITEMS = [
   { to: '/ayuda', icon: BookOpen, label: 'Ayuda' },
   { to: '/favorites', icon: Star, label: 'Favoritos' },
   { to: '/profile', icon: User, label: 'Mi perfil' },
+  { to: '/caddies', icon: Handshake, label: 'Caddies' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ]
 

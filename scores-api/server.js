@@ -77,6 +77,7 @@ app.use('/api/sedes', sedesRoutes)
 app.use('/api/users', usersRoutes)
 app.use('/api/countries', countriesRoutes)
 app.use('/api/tickets', require('./src/modules/support/support.routes'))
+app.use('/api/caddies', require('./src/modules/caddies/routes'))
 app.use('/api/notificaciones', require('./src/modules/support/notifications.routes'))
 app.use('/api/push', require('./src/modules/support/push.routes'))
 

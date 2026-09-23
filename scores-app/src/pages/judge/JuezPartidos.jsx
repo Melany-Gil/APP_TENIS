@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import CaddiePanel from '../../components/match/CaddiePanel'
 import { useOutletContext } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -76,6 +77,7 @@ export default function JuezPartidos() {
   const [nameDraft, setNameDraft] = useState(['', ''])
   const [nameBusy, setNameBusy] = useState(false)
   const [nameError, setNameError] = useState('')
+  const [caddieAssignment, setCaddieAssignment] = useState(null)
   const isDirectorOrAdmin = ['admin', 'juez_director'].includes(user?.rol)
 
   // Filtros y pestañas ordenadas para jueces y directores
@@ -820,7 +822,7 @@ export default function JuezPartidos() {
             >
               <ArrowLeft size={17} /> Partidos
             </button>
-            <span className='text-xs truncate'>{match?.cancha?.nombre || 'Mesa de juez'}</span>
+            <CaddiePanel key={selectedId} matchId={selectedId} refreshKey={match?.estado} compact mode='gestion' onAssignment={setCaddieAssignment}/>
             <MatchPhotoCapture
               key={`${userId}:${selectedId}`}
               matchId={selectedId}
@@ -1198,11 +1200,12 @@ export default function JuezPartidos() {
                   </p>
                   <button
                     className='btn-primary py-4 w-full'
-                    disabled={adminLocked}
+                    disabled={adminLocked || caddieAssignment?.matchId !== selectedId || !caddieAssignment?.ready}
                     onClick={() => write((id) => matchService.startLive(id))}
                   >
                     <Play size={18} /> Iniciar partido
                   </button>
+                  {!caddieAssignment?.ready && <p className='text-xs font-semibold text-amber-700'>Primero selecciona y guarda el caddie usando el botón «Caddie» de la barra superior.</p>}
                 </section>
               )}
               {paused && !finished && (

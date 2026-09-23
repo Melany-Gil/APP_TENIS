@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import useAuthStore from '../store/useAuthStore'
 import AuthLayout from '../layouts/AuthLayout'
 import AppLayout from '../layouts/AppLayout'
@@ -36,6 +36,7 @@ const Sponsors = lazy(() => import('../pages/Sponsors'))
 const Pantalla = lazy(() => import('../pages/Pantalla'))
 const Ayuda = lazy(() => import('../pages/Ayuda'))
 const Support = lazy(() => import('../pages/Support'))
+const Caddies = lazy(() => import('../pages/Caddies'))
 
 // ── Admin ─────────────────────────────────────────────────
 const Dashboard = lazy(() => import('../pages/admin/Dashboard'))
@@ -58,19 +59,7 @@ const JuezPartidos = lazy(() => import('../pages/judge/JuezPartidos'))
 // interno muestra un loader pequeño mientras carga el chunk.
 export default function AppRouter() {
   const { user, isAuthenticated } = useAuthStore()
-  const { pathname } = useLocation()
-  // Un juez estándar tiene solo /juez, /juez/perfil y la ayuda
-  if (isAuthenticated && user?.rol === 'juez' && !['/juez', '/juez/perfil', '/ayuda', '/soporte'].includes(pathname)) {
-    return <Navigate to={pathname === '/profile' ? '/juez/perfil' : '/juez'} replace />
-  }
-  // Un juez director tiene acceso a su panel dedicado (/director), a la mesa (/juez), a su perfil y a la ayuda
-  if (
-    isAuthenticated &&
-    user?.rol === 'juez_director' &&
-    !['/director', '/juez', '/juez/perfil', '/ayuda', '/soporte'].includes(pathname)
-  ) {
-    return <Navigate to='/director' replace />
-  }
+  // Officials may also be players. Each privileged route retains its guard.
   return (
     <Routes>
       {/* Auth */}
@@ -87,6 +76,7 @@ export default function AppRouter() {
 
       {/* Consulta pública de marcadores */}
       <Route element={<AppLayout />}>
+        <Route path='/caddies' element={<ProtectedRoute><Caddies /></ProtectedRoute>} />
         <Route path='/' element={isAuthenticated && user?.rol === 'miembro' ? <PlayerDashboard key={user.id} /> : <Home />} />
         <Route path='/live' element={<Live />} />
         <Route path='/anuncios' element={<Anuncios />} />
@@ -172,6 +162,7 @@ export default function AppRouter() {
         <Route path='/admin/sedes' element={<GestionSedes />} />
         <Route path='/admin/categorias' element={<GestionCategorias />} />
         <Route path='/admin/usuarios' element={<GestionUsuarios />} />
+        <Route path='/admin/caddies' element={<Caddies />} />
       </Route>
 
       <Route path='*' element={<Navigate to='/' replace />} />

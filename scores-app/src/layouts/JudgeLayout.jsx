@@ -50,6 +50,7 @@ export default function JudgeLayout() {
       <NavLink to='/soporte' className='btn-ghost text-xs px-2 py-2'>
         Soporte
       </NavLink>
+      <NavLink to='/caddies' className='btn-ghost text-xs px-2 py-2'>Caddies</NavLink>
       <NavLink
         to='/juez/perfil'
         className={({ isActive }) =>

@@ -117,6 +117,7 @@ exports.startMatch = async (id, user) => {
     if (matches[0].estado === 'finalizado' || matches[0].estado === 'cancelado') {
       throw { status: 409, message: 'Este partido no se puede iniciar' }
     }
+    if (matches[0].estado === 'programado') await require('../caddies/service').assertAssigned(connection, matches[0])
     await ensureLiveState(connection, id)
     await connection.query(
       `UPDATE estado_en_vivo_partido
@@ -233,6 +234,7 @@ exports.addEvent = async (id, event, user) => {
     if (matches[0].estado === 'finalizado' || matches[0].estado === 'cancelado') {
       throw { status: 409, message: 'Este partido ya no admite cambios' }
     }
+    if (matches[0].estado === 'programado') await require('../caddies/service').assertAssigned(connection, matches[0])
     await ensureLiveState(connection, id)
     const [liveRows] = await connection.query(
       'SELECT pausado_at FROM estado_en_vivo_partido WHERE partido_id = ? FOR UPDATE',

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import CaddieInvite from '../components/match/CaddieInvite'
 import { Link } from 'react-router-dom'
 import { BarChart3, CalendarDays, Trophy, UserRound } from 'lucide-react'
 import useAuthStore from '../store/useAuthStore'
@@ -57,6 +58,7 @@ export default function PlayerDashboard() {
   const list = (tab === 'historial' ? history : upcoming).filter(m => !tournament || String(m.torneo?.id) === tournament)
 
   return <div className='space-y-6 animate-fade-up'>
+    <CaddieInvite />
     <section className='card p-5 sm:p-7 flex flex-wrap items-center gap-4'>
       <Avatar src={data?.jugador?.foto || user?.avatar} name={`${user?.nombre || ''} ${user?.apellido || ''}`} size='lg' />
       <div className='flex-1 min-w-[160px]'>

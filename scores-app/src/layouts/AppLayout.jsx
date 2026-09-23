@@ -22,7 +22,7 @@ export default function AppLayout() {
           </Suspense>
         </div>
       </main>
-      {!/^\/match\/[^/]+\/?$/.test(pathname) && <SponsorDock />}
+      {pathname !== '/caddies' && !/^\/match\/[^/]+\/?$/.test(pathname) && <SponsorDock />}
       <ToastContainer />
     </div>
   )
