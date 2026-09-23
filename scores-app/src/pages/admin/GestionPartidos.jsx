@@ -1,6 +1,6 @@
 import BulkDelete from '../../components/ui/BulkDelete'
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { useForm } from 'react-hook-form'
+import { useState, useEffect, useMemo } from 'react'
+import { Controller, useForm } from 'react-hook-form'
 import { Plus, Pencil, Trash2, X, Radio, Gavel, SlidersHorizontal, MapPin } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { matchService } from '../../services/matchService'
@@ -47,6 +47,7 @@ export default function GestionPartidos() {
   const [showForm, setShowForm] = useState(false)
   const [showMarcador, setShowMarcador] = useState(null)
   const [editing, setEditing] = useState(null)
+  const [submitError, setSubmitError] = useState('')
   const [filterTab, setFilterTab] = useState('todos')
   const [setNumbers, setSetNumbers] = useState([1, 2, 3])
   const { addToast } = useUIStore()
@@ -54,6 +55,7 @@ export default function GestionPartidos() {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     setValue,
@@ -84,7 +86,7 @@ export default function GestionPartidos() {
     setDistribution(null)
     setGroupError('')
     if (
-      selectedTournamentId &&
+      showForm && selectedTournamentId &&
       selectedTournament?.sistema === 'grupos_eliminacion' &&
       selectedModality === 'dobles'
     ) {
@@ -93,11 +95,6 @@ export default function GestionPartidos() {
         .then((r) => {
           if (!active) return
           setDistribution(r.data)
-          if (editing && String(editing.torneo?.id || '') === selectedTournamentId) {
-            if (editing.grupo) setValue('grupo', editing.grupo)
-            if (editing.equipo1?.id) setValue('equipo1_id', String(editing.equipo1.id))
-            if (editing.equipo2?.id) setValue('equipo2_id', String(editing.equipo2.id))
-          }
         })
         .catch((e) => {
           if (active) setGroupError(e.message || 'No se pudieron cargar los grupos')
@@ -108,7 +105,7 @@ export default function GestionPartidos() {
     return () => {
       active = false
     }
-  }, [selectedTournamentId, selectedTournament?.sistema, selectedModality, editing])
+  }, [showForm, selectedTournamentId, selectedTournament?.sistema, selectedModality])
   const selectedGroup = watch('grupo') || ''
   const useGroups =
     selectedTournament?.sistema === 'grupos_eliminacion' && selectedModality === 'dobles'
@@ -152,7 +149,7 @@ export default function GestionPartidos() {
 
   const fetchAll = () => {
     setLoading(true)
-    Promise.all([
+    return Promise.all([
       matchService.getAll(),
       playerService.getAll(),
       teamService.getAll(),
@@ -194,6 +191,7 @@ export default function GestionPartidos() {
   }, [])
 
   const openCreate = () => {
+    setSubmitError('')
     reset({
       torneo_id: searchParams.get('torneo') || '',
       deporte: 'tenis',
@@ -222,6 +220,7 @@ export default function GestionPartidos() {
   }
 
   const openEdit = (partido) => {
+    setSubmitError('')
     setEditing(partido)
     const tId = partido.torneo?.id ? String(partido.torneo.id) : ''
     reset({
@@ -275,12 +274,27 @@ export default function GestionPartidos() {
   }
 
   const onSubmit = async (data) => {
+    setSubmitError('')
     try {
+      if (useGroups) {
+        if (!distribution || groupError) throw new Error(groupError || 'Espera a que se carguen los grupos antes de guardar.')
+        if (selectedPhase === 'grupos' && !distribution.grupos.some(g => String(g.categoria_id) === selectedCategoryId && g.nombre === data.grupo)) {
+          throw new Error('Selecciona un grupo válido de esta categoría.')
+        }
+      }
+      for (const side of [1, 2]) {
+        if (data[`participante${side}_tipo`] === 'ganador') continue
+        const options = selectedModality === 'dobles' ? equiposDisponibles : jugadoresDisponibles
+        const id = data[`${selectedModality === 'dobles' ? 'equipo' : 'jugador'}${side}_id`]
+        if (!options.some(option => String(option.id) === String(id))) {
+          throw new Error(`El participante ${side} no pertenece a la selección actual. Revisa categoría y grupo.`)
+        }
+      }
       const payload = {
         torneo_id: data.torneo_id || null,
-        deporte: data.deporte || 'tenis',
-        modalidad: data.modalidad || 'individual',
-        categoria_id: data.categoria_id,
+        deporte: selectedDeporte,
+        modalidad: selectedModality,
+        categoria_id: selectedCategoryId,
         estado: data.estado,
         fecha_inicio: data.fecha_inicio,
         hora_inicio: data.hora_inicio,
@@ -321,8 +335,9 @@ export default function GestionPartidos() {
         addToast({ type: 'success', title: 'Partido creado' })
       }
       setShowForm(false)
-      fetchAll()
+      await fetchAll()
     } catch (err) {
+      setSubmitError(err.message || 'No se pudo guardar el partido. Tus datos se conservan; vuelve a intentarlo.')
       addToast({ type: 'error', title: 'Error', message: err.message })
     }
   }
@@ -433,13 +448,14 @@ export default function GestionPartidos() {
             >
               Cancelar
             </Button>
-            <Button type='submit' loading={isSubmitting}>
+            <Button type='submit' loading={isSubmitting} disabled={useGroups && (!distribution || !!groupError)}>
               {editing ? 'Guardar cambios' : 'Crear partido'}
             </Button>
           </>
         }
       >
         <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+              {submitError && <p role='alert' className='form-error sm:col-span-2'>{submitError}</p>}
               <div className='form-group sm:col-span-2'>
                 <label className='form-label'>Torneo (opcional)</label>
                 <select
@@ -569,11 +585,14 @@ export default function GestionPartidos() {
                 <label className='form-label'>Grupo *</label>
                 {useGroups ? (
                   <>
-                    <select
+                    <FormSelect
+                      control={control}
+                      name='grupo'
+                      rules={{ required: 'Selecciona un grupo' }}
+                      disabled={!distribution}
                       className='form-input'
-                      {...register('grupo', { required: 'Selecciona un grupo' })}
                     >
-                      <option value=''>Selecciona un grupo…</option>
+                      <option value=''>{!distribution && !groupError ? 'Cargando grupos…' : 'Selecciona un grupo…'}</option>
                       {(distribution?.grupos || [])
                         .filter((g) => String(g.categoria_id) === selectedCategoryId)
                         .map((g) => (
@@ -581,7 +600,8 @@ export default function GestionPartidos() {
                             {g.nombre} · {g.equipo_ids.length} parejas
                           </option>
                         ))}
-                    </select>
+                    </FormSelect>
+                    {errors.grupo && <p className='form-error'>{errors.grupo.message}</p>}
                     <p className='text-xs mt-1'>
                       {groupError || 'Solo podrás seleccionar parejas de esta categoría y grupo.'}{' '}
                       <Link className='underline' to={'/torneo/' + selectedTournamentId}>
@@ -807,7 +827,7 @@ export default function GestionPartidos() {
                     label: `${jugador.nombre} ${jugador.apellido}`,
                   }))}
                   sourceMatches={sourceMatches}
-                  register={register}
+                  control={control}
                   error={errors.jugador1_id || errors.origen_partido1_id}
                 />
                 <ParticipantSelector
@@ -822,7 +842,7 @@ export default function GestionPartidos() {
                     label: `${jugador.nombre} ${jugador.apellido}`,
                   }))}
                   sourceMatches={sourceMatches}
-                  register={register}
+                  control={control}
                   error={errors.jugador2_id || errors.origen_partido2_id}
                 />
               </>
@@ -840,7 +860,8 @@ export default function GestionPartidos() {
                     label: equipo.nombre,
                   }))}
                   sourceMatches={sourceMatches}
-                  register={register}
+                  control={control}
+                  disabled={useGroups && !distribution}
                   error={errors.equipo1_id || errors.origen_partido1_id}
                 />
                 <ParticipantSelector
@@ -855,7 +876,8 @@ export default function GestionPartidos() {
                     label: equipo.nombre,
                   }))}
                   sourceMatches={sourceMatches}
-                  register={register}
+                  control={control}
+                  disabled={useGroups && !distribution}
                   error={errors.equipo2_id || errors.origen_partido2_id}
                 />
               </>
@@ -1131,6 +1153,13 @@ function getParticipantNames(partido) {
   return [getParticipantName(partido, 1), getParticipantName(partido, 2)]
 }
 
+// Controlled selects retain reset values while their asynchronous options arrive.
+function FormSelect({ control, name, rules, children, ...props }) {
+  return <Controller control={control} name={name} rules={rules} render={({ field }) => (
+    <select {...props} {...field} value={field.value ?? ''}>{children}</select>
+  )} />
+}
+
 function ParticipantSelector({
   label,
   mode,
@@ -1140,24 +1169,28 @@ function ParticipantSelector({
   fixedLabel,
   fixedOptions,
   sourceMatches,
-  register,
+  control,
+  disabled = false,
   error,
 }) {
   return (
     <div className='form-group'>
       <label className='form-label'>{label}</label>
-      <select className='form-input' {...register(modeField)}>
+      <FormSelect className='form-input' control={control} name={modeField}>
         <option value='fijo'>{fixedLabel} definido</option>
         <option value='ganador' disabled={!sourceMatches.length}>
           Ganador de otro partido
         </option>
-      </select>
+      </FormSelect>
 
       {mode === 'ganador' ? (
         <>
-          <select
+          <FormSelect
+            key={sourceField}
+            control={control}
+            name={sourceField}
             className='form-input'
-            {...register(sourceField, { required: 'Selecciona el partido de origen' })}
+            rules={{ required: 'Selecciona el partido de origen' }}
           >
             <option value=''>Seleccionar partido</option>
             {sourceMatches.map((match) => (
@@ -1165,7 +1198,7 @@ function ParticipantSelector({
                 Gdor: {getMatchupLabel(match)}
               </option>
             ))}
-          </select>
+          </FormSelect>
           {sourceMatches.length === 0 && (
             <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
               Primero crea otro partido de la misma categoría.
@@ -1173,9 +1206,13 @@ function ParticipantSelector({
           )}
         </>
       ) : (
-        <select
+        <FormSelect
+          key={fixedField}
+          control={control}
+          name={fixedField}
+          disabled={disabled}
           className='form-input'
-          {...register(fixedField, { required: `Selecciona un ${fixedLabel.toLowerCase()}` })}
+          rules={{ required: `Selecciona un ${fixedLabel.toLowerCase()}` }}
         >
           <option value=''>Seleccionar</option>
           {fixedOptions.map((option) => (
@@ -1183,7 +1220,7 @@ function ParticipantSelector({
               {option.label}
             </option>
           ))}
-        </select>
+        </FormSelect>
       )}
       {error && <p className='form-error'>{error.message}</p>}
     </div>

@@ -7,9 +7,83 @@ const os = require('node:os')
 const sharp = require('../scores-api/node_modules/sharp')
 const { createInitialState, applyEvent, serializeState } = require('../scores-api/src/modules/matches/score.engine')
 
+async function checkMatchEditing(browser) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  const admin = { id: 99, rol: 'admin', nombre: 'Admin', apellido: 'QA', email: 'qa@example.com', numero_documento: '12345678' }
+  const categoria = { id: 1, nombre: 'Cuarta', deporte: 'tenis' }
+  const torneo = { id: 1, nombre: 'Torneo QA', deporte: 'tenis', modalidad: 'dobles', sistema: 'grupos_eliminacion', estado: 'activo' }
+  const teams = [1, 2, 3, 4].map(id => ({ id, nombre: `Pareja ${id}`, deporte: 'tenis', categoria }))
+  const matches = [0, 1].map(i => ({ id: i + 10, torneo, categoria, modalidad: 'dobles', deporte: 'tenis', estado: 'programado', fase: 'grupos', grupo: `GRUPO ${i + 1}`, equipo1: teams[i * 2], equipo2: teams[i * 2 + 1], formato: {}, sets: [] }))
+  const distribution = {
+    grupos: [1, 2].map(n => ({ nombre: `GRUPO ${n}`, categoria_id: 1, equipo_ids: [n * 2 - 1, n * 2] })),
+    parejas: teams.map(t => ({ equipo_id: t.id, categoria_id: 1, grupo: `GRUPO ${Math.ceil(t.id / 2)}` })),
+  }
+  let writes = 0, failSave = false, failGroups = false
+  const errors = []
+  page.on('pageerror', e => errors.push(e.message))
+  await page.addInitScript(u => localStorage.setItem('auth-storage-v2', JSON.stringify({ state: { isAuthenticated: true, user: u }, version: 0 })), admin)
+  await page.route('**/*', async route => {
+    const req = route.request(), url = new URL(req.url()), endpoint = url.pathname.replace(/^\/api/, '')
+    if (!url.pathname.startsWith('/api/')) return url.hostname === '127.0.0.1' ? route.continue() : route.abort()
+    const respond = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(status === 200 ? { ok: true, data } : { ok: false, message: 'Error simulado QA' }) })
+    if (req.method() === 'PUT') {
+      assert.match(endpoint, /^\/partidos\/1[01]$/)
+      if (failSave) return respond(null, 500)
+      const saved = matches.find(m => m.id === Number(endpoint.split('/').at(-1)))
+      const body = req.postDataJSON()
+      assert.equal(body.grupo, saved.grupo)
+      assert.equal(Number(body.equipo1_id), saved.equipo1.id)
+      assert.equal(Number(body.equipo2_id), saved.equipo2.id)
+      saved.notas = body.notas
+      writes++
+      return respond(saved)
+    }
+    assert.equal(req.method(), 'GET')
+    if (endpoint.endsWith('/grupos')) {
+      await new Promise(resolve => setTimeout(resolve, 350))
+      return respond(distribution, failGroups ? 500 : 200)
+    }
+    return respond(endpoint.endsWith('/me') ? admin : ({ '/partidos': matches, '/equipos': teams, '/torneos': [torneo], '/categorias': [categoria] }[endpoint] || []))
+  })
+  try {
+    await page.goto('http://127.0.0.1:4173/admin/partidos')
+    for (const index of [0, 1, 0]) {
+      await page.getByRole('button', { name: 'Editar datos del partido', exact: true }).nth(index).click()
+      const modal = page.getByRole('dialog', { name: 'Editar partido', exact: true })
+      await modal.locator('select[name="grupo"]:not([disabled])').waitFor()
+      assert.equal(await modal.locator('[name="grupo"]').inputValue(), matches[index].grupo)
+      assert.equal(await modal.locator('[name="equipo1_id"]').inputValue(), String(matches[index].equipo1.id))
+      assert.equal(await modal.locator('[name="equipo2_id"]').inputValue(), String(matches[index].equipo2.id))
+      await modal.locator('[name="notas"]').fill(`Edición ${writes}`)
+      await modal.getByRole('button', { name: 'Guardar cambios' }).click()
+      await modal.waitFor({ state: 'detached' })
+    }
+    assert.equal(writes, 3, 'Three consecutive edits without reloading')
+    failSave = true
+    await page.getByRole('button', { name: 'Editar datos del partido', exact: true }).first().click()
+    const modal = page.getByRole('dialog', { name: 'Editar partido', exact: true })
+    await modal.locator('select[name="grupo"]:not([disabled])').waitFor()
+    await modal.getByRole('button', { name: 'Guardar cambios' }).click()
+    await modal.getByRole('alert').filter({ hasText: 'Error simulado QA' }).waitFor()
+    assert.equal(await modal.locator('[name="equipo1_id"]').inputValue(), '1')
+    failSave = false
+    await modal.getByRole('button', { name: 'Guardar cambios' }).click()
+    await modal.waitFor({ state: 'detached' })
+    assert.equal(writes, 4)
+    failGroups = true
+    await page.getByRole('button', { name: 'Editar datos del partido', exact: true }).first().click()
+    await modal.getByText(/Error simulado QA/).waitFor()
+    assert.equal(await modal.getByRole('button', { name: 'Guardar cambios' }).isDisabled(), true)
+    assert.deepEqual(errors, [])
+    console.log('PASS: match edit retains groups/teams, consecutive saves, save retry and group-load failure')
+  } finally { await page.close() }
+}
+
 ;(async () => {
   const browser = await chromium.launch({ headless: true, channel: 'chrome' })
   try {
+    await checkMatchEditing(browser)
+    if (process.env.QA_MATCH_EDIT_ONLY === '1') return
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
     const page = await context.newPage()
     const failures = []
