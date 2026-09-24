@@ -32,9 +32,11 @@ async function renderCard(card, originalPhotoUrl) {
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
   const background = new Image()
-  background.src = new URL('../assets/photocall-court.svg', import.meta.url).href
+  background.src = new URL('../assets/photocall-court-photo.webp', import.meta.url).href
   await background.decode()
   ctx.drawImage(background, 0, 0, 1080, 1920)
+  ctx.fillStyle = getComputedStyle(card).getPropertyValue('--photocall-veil').trim() || 'rgba(7,24,19,.24)'
+  ctx.fillRect(0, 0, 1080, 1920)
   ctx.translate((1080 - bounds.width * scale) / 2, (1920 - height * scale) / 2)
   ctx.scale(scale, scale)
   const relative = rect => ({ x: rect.left - bounds.left, y: rect.top - bounds.top, w: rect.width, h: rect.height })
@@ -47,7 +49,7 @@ async function renderCard(card, originalPhotoUrl) {
     const style = getComputedStyle(el)
     return { rect: relative(el.getBoundingClientRect()), color: style.backgroundColor, radius: corners(style),
       outline: style.outlineStyle === 'none' ? style.borderColor : style.outlineColor,
-      lineWidth: parseFloat(style.outlineWidth) || parseFloat(style.borderWidth) || .65 }
+      lineWidth: parseFloat(style.outlineStyle === 'none' ? style.borderWidth : style.outlineWidth) || .5 }
   })
   const images = [...card.querySelectorAll('img')].map(el => ({
     url: el.classList.contains('photocall-photo-img') ? originalPhotoUrl : el.currentSrc || el.src,
@@ -83,9 +85,9 @@ async function renderCard(card, originalPhotoUrl) {
   }))
   for (const box of boxes) {
     ctx.save()
-    ctx.shadowColor = 'rgba(4,27,20,.15)'
-    ctx.shadowBlur = 6
-    ctx.shadowOffsetY = 2
+    ctx.shadowColor = 'rgba(0,18,12,.3)'
+    ctx.shadowBlur = 12
+    ctx.shadowOffsetY = 3
     rounded(box.rect, box.radius); ctx.fillStyle = box.color; ctx.fill()
     ctx.restore()
   }

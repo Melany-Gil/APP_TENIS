@@ -104,7 +104,7 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
         <div className='photocall-score-meta'><span>{match.torneo?.nombre || 'Encuentro de tenis'}</span><strong>{finished ? 'Resultado final' : match.estado === 'cancelado' ? 'Cancelado' : match.estado === 'en_vivo' ? 'Marcador actual' : 'Programado'}</strong></div>
         <table aria-label='Marcador de la foto'>
           <thead><tr><th>Jugador / pareja</th>{sets.map((set, i) => <th key={i}>{set.type === 'match_tiebreak' ? 'STB' : `S${i + 1}`}</th>)}{!finished && marker && <th>Pts</th>}</tr></thead>
-          <tbody>{[1, 2].map((side, i) => <tr key={side}><th scope='row'>{getParticipantName(match, side)}</th>{sets.map((set, index) => <td key={index}>{set.games?.[i] ?? '—'}{set.type !== 'match_tiebreak' && set.tiebreak?.some(Boolean) && <sup>{set.tiebreak[i]}</sup>}</td>)}{!finished && marker && <td>{marker.displayPoints?.[i] ?? '—'}</td>}</tr>)}</tbody>
+          <tbody>{[1, 2].map((side, i) => <tr key={side} data-winner={finished && match.ganador === `jugador${side}` ? 'true' : undefined}><th scope='row'>{getParticipantName(match, side)}</th>{sets.map((set, index) => <td key={index}>{set.games?.[i] ?? '—'}{set.type !== 'match_tiebreak' && set.tiebreak?.some(Boolean) && <sup>{set.tiebreak[i]}</sup>}</td>)}{!finished && marker && <td>{marker.displayPoints?.[i] ?? '—'}</td>}</tr>)}</tbody>
         </table>
         {!marker && <p className='photocall-score-note'>Marcador no disponible</p>}
         {!finished && marker && <p className='photocall-score-note'>Marcador actual, no necesariamente el del momento de la foto.</p>}

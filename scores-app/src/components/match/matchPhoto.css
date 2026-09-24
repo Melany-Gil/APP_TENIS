@@ -1,17 +1,18 @@
-.match-photocall-card { container-type: inline-size; width: 100%; max-width: 880px; margin: 18px auto; padding: 14px; box-sizing: border-box; border-radius: 20px; background: #0d3028 url('../../assets/photocall-court.svg') center / 100% 100% no-repeat; border: 1px solid #e8cf9a40; color: #fff; box-shadow: 0 12px 32px #101d2826, inset 0 1px 0 #f5e7cb24; }
-.match-photocall-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0 2px 10px; position: relative; isolation: isolate; overflow: hidden; }
+.match-photocall-card { --photocall-veil: rgba(7, 24, 19, .24); container-type: inline-size; width: 100%; max-width: 880px; margin: 18px auto; padding: 14px; box-sizing: border-box; border-radius: 20px; background: linear-gradient(var(--photocall-veil), var(--photocall-veil)), #0d3028 url('../../assets/photocall-court-photo.webp') center / 100% 100% no-repeat; border: 1px solid #e8cf9a40; color: #fff; box-shadow: 0 12px 32px #101d2826, inset 0 1px 0 #f5e7cb24; }
+.match-photocall-header { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5px 8px; padding: 0 2px 12px; position: relative; isolation: isolate; }
+.match-photocall-header > div { display: contents; }
 .photocall-kicker { font-size: 9px; letter-spacing: .14em; color: #e0d5bc; }
-.match-photocall-title { font-size: 13px; font-weight: 700; margin-top: 3px; }
-.match-photocall-badge { font-size: 9px; white-space: nowrap; border: 1px solid #d2ad70; border-radius: 20px; padding: 5px 8px; color: #fff8e8; background: #71431f; }
-.photocall-photo-wrapper { width: 100%; overflow: hidden; border-radius: 14px 14px 0 0; background: #0e202b; outline: 1.5px solid #b66b43; outline-offset: -1.5px; }
+.match-photocall-title { grid-row: 2; grid-column: 1 / -1; font-size: 17px; line-height: 1.15; font-weight: 800; margin-top: 0; letter-spacing: -.02em; text-shadow: 0 2px 8px #0004; }
+.match-photocall-badge { grid-row: 1; grid-column: 2; font-size: 8px; white-space: nowrap; border: .6px solid #d8b78a; border-radius: 20px; padding: 4px 8px; color: #fff8e8; background: #754322; }
+.photocall-photo-wrapper { width: 100%; overflow: hidden; border-radius: 14px 14px 0 0; background: #0e202b; outline: .7px solid #c19765; outline-offset: -.7px; box-shadow: 0 6px 18px #00170f4d; }
 .photocall-photo-btn { display: block; width: 100%; position: relative; aspect-ratio: 3 / 2; overflow: hidden; }
 .photocall-photo-btn[data-expanded] { aspect-ratio: 1 / 1; }
 .photocall-photo-img { display: block; position: relative; width: 100%; height: 100%; object-fit: contain; margin: auto; }
 .photocall-photo-backdrop { position: absolute; inset: -14px; background-size: cover; background-position: center; filter: blur(12px) brightness(.65); pointer-events: none; }
 .photocall-expand { position: absolute; right: 8px; bottom: 8px; padding: 7px; border-radius: 50%; background: #0008; color: white; }
-.photocall-score { padding: 6px 10px; background: #f7faf6; color: #17382b; border-radius: 0 0 14px 14px; box-shadow: 0 4px 16px #071e181a; outline: 1px solid #b66b43; outline-offset: -1px; }
+.photocall-score { padding: 7px 10px; background: #f7faf6; color: #17382b; border-radius: 0 0 14px 14px; box-shadow: 0 6px 16px #00170f40; outline: .6px solid #c19765; outline-offset: -.6px; }
 .photocall-score-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 9px; line-height: 1.3; margin-bottom: 3px; color: #52685b; }
-.photocall-score-meta > span { overflow-wrap: anywhere; min-width: 0; }
+.photocall-score-meta > span { overflow-wrap: anywhere; min-width: 0; font-weight: 700; color: #17382b; }
 .photocall-score-meta > strong { flex-shrink: 0; color: #23653e; }
 .photocall-score table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .photocall-score th:first-child { width: 49%; text-align: left; overflow-wrap: anywhere; }
@@ -19,12 +20,12 @@
 .photocall-score tbody th { font-size: 12px; padding: 3px 5px 3px 0; line-height: 1.3; }
 .photocall-score td { padding: 2px 0; line-height: 1.15; text-align: center; font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .photocall-score tbody tr + tr { border-top: 1px solid #dfe8de; }
-.photocall-score tbody tr:last-child td { color: #36804b; }
+.photocall-score tbody tr[data-winner='true'] { color: #36804b; }
 .photocall-score sup { font-size: 8px; }
 .photocall-score-note { font-size: 9px; color: #52685b; margin-top: 5px; }
 .photocall-sponsors { display: grid; grid-auto-flow: row dense; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 10px; }
 .photocall-logo-mxm { grid-column: 1; grid-row: 2; }
-.photocall-logo { background: #fff; border-radius: 7px; height: 38px; padding: 5px; display: flex; align-items: center; justify-content: center; min-width: 0; box-shadow: 0 2px 6px #041b1426; outline: 1px solid #b66b43; outline-offset: -1px; }
+.photocall-logo { background: #fff; border-radius: 7px; height: 38px; padding: 5px; display: flex; align-items: center; justify-content: center; min-width: 0; box-shadow: 0 3px 7px #00170f38; outline: .5px solid #c5a274; outline-offset: -.5px; }
 .photocall-logo img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
 .photocall-actions { text-align: center; padding-top: 10px; }
 .photocall-download-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; font-size: 11px; color: #e0ede5; padding: 6px 12px; border-radius: 10px; background: #ffffff0d; }
@@ -37,6 +38,6 @@
 .photocall-framing input:disabled { opacity: .4; }
 .match-photocall-card button:focus-visible { outline: 2px solid #dfd974; outline-offset: 2px; }
 @container (min-width: 480px) { .photocall-sponsors { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; } .photocall-logo { height: 46px; padding: 6px; } .photocall-score tbody th { font-size: 15px; } .photocall-score td { font-size: 24px; } }
-@container (max-width: 300px) { .photocall-logo { height: 34px; padding: 4px; } .photocall-score th:first-child { width: 44%; } .photocall-score td { font-size: 16px; } .match-photocall-title { font-size: 11px; } }
+@container (max-width: 300px) { .photocall-logo { height: 34px; padding: 4px; } .photocall-score th:first-child { width: 44%; } .photocall-score td { font-size: 16px; } .match-photocall-title { font-size: 15px; } }
 @media print { .photocall-actions, .photocall-expand { display: none; } .match-photocall-card { break-inside: avoid; print-color-adjust: exact; } }
 .photocall-logo.photocall-logo-large { padding: 1px; }
