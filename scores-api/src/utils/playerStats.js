@@ -2,6 +2,8 @@ const PLAYER_STATS_QUERY = `
   SELECT
     p.id AS partido_id,
     p.categoria_id,
+    p.mejor_de_sets,
+    p.set_decisivo,
     cat.nombre AS categoria_nombre,
     cat.orden AS categoria_orden,
     p.jugador1_id,
@@ -65,12 +67,15 @@ function calculatePlayerStats(rows) {
         p1Ids: [...new Set(p1Ids)],
         p2Ids: [...new Set(p2Ids)],
         ganador: row.ganador,
+        mejor_de_sets: Number(row.mejor_de_sets || 3),
+        set_decisivo: row.set_decisivo,
         sets: [],
       })
     }
 
     if (row.numero_set !== null && row.numero_set !== undefined) {
       matches.get(row.partido_id).sets.push({
+        numero_set: Number(row.numero_set),
         games_j1: Number(row.games_j1) || 0,
         games_j2: Number(row.games_j2) || 0,
       })
@@ -90,12 +95,18 @@ function calculatePlayerStats(rows) {
     let gamesWonJ2 = 0
 
     for (const set of match.sets) {
-      gamesWonJ1 += set.games_j1
-      gamesWonJ2 += set.games_j2
+      const g1 = Number(set.games_j1) || 0
+      const g2 = Number(set.games_j2) || 0
+      const isSTB = match.set_decisivo === 'match_tiebreak' && set.numero_set === match.mejor_de_sets
+      const g1Stats = isSTB ? (g1 > g2 ? 1 : 0) : g1
+      const g2Stats = isSTB ? (g2 > g1 ? 1 : 0) : g2
 
-      if (set.games_j1 > set.games_j2) {
+      gamesWonJ1 += g1Stats
+      gamesWonJ2 += g2Stats
+
+      if (g1 > g2) {
         setsWonByPlayer1 += 1
-      } else if (set.games_j2 > set.games_j1) {
+      } else if (g2 > g1) {
         setsWonByPlayer2 += 1
       }
     }
@@ -119,15 +130,14 @@ function calculatePlayerStats(rows) {
     const winnerIs1 = match.ganador === 'jugador1'
     const winnerPlayers = winnerIs1 ? p1Players : p2Players
     const loserPlayers = winnerIs1 ? p2Players : p1Players
-    const loserWonASet = winnerIs1 ? setsWonByPlayer2 > 0 : setsWonByPlayer1 > 0
 
     for (const p of winnerPlayers) {
       p.victorias += 1
-      p.puntos += loserWonASet ? 2 : 3
+      p.puntos += 1
     }
     for (const p of loserPlayers) {
       p.derrotas += 1
-      p.puntos += loserWonASet ? 1 : 0
+      p.puntos += 0
     }
   }
 

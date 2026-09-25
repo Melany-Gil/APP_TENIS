@@ -149,6 +149,20 @@ async function checkMatchEditing(browser) {
     }
     await page.goto('http://127.0.0.1:4173/sponsors')
     await page.waitForURL('**/juez')
+    for (const mode of ['Individual', 'Dobles']) {
+      const writesBefore = posts
+      await page.getByRole('button', { name: `Práctica ${mode}`, exact: true }).click()
+      await page.locator('.judge-point').first().click()
+      const detail = page.locator('.reason-tiro_ganador')
+      if (await detail.isVisible()) await detail.click()
+      await page.getByRole('button', { name: /^Pausar$/ }).click()
+      await page.getByRole('button', { name: /^Reanudar$/ }).click()
+      assert.equal(await page.locator('.judge-point').first().isEnabled(), true)
+      await page.getByRole('button', { name: 'Salir de práctica', exact: true }).first().click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Salir de práctica', exact: true }).click()
+      await page.getByRole('button', { name: 'Práctica Individual', exact: true }).waitFor()
+      assert.equal(posts, writesBefore, 'Practice must not send scoring events')
+    }
     await page.getByRole('button', { name: /Carlos Rodríguez.*Andrés Martínez/ }).click()
     await page.locator('.judge-point').first().waitFor()
     await page.getByText('Marcación activa', { exact: true }).waitFor()
@@ -302,6 +316,18 @@ async function checkMatchEditing(browser) {
     const publicPage = await browser.newPage({ viewport: { width: 390, height: 844 } })
     publicPage.on('pageerror', error => failures.push(error.message))
     await publicPage.route('**/*', mockRoute)
+    await publicPage.route('**/api/jugadores/77', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data: {
+      id: 77, nombre: 'Jugador', apellido: 'QA', estadisticas: [1, 2].map(id => ({
+        categoria: { id, nombre: `Categoría ${id}` }, ranking: 1, puntos: 1,
+        partidos_jugados: 1, victorias: 1, derrotas: 0, sets_ganados: 2, sets_perdidos: 0,
+        games_ganados: 12, games_perdidos: 4, porcentaje_sets: 1, porcentaje_games: .75,
+      }))
+    } }) }))
+    await publicPage.goto('http://127.0.0.1:4173/player/77')
+    await publicPage.locator('#player-category').waitFor()
+    assert.equal(await publicPage.locator('#player-category').inputValue(), 'todas')
+    await publicPage.locator('#player-category').selectOption('1')
+    assert.equal(await publicPage.locator('#player-category').inputValue(), '1')
     await publicPage.goto('http://127.0.0.1:4173/pantalla')
     await publicPage.getByRole('heading', { name: 'Jornada de hoy' }).waitFor()
     await publicPage.getByRole('button', { name: 'Ver este partido a detalle' }).first().click()

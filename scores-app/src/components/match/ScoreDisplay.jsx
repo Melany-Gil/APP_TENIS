@@ -1,11 +1,13 @@
 import { cn } from '../../utils/cn'
 
-export default function ScoreDisplay({ sets, isWinner, isLive }) {
-  if (!sets?.length) return <span className='text-text-muted text-sm'>vs</span>
-  const displaySets = Array.from(
-    { length: Math.max(3, sets.length) },
-    (_, index) => sets[index] ?? '/'
-  )
+export default function ScoreDisplay({ sets, isWinner, isLive, compact = false }) {
+  if (!sets?.length) return <span className='text-text-muted text-xs'>vs</span>
+  const displaySets = compact
+    ? sets
+    : Array.from(
+        { length: Math.max(3, sets.length) },
+        (_, index) => sets[index] ?? '/'
+      )
 
   return (
     <div
@@ -16,12 +18,13 @@ export default function ScoreDisplay({ sets, isWinner, isLive }) {
         <span
           key={index}
           className={cn(
-            'score-number text-base min-w-[1.25rem] text-center',
+            'score-number text-center font-bold tabular-nums',
+            compact ? 'text-xs min-w-[1.1rem]' : 'text-base min-w-[1.25rem]',
             isLive && index === sets.length - 1
               ? 'text-text-primary'
               : isWinner
-                ? 'text-text-primary'
-                : 'text-text-secondary'
+                ? 'text-[var(--color-brand)] font-extrabold'
+                : 'text-[var(--text-muted)] font-medium'
           )}
         >
           {score}
