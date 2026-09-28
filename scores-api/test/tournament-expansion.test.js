@@ -78,6 +78,7 @@ test('posiciones separa categorías del mismo grupo, no suma finalizados sin gan
               fase: 'grupos',
               grupo: 'A',
               categoria_nombre: 'Damas',
+              categoria_id: 1,
               estado: 'finalizado',
               ganador: 'jugador1',
             },
@@ -88,6 +89,7 @@ test('posiciones separa categorías del mismo grupo, no suma finalizados sin gan
               fase: 'grupos',
               grupo: 'A',
               categoria_nombre: 'Quinta',
+              categoria_id: 2,
               estado: 'finalizado',
               ganador: null,
             },
@@ -105,6 +107,7 @@ test('posiciones separa categorías del mismo grupo, no suma finalizados sin gan
   assert.equal(r.nombres_grupos.length, 2)
   assert.equal(r.grupos['Damas · A'][0].puntos, 1)
   assert.equal(r.grupos['Quinta · A'][0].pj, 0)
+  assert.deepEqual(r.categorias.map(c => c.grupos.map(g => g.clave)), [['Damas · A'], ['Quinta · A']])
 })
 test('compatibilidad conserva INT UNSIGNED y lecturas por destinatario', async () => {
   const calls = []

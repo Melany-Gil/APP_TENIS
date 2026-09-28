@@ -99,7 +99,7 @@ exports.getById = async (id) => {
   }
 
   return {
-    ...formatListItem(rows[0]),
+    ...formatListItem(rows[0], playerStats[0] || null),
     estadisticas: playerStats,
     parejas,
   }

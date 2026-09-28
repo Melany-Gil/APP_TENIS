@@ -614,7 +614,12 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
   const { formatted, isPaused } = useMatchTimer(match.en_vivo, match.estado)
   const p1 = getParticipantName(match, 1) || 'Por definir'
   const p2 = getParticipantName(match, 2) || 'Por definir'
-  const sets = marker?.sets || []
+  const markerSets = marker?.sets || []
+  const fallbackSets = match.sets?.map((s) => ({
+    games: [s.games_j1, s.games_j2],
+    completed: s.completado,
+  })) || []
+  const sets = markerSets.length > 0 ? markerSets : fallbackSets
   const visibleSets = Math.max(3, sets.length)
   const isFinished = match.estado === 'finalizado'
 
@@ -664,6 +669,7 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
           side='jugador1'
           index={0}
           marker={marker}
+          sets={sets}
           visibleSets={visibleSets}
           featured={featured}
         />
@@ -675,6 +681,7 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
           side='jugador2'
           index={1}
           marker={marker}
+          sets={sets}
           visibleSets={visibleSets}
           featured={featured}
         />
@@ -750,7 +757,7 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
   )
 }
 
-function ScreenPlayer({ name, photo, team, side, index, marker, visibleSets, featured }) {
+function ScreenPlayer({ name, photo, team, side, index, marker, sets, visibleSets, featured }) {
   return (
     <div
       className='grid items-center gap-1 sm:gap-2 py-2 [--screen-set:24px] sm:[--screen-set:36px] [--screen-point:36px] sm:[--screen-point:48px]'
@@ -773,7 +780,7 @@ function ScreenPlayer({ name, photo, team, side, index, marker, visibleSets, fea
       </div>
       {Array.from({ length: visibleSets }, (_, setIndex) => (
         <strong key={setIndex} className='text-center rounded-lg py-1.5 bg-white/5 text-white/80'>
-          {marker?.sets?.[setIndex]?.games?.[index] ?? '/'}
+          {sets?.[setIndex]?.games?.[index] ?? marker?.sets?.[setIndex]?.games?.[index] ?? '/'}
         </strong>
       ))}
       <strong

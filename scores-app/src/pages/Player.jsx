@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 import { usePlayer } from '../hooks/usePlayers'
+import { useMatchRealtime } from '../hooks/useMatchRealtime'
 import { matchService } from '../services/matchService'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { cn } from '../utils/cn'
@@ -25,9 +26,22 @@ import { getParticipantName } from '../utils/matchParticipants'
 export default function Player() {
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { player, loading } = usePlayer(id)
+  const [tick, setTick] = useState(0)
+  const { player, loading } = usePlayer(id, tick)
   const { toggleJugador, isJugadorFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
+
+  const refreshTimer = useRef(null)
+  useMatchRealtime(useCallback((event) => {
+    if (!refreshTimer.current) {
+      refreshTimer.current = setTimeout(() => {
+        refreshTimer.current = null
+        setTick((v) => v + 1)
+      }, 1000)
+    }
+  }, []))
+
+  useEffect(() => () => { clearTimeout(refreshTimer.current) }, [])
 
   const [matches, setMatches] = useState([])
   const [matchesLoading, setMatchesLoading] = useState(true)
@@ -53,7 +67,7 @@ export default function Player() {
         if (active) setMatchesLoading(false)
       })
     return () => { active = false }
-  }, [id])
+  }, [id, tick])
 
   const statsByCategory = useMemo(() => player?.estadisticas || [], [player])
 
@@ -548,12 +562,12 @@ function PlayerMatchRow({ match, playerId }) {
         <div className='flex items-center gap-2 shrink-0'>
           {isWon && (
             <span className='text-[10px] font-bold uppercase rounded-full px-2 py-0.5 bg-emerald-500/10 text-emerald-500'>
-              Victoria
+              {match.walkover?.es_retiro ? 'Victoria por retiro' : match.walkover ? 'Victoria (W.O.)' : 'Victoria'}
             </span>
           )}
           {isLost && (
             <span className='text-[10px] font-bold uppercase rounded-full px-2 py-0.5 bg-rose-500/10 text-rose-500'>
-              Derrota
+              {match.walkover?.es_retiro ? 'Derrota por retiro' : match.walkover ? 'Derrota (W.O.)' : 'Derrota'}
             </span>
           )}
           {isLive && (

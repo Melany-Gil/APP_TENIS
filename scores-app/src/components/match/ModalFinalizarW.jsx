@@ -149,7 +149,7 @@ export default function ModalFinalizarW({ isOpen, onClose, match, onSuccess }) {
         message:
           winnerParam === 'ninguno'
             ? 'El partido finalizó como Doble Walkover sin ganador.'
-            : `El encuentro finalizó a favor de ${winnerName}.`,
+            : `El encuentro finalizó a favor de ${winnerName}. ${res.data?.walkover?.marcador_oficial ? 'Marcador: ' + res.data.walkover.marcador_oficial : 'Se conserva el juego registrado.'}`,
       })
       if (onSuccess) onSuccess(res.data)
       onClose()
@@ -447,6 +447,14 @@ export default function ModalFinalizarW({ isOpen, onClose, match, onSuccess }) {
                       {winnerName}
                     </span>
                   </div>
+                  {retirado !== 'ambos' && (
+                    <div className='pt-1'>
+                      <strong>Marcador asignado:</strong>{' '}
+                      <span className='font-bold text-[var(--color-brand)]'>
+                        6/0 6/0 solo por incomparecencia sin juego registrado. Si hubo juego, se conserva el marcador; otros cierres no asignan parciales.
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

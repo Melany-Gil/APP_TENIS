@@ -384,6 +384,20 @@ async function checkMatchEditing(browser) {
     await publicPage.getByRole('button', { name: 'Regresar a partidos' }).click()
     await publicPage.getByRole('heading', { name: 'Jornada de hoy' }).waitFor()
     assert.deepEqual(failures, [])
+    for (const kind of ['wo', 'double', 'retirement']) {
+      await publicPage.route('**/api/partidos/*/estadisticas*', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data: {
+        estadisticas: { jugador1: { puntos_ganados: kind === 'retirement' ? 3 : 0 }, jugador2: { puntos_ganados: 0 } },
+        walkover: { es_retiro: kind === 'retirement', doble: kind === 'double', ganador: kind === 'double' ? null : 'jugador1',
+          marcador_oficial: kind === 'double' ? null : kind === 'wo' ? '6/0 6/0' : '3/1', sets: kind === 'double' ? [] : [{ games_j1: 6, games_j2: 0 }] }
+      } }) }))
+      await publicPage.getByRole('button', { name: 'Ver este partido a detalle' }).first().click()
+      await publicPage.getByText(kind === 'double' ? '0 para ambos' : '1 al ganador · 0 al rival', { exact: true }).waitFor()
+      for (const width of [320, 1440]) {
+        await publicPage.setViewportSize({ width, height: 900 })
+        assert.equal(await publicPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      }
+      await publicPage.getByRole('button', { name: 'Regresar a partidos' }).click()
+    }
     // Exercise the real React hooks with delayed responses and an SSE burst.
     const hooksPage = await browser.newPage()
     const adminPage = await browser.newPage({ viewport: { width: 390, height: 844 } })

@@ -97,8 +97,8 @@ exports.getById = async (id) => {
 
   try {
     const [matches] = await db.query(
-      `SELECT p.id, p.ganador, p.equipo1_id, p.equipo2_id,
-              s.numero_set, s.games_j1, s.games_j2
+      `SELECT p.id, p.ganador, p.notas, p.mejor_de_sets, p.set_decisivo, p.equipo1_id, p.equipo2_id,
+              s.numero_set, s.games_j1, s.games_j2, s.completado
        FROM partidos p
        LEFT JOIN sets_partido s ON s.partido_id = p.id
        WHERE (p.equipo1_id = ? OR p.equipo2_id = ?) AND p.estado = 'finalizado'
@@ -115,10 +115,13 @@ exports.getById = async (id) => {
           sets: [],
         })
       }
-      if (m.numero_set !== null && m.numero_set !== undefined) {
+      if (m.numero_set !== null && m.numero_set !== undefined && m.completado !== 0 && m.completado !== false) {
+        const stb = !String(m.notas || '').includes('[Victoria por W.O. (6/0 6/0)]') && m.set_decisivo === 'match_tiebreak' && Number(m.numero_set) === Number(m.mejor_de_sets || 3)
+        const g1 = stb ? (Number(m.games_j1) > Number(m.games_j2) ? 1 : 0) : Number(m.games_j1)
+        const g2 = stb ? (Number(m.games_j2) > Number(m.games_j1) ? 1 : 0) : Number(m.games_j2)
         matchMap.get(m.id).sets.push({
-          games_favor: Number(m.equipo1_id) === Number(id) ? Number(m.games_j1) : Number(m.games_j2),
-          games_contra: Number(m.equipo1_id) === Number(id) ? Number(m.games_j2) : Number(m.games_j1),
+          games_favor: Number(m.equipo1_id) === Number(id) ? g1 : g2,
+          games_contra: Number(m.equipo1_id) === Number(id) ? g2 : g1,
         })
       }
     }
@@ -147,6 +150,7 @@ exports.getById = async (id) => {
       partidos_jugados: pj,
       victorias,
       derrotas,
+      puntos: victorias,
       sets_ganados,
       sets_perdidos,
       games_ganados,

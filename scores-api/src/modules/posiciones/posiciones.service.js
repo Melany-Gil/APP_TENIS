@@ -20,7 +20,7 @@ exports.getByTorneo = async (torneoId) => {
 
   // Fetch all matches of this tournament (both finished and pending, to know participants & groups)
   const [allPartidos] = await db.query(
-    `SELECT p.id, p.categoria_id, p.mejor_de_sets, p.set_decisivo, torneo_id, fase, grupo, ronda, p.estado, ganador, COALESCE(c.nombre,'Sin categoría') AS categoria_nombre,
+    `SELECT p.id, p.categoria_id, p.mejor_de_sets, p.set_decisivo, p.notas, torneo_id, fase, grupo, ronda, p.estado, ganador, COALESCE(c.nombre,'Sin categoría') AS categoria_nombre,
             ${col1} AS p1_id, ${col2} AS p2_id
      FROM partidos p LEFT JOIN categorias c ON c.id=p.categoria_id
      WHERE torneo_id = ? AND p.estado <> 'cancelado'`,
@@ -223,7 +223,7 @@ exports.getByTorneo = async (torneoId) => {
       const g2 = Number(s.games_j2 || 0)
 
       // Use the saved match format, never infer the set type from its score.
-      const isSTB = p.set_decisivo === 'match_tiebreak' &&
+      const isSTB = !String(p.notas || '').includes('[Victoria por W.O. (6/0 6/0)]') && p.set_decisivo === 'match_tiebreak' &&
         Number(s.numero_set) === Number(p.mejor_de_sets || 3)
       const g1Stats = isSTB ? (g1 > g2 ? 1 : 0) : g1
       const g2Stats = isSTB ? (g2 > g1 ? 1 : 0) : g2
@@ -458,7 +458,14 @@ exports.getByTorneo = async (torneoId) => {
               .filter((g) => Number(g.categoria_id) === Number(c.id))
               .map((g) => ({ nombre: g.nombre, clave: label(c.id, g.nombre) })),
           }))
-      : [],
+      : Array.from(new Set(allPartidos.map(p => p.categoria_id || torneo.categoria_id || 'general'))).map(id => {
+          const matches = allPartidos.filter(p => (p.categoria_id || torneo.categoria_id || 'general') === id)
+          const keys = new Set(matches.map(groupKey).filter(Boolean))
+          return { id, nombre: matches[0]?.categoria_nombre || 'General',
+            grupos: sortedGroupNames.filter(key => keys.has(key)).map(key => ({
+              nombre: key.includes(' · ') ? key.slice(key.indexOf(' · ') + 3) : key, clave: key,
+            })) }
+        }),
     sin_grupo: authoritative ? tablaGeneral.filter((r) => !assignment.has(Number(r.id))) : [],
     incidencias: structure?.incidencias || [],
     grupos_explicitos: authoritative,

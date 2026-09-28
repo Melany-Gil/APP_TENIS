@@ -3,6 +3,22 @@ import { BarChart3 } from 'lucide-react'
 import { useMatchRealtime } from '../../hooks/useMatchRealtime'
 import { matchService } from '../../services/matchService'
 
+function ClosureCard({ info, player1, player2 }) {
+  const winner = info.ganador === 'jugador1' ? player1 : info.ganador === 'jugador2' ? player2 : null
+  const sets = info.sets || []
+  return <section className='rounded-2xl border p-4 sm:p-5 space-y-3 text-left' style={{ borderColor: 'var(--border-color)', background: 'var(--bg-hover)' }}>
+    <span className='text-xs font-bold uppercase tracking-wider' style={{ color: 'var(--color-brand)' }}>
+      {info.es_retiro ? 'Cierre por retiro' : info.doble ? 'Doble W.O.' : 'Victoria por W.O.'}
+    </span>
+    <h3 className='font-bold text-base break-words' style={{ color: 'var(--text-primary)' }}>{winner ? `Victoria: ${winner}` : 'Sin ganador'}</h3>
+    <div className='grid grid-cols-2 gap-3'>
+      <div className='rounded-xl p-3' style={{ background: 'var(--bg-card)' }}><p className='text-xs'>Marcador registrado (lado 1 / lado 2)</p><strong className='text-lg'>{info.marcador_oficial || 'Sin parciales'}</strong></div>
+      <div className='rounded-xl p-3' style={{ background: 'var(--bg-card)' }}><p className='text-xs'>Puntos de clasificación</p><strong className='text-lg'>{winner ? '1 al ganador · 0 al rival' : '0 para ambos'}</strong></div>
+    </div>
+    <p className='text-xs leading-relaxed'>{info.es_retiro ? 'Se conservan el marcador y las acciones registradas antes del retiro.' : !sets.length && winner ? 'No hay sets guardados: no se atribuyen games ni sets desconocidos. Requiere revisión administrativa.' : 'El marcador asignado no genera aces, winners ni otros puntos de juego ficticios.'}</p>
+  </section>
+}
+
 const ROWS = [
   ['Total de puntos ganados', 'puntos_ganados'],
   ['Aces · puntos directos de saque', 'aces'],
@@ -16,6 +32,7 @@ const ROWS = [
 
 export default function MatchStats({ matchId, player1, player2, initialStats = null }) {
   const [stats, setStats] = useState(initialStats)
+  const [walkover, setWalkover] = useState(initialStats?.walkover || null)
   const [totalSets, setTotalSets] = useState(0)
   const [selectedSet, setSelectedSet] = useState(null)
   const [loading, setLoading] = useState(!initialStats)
@@ -31,10 +48,11 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
       .then((response) => {
         if (version !== sequence.current) return
         setStats(response.data?.estadisticas || null)
+        setWalkover(response.data?.walkover || null)
         setTotalSets(Number(response.data?.total_sets || 0))
         setHasCorrections(Boolean(response.data?.tiene_correcciones))
       })
-      .catch(() => { if (version === sequence.current) setStats(null) })
+      .catch(() => { if (version === sequence.current) { setStats(null); setWalkover(null) } })
       .finally(() => {
         if (version === sequence.current) setLoading(false)
       })
@@ -55,8 +73,10 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
   if (!stats || (!stats.jugador1?.puntos_ganados && !stats.jugador2?.puntos_ganados)) {
     return (
       <div className='text-center py-8' style={{ color: 'var(--text-muted)' }}>
+        {walkover ? <ClosureCard info={walkover} player1={player1} player2={player2} /> : <>
         <BarChart3 className='w-7 h-7 mx-auto mb-2 opacity-40' />
         <p className='text-sm'>Aún no hay estadísticas disponibles.</p>
+        </>}
         {selectedSet !== null && <FilterButton active={false} onClick={() => setSelectedSet(null)}>Volver al partido completo</FilterButton>}
         {hasCorrections && <p className='text-xs mt-2'>El marcador contiene una corrección supervisada; no se generan estadísticas de puntos que no fueron registrados.</p>}
       </div>
@@ -65,6 +85,7 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
 
   return (
     <div className='space-y-4'>
+      {walkover && <ClosureCard info={walkover} player1={player1} player2={player2} />}
       {hasCorrections && <p className='text-xs rounded-lg p-3 bg-amber-500/10'>Este marcador tiene correcciones supervisadas. Las estadísticas conservan los puntos registrados y pueden no coincidir con los games corregidos.</p>}
       <p className='text-xs' style={{ color: 'var(--text-muted)' }}>Solo incluye acciones confirmadas por el servidor. Los aces y errores dependen de los motivos registrados por el juez. El porcentaje de primeros saques se calcula sobre los puntos con servicio registrado.</p>
       <details className='rounded-xl p-3 text-xs' style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>

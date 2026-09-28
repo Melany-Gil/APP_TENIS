@@ -13,7 +13,9 @@ const PLAYER_STATS_QUERY = `
     e2.jugador1_id AS e2_j1_id,
     e2.jugador2_id AS e2_j2_id,
     p.ganador,
+    p.notas,
     s.numero_set,
+    s.completado,
     s.games_j1,
     s.games_j2
   FROM partidos p
@@ -67,13 +69,14 @@ function calculatePlayerStats(rows) {
         p1Ids: [...new Set(p1Ids)],
         p2Ids: [...new Set(p2Ids)],
         ganador: row.ganador,
+        officialWO: String(row.notas || '').includes('[Victoria por W.O. (6/0 6/0)]'),
         mejor_de_sets: Number(row.mejor_de_sets || 3),
         set_decisivo: row.set_decisivo,
         sets: [],
       })
     }
 
-    if (row.numero_set !== null && row.numero_set !== undefined) {
+    if (row.numero_set !== null && row.numero_set !== undefined && row.completado !== 0 && row.completado !== false) {
       matches.get(row.partido_id).sets.push({
         numero_set: Number(row.numero_set),
         games_j1: Number(row.games_j1) || 0,
@@ -97,7 +100,7 @@ function calculatePlayerStats(rows) {
     for (const set of match.sets) {
       const g1 = Number(set.games_j1) || 0
       const g2 = Number(set.games_j2) || 0
-      const isSTB = match.set_decisivo === 'match_tiebreak' && set.numero_set === match.mejor_de_sets
+      const isSTB = !match.officialWO && match.set_decisivo === 'match_tiebreak' && set.numero_set === match.mejor_de_sets
       const g1Stats = isSTB ? (g1 > g2 ? 1 : 0) : g1
       const g2Stats = isSTB ? (g2 > g1 ? 1 : 0) : g2
 

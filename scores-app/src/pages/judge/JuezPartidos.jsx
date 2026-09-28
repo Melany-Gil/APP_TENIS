@@ -53,6 +53,7 @@ const reasonLabel = (event, names) => {
   if (event.tipo === 'let') return 'Let · se repite el saque'
   if (event.tipo === 'cambio_servidor') return 'Cambio de sacador'
   if (event.tipo === 'correccion') return 'Corrección de marcador por supervisión'
+  if (event.tipo === 'walkover') return event.ganador ? `Cierre por W.O. · ${names[event.ganador]}` : 'Doble W.O. · Sin ganador'
   const reason = event.motivo === 'doble_falta' ? 'Doble falta' : reasons.find(([key]) => key === event.motivo)?.[1] || 'Punto sin detalle'
   return `${names[event.ganador]} · ${reason}`
 }
@@ -1532,6 +1533,7 @@ export default function JuezPartidos() {
               )}
               {finished && (
                 <section className='judge-state-card' role='status'>
+                  {state?.walkover && <p>{state.walkover.es_retiro ? 'Retiro: se conserva el juego registrado.' : state.walkover.doble ? 'Doble W.O.: sin ganador.' : `W.O. · ${state.walkover.marcador_oficial || 'Sin parciales registrados'}`}</p>}
                   <span className='judge-eyebrow'>
                     {isPractice
                       ? 'PARTIDO DE PRÁCTICA FINALIZADO'

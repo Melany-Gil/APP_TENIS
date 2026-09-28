@@ -383,5 +383,6 @@ const eventText = (event, names) => {
   if (event.tipo === 'primera_falta') return `Primera falta · ${names[event.servidor]}`
   if (event.tipo === 'let') return 'Let / repetir punto'
   if (event.tipo === 'cambio_servidor') return `Servicio corregido · ${names[event.ganador]}`
+  if (event.tipo === 'walkover') return event.ganador ? `Cierre por W.O. · ${names[event.ganador]}` : 'Doble W.O. · Sin ganador'
   return `${names[event.ganador]} · ${reasonLabel(event.motivo)}`
 }

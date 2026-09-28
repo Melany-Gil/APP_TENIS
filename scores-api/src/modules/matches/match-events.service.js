@@ -1,5 +1,6 @@
 const db = require('../../config/db')
 const matchesService = require('./matches.service')
+const { closureInfo, snapshotFromSets } = require('../../utils/matchClosure')
 const { validateDelivery, assertSameDelivery, revisionOf, configurationOf } = require('./eventDelivery')
 const {
   applyEvent,
@@ -52,6 +53,7 @@ exports.getControl = async (id, user, { lightweight = false } = {}) => {
      FROM eventos_partido WHERE partido_id = ?`, [id, id]
   )
   if (revisionRows[0] && 'latest_state' in revisionRows[0]) state = parseJson(revisionRows[0].latest_state) || createInitialState(matchRow)
+  if ((!lastEvents.length && !revisionRows[0]?.latest_state) || matchRow.notas?.includes('[Victoria por W.O. (6/0 6/0)]')) state = snapshotFromSets(match, match.sets) || state
   if (matchRow.estado === 'finalizado') state = { ...state, winner: matchRow.ganador || null }
   const breakpoint = computeBreakpoint(state, matchRow)
   let doublesOrder = null
@@ -72,6 +74,7 @@ exports.getControl = async (id, user, { lightweight = false } = {}) => {
     marcador: { ...serializeState(state), breakpoint },
     breakpoint,
     estadisticas: lightweight ? null : buildStats(pointEvents),
+    walkover: closureInfo(match),
     revision: revisionOf(revisionRows[0]),
     configuration: configurationOf(matchRow),
     eventos_recientes: lastEvents.map(formatEvent),
@@ -80,7 +83,7 @@ exports.getControl = async (id, user, { lightweight = false } = {}) => {
 }
 
 exports.getStats = async (id, setNumber = null) => {
-  await matchesService.getById(id)
+  const match = await matchesService.getById(id)
   const selectedSet = setNumber === null || setNumber === undefined || setNumber === ''
     ? null
     : Number(setNumber)
@@ -101,8 +104,9 @@ exports.getStats = async (id, setNumber = null) => {
 
   return {
     estadisticas: buildStats(events, selectedSet),
+    walkover: closureInfo(match),
     tiene_correcciones: events.some((event) => event.tipo === 'correccion'),
-    total_sets: setNumbers.length ? Math.max(...setNumbers) : 0,
+    total_sets: Math.max(0, ...setNumbers, match.sets?.length || 0),
     set: selectedSet,
   }
 }
@@ -574,19 +578,26 @@ exports.walkover = async (id, body, user) => {
        finalizado_at = NOW() WHERE partido_id = ?`,
       [id]
     )
-    const personaDetalle = body.persona_retirada ? ` (${body.persona_retirada})` : ''
-    const incidencia = body.tipo_incidencia ? ` [${body.tipo_incidencia}]` : ''
-    const quienSeRetiro = isDoubleWalkover
-      ? 'Ambos participantes'
-      : body.retirado === 'jugador1'
-        ? `Lado 1${personaDetalle}`
-        : body.retirado === 'jugador2'
-          ? `Lado 2${personaDetalle}`
-          : (winner === 'jugador1' ? 'Lado 2' : 'Lado 1')
+    const [history] = await connection.query(`SELECT
+      EXISTS (SELECT 1 FROM eventos_partido WHERE partido_id = ? AND tipo IN ('punto', 'correccion')) AS has_points,
+      EXISTS (SELECT 1 FROM sets_partido WHERE partido_id = ? AND (games_j1 > 0 OR games_j2 > 0 OR completado = 1)) AS has_score`, [id, id])
+    // Missing history information is never permission to overwrite a result.
+    const hasPlay = !history[0] || history[0].has_points == null || history[0].has_score == null ||
+      Boolean(Number(history[0].has_points) || Number(history[0].has_score))
+    const assignScore = Boolean(winner) && !hasPlay && (!body.tipo_incidencia || body.tipo_incidencia === 'No presentación (Incomparecencia / No Show)')
+    const notaWo = hasPlay ? '[Retiro con juego registrado]'
+      : assignScore ? '[Victoria por W.O. (6/0 6/0)]'
+      : winner ? '[Victoria por W.O. - Sin parciales asignados]'
+      : '[Doble W.O. - Sin ganador]'
 
-    const notaWo = winner
-      ? `[Victoria por W.O. - Retiro/Incomparecencia: ${quienSeRetiro}${incidencia} - Ganador: ${winner === 'jugador1' ? 'Lado 1' : 'Lado 2'} - Motivo: ${motivo}]`
-      : `[Doble W.O. - Incomparecencia de ambos participantes${incidencia} - Sin ganador - Motivo: ${motivo}]`
+    if (assignScore) {
+      await connection.query('DELETE FROM sets_partido WHERE partido_id = ?', [id])
+      const g1 = winner === 'jugador1' ? 6 : 0
+      const g2 = winner === 'jugador2' ? 6 : 0
+      await connection.query(`INSERT INTO sets_partido
+        (partido_id, numero_set, games_j1, games_j2, tiebreak_j1, tiebreak_j2, completado)
+        VALUES (?, 1, ?, ?, NULL, NULL, 1), (?, 2, ?, ?, NULL, NULL, 1)`, [id, g1, g2, id, g1, g2])
+    }
 
     const updatedNotas = matches[0].notas ? `${matches[0].notas}\n${notaWo}` : notaWo
     await connection.query(
@@ -600,6 +611,8 @@ exports.walkover = async (id, body, user) => {
         retirado: retired,
         persona_retirada: body.persona_retirada || null,
         tipo_incidencia: body.tipo_incidencia || null,
+        marcador_asignado: assignScore,
+        conserva_juego: hasPlay,
         motivo
       })]
     )

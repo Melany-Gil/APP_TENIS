@@ -232,7 +232,7 @@ exports.getAll = async ({
   }
 
   return rows.map((row) => ({
-    ...formatSummary(row),
+    ...formatSummary(row, setsByMatch.get(row.id) || []),
     sets: setsByMatch.get(row.id) || [],
   }))
 }
@@ -290,7 +290,7 @@ exports.getMyMatches = async (userId) => {
   }
 
   const matches = rows.map((row) => {
-    const match = { ...formatSummary(row), sets: setsByMatch.get(row.id) || [] }
+    const match = { ...formatSummary(row, setsByMatch.get(row.id) || []), sets: setsByMatch.get(row.id) || [] }
     const mySide = [row.j1_id, row.e1_jugador1_id, row.e1_jugador2_id].some(
       (id) => Number(id) === Number(player.id)
     )
@@ -341,7 +341,7 @@ exports.getById = async (id) => {
   )
 
   return {
-    ...formatSummary(rows[0]),
+    ...formatSummary(rows[0], sets.map(formatSet)),
     sets: sets.map(formatSet),
   }
 }
@@ -1104,8 +1104,9 @@ async function propagateWinner(connection, match, estado, ganador) {
   )
 }
 
-function formatSummary(row) {
+function formatSummary(row, sets = []) {
   let snapshot = parseScoreSnapshot(row.marcador_actual)
+  if (!snapshot || row.notas?.includes('[Victoria por W.O. (6/0 6/0)]')) snapshot = require('../../utils/matchClosure').snapshotFromSets(row, sets) || snapshot
   if (snapshot && row.estado === 'finalizado') snapshot = { ...snapshot, winner: row.ganador || null }
   const matchConfig = {
     mejor_de_sets: Number(row.mejor_de_sets || 3),
@@ -1141,6 +1142,7 @@ function formatSummary(row) {
     grupo: row.grupo || null,
     ronda: row.ronda || null,
     notas: row.notas || null,
+    walkover: require('../../utils/matchClosure').closureInfo(row, sets),
     nombre_override: row.nombre_override || null,
     nombre_override_j1: row.nombre_override_j1 || null,
     nombre_override_j2: row.nombre_override_j2 || null,
