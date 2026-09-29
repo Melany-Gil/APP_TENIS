@@ -115,9 +115,14 @@ exports.startMatch = async (id, user) => {
   const connection = await db.getConnection()
   try {
     await connection.beginTransaction()
+    const [[target]] = await connection.query('SELECT torneo_id FROM partidos WHERE id=?', [id])
+    if (target?.torneo_id) await connection.query('SELECT id FROM torneos WHERE id=? FOR UPDATE', [target.torneo_id])
     const [matches] = await connection.query('SELECT * FROM partidos WHERE id = ? FOR UPDATE', [id])
     if (!matches.length) throw { status: 404, message: 'Partido no encontrado' }
     assertCanManage(matches[0], user)
+    if (matches[0].estado !== 'en_vivo') {
+      await require('../torneos/retiros.service').assertAvailable(matches[0], connection)
+    }
     if (matches[0].estado === 'finalizado' || matches[0].estado === 'cancelado') {
       throw { status: 409, message: 'Este partido no se puede iniciar' }
     }
@@ -237,6 +242,8 @@ exports.addEvent = async (id, event, user) => {
     if (matches[0].estado === 'finalizado' || matches[0].estado === 'cancelado') {
       throw { status: 409, message: 'Este partido ya no admite cambios' }
     }
+    if (matches[0].estado === 'programado')
+      await require('../torneos/retiros.service').assertAvailable(matches[0], connection)
     await ensureLiveState(connection, id)
     const [liveRows] = await connection.query(
       'SELECT pausado_at FROM estado_en_vivo_partido WHERE partido_id = ? FOR UPDATE',
@@ -410,8 +417,9 @@ async function syncProjection(connection, match, state, fallbackStatus) {
 async function propagateWinner(connection, match, status, winner) {
   const position = winner === 'jugador1' ? 1 : winner === 'jugador2' ? 2 : null
   const participantColumn = match.equipo1_id || match.equipo2_id ? 'equipo' : 'jugador'
-  const participantId =
+  let participantId =
     status === 'finalizado' && position ? match[`${participantColumn}${position}_id`] : null
+  participantId = await require('../torneos/retiros.service').eligibleWinner(match, participantColumn, participantId, connection)
 
   await connection.query(
     `UPDATE partidos SET ${participantColumn}1_id = ? WHERE origen_partido1_id = ?`,

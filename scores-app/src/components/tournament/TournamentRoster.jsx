@@ -4,10 +4,12 @@ import { tournamentService } from '../../services/tournamentService'
 import { categoriaService } from '../../services/categoriaService'
 import ParticipantAvatar from '../ui/ParticipantAvatar'
 import { confirm } from '../../utils/confirm'
+import { RetirementBadge } from '../match/RetirementNotice'
 
 export default function TournamentRoster({
   tournament,
   data,
+  retirements,
   admin,
   remove,
   removing,
@@ -199,6 +201,7 @@ export default function TournamentRoster({
           <Link to={`/team/${p.equipo_id}`} className='font-semibold text-sm break-words'>
             {p.nombre}
           </Link>
+          {retirements?.parejas?.includes(Number(p.equipo_id)) && <div><RetirementBadge /></div>}
           <p className='text-xs text-[var(--text-muted)]'>
             {[p.jugador1, p.jugador2]
               .filter(Boolean)
@@ -237,7 +240,7 @@ export default function TournamentRoster({
           disabled={removing || dirty || busy}
           onClick={() => remove(p)}
         >
-          Retirar del torneo
+          Quitar inscripción
         </button>
       )}
     </article>

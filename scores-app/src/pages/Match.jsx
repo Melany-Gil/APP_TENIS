@@ -16,6 +16,7 @@ import MatchPhoto from '../components/match/MatchPhoto'
 import MatchPhotoCapture from '../components/match/MatchPhotoCapture'
 import useAuthStore from '../store/useAuthStore'
 import { MatchCardSkeleton } from '../components/ui/Skeleton'
+import RetirementNotice from '../components/match/RetirementNotice'
 import useFavoritesStore from '../store/useFavoritesStore'
 import { useMatch } from '../hooks/useMatches'
 import { formatClockTime, formatDate } from '../utils/formatDate'
@@ -107,6 +108,7 @@ export default function Match() {
       </div>
 
       {/* Scoreboard */}
+      <RetirementNotice match={match} />
       <div className='card p-5'>
         <div
           className='flex items-center justify-center gap-2 mb-5 text-sm'

@@ -79,10 +79,67 @@ async function checkMatchEditing(browser) {
   } finally { await page.close() }
 }
 
+async function checkTournamentRetirements(browser) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  const errors = []
+  page.on('pageerror', e => errors.push(e.message))
+  const admin = { id: 99, rol: 'admin', nombre: 'Admin', apellido: 'QA', email: 'qa@example.com', numero_documento: '12345678' }
+  const tournament = { id: 1, nombre: 'Torneo QA', modalidad: 'dobles', estado: 'en_curso', sistema: 'grupos_eliminacion', deporte: 'tenis' }
+  let retired = false, version = 0, writes = 0
+  const participants = [{ tipo: 'pareja', participante_id: 1, nombre: 'GÓMEZ / PÉREZ' }]
+  const audit = []
+  const routeHandler = async route => {
+    const req = route.request(), url = new URL(req.url()), endpoint = url.pathname.replace(/^\/api/, '')
+    if (!url.pathname.startsWith('/api/')) return url.hostname === '127.0.0.1' ? route.continue() : route.abort()
+    const respond = data => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data }) })
+    if (req.method() === 'PUT') {
+      assert.equal(endpoint, '/torneos/1/retiros')
+      const body = req.postDataJSON()
+      assert.equal(body.version, version)
+      assert.equal(body.motivo, 'Motivo privado QA')
+      retired = body.retirado; version++; writes++
+      audit.unshift({ ...body, id: version, actor_id: 99, created_at: new Date().toISOString() })
+      return respond({ message: retired ? 'Retiro registrado' : 'Participación reactivada' })
+    }
+    if (endpoint.endsWith('/me')) return respond(admin)
+    if (endpoint === '/torneos/1') return respond(tournament)
+    if (endpoint.endsWith('/retiros/participantes')) return respond(participants)
+    if (endpoint.endsWith('/retiros/auditoria')) return respond(audit)
+    if (endpoint.endsWith('/retiros')) return respond({ jugadores: [], parejas: retired ? [1] : [], estados: version ? [{ ...participants[0], retirado: retired, version }] : [] })
+    return respond([])
+  }
+  await page.addInitScript(u => localStorage.setItem('auth-storage-v2', JSON.stringify({ state: { isAuthenticated: true, user: u }, version: 0 })), admin)
+  await page.route('**/*', routeHandler)
+  try {
+    await page.goto('http://127.0.0.1:4173/torneo/1')
+    await page.getByRole('button', { name: 'Participación', exact: true }).click()
+    await page.getByLabel('Jugador o pareja', { exact: true }).selectOption('pareja:1')
+    await page.getByLabel('Motivo privado del retiro', { exact: true }).fill('Motivo privado QA')
+    await page.getByRole('button', { name: 'Registrar retiro del torneo', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Registrar retiro', exact: true }).click()
+    await page.getByRole('button', { name: 'Reactivar en este torneo', exact: true }).waitFor()
+    assert.equal(writes, 1)
+    await page.getByText('Historial privado de cambios', { exact: true }).click()
+    await page.getByText('Motivo privado QA', { exact: true }).waitFor()
+    for (const width of [320, 390, 1440]) {
+      await page.setViewportSize({ width, height: 844 })
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Participation fits at ${width}px`)
+    }
+    await page.getByLabel('Motivo privado de reactivación', { exact: true }).fill('Motivo privado QA')
+    await page.getByRole('button', { name: 'Reactivar en este torneo', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Reactivar', exact: true }).click()
+    await page.getByRole('button', { name: 'Registrar retiro del torneo', exact: true }).waitFor()
+    assert.equal(writes, 2)
+    assert.deepEqual(errors, [])
+    console.log('PASS: tournament retirement, private audit, reactivation and 320/390/1440px layout')
+  } finally { await page.close() }
+}
+
 ;(async () => {
   const browser = await chromium.launch({ headless: true, channel: 'chrome' })
   try {
     await checkMatchEditing(browser)
+    await checkTournamentRetirements(browser)
     if (process.env.QA_MATCH_EDIT_ONLY === '1') return
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
     const page = await context.newPage()

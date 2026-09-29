@@ -71,6 +71,24 @@ export default function GestionPartidos() {
   } = useForm()
 
   const selectedTournamentId = String(watch('torneo_id') || '')
+  const [retirements, setRetirements] = useState(null)
+  const [retirementError, setRetirementError] = useState('')
+  useEffect(() => {
+    let active = true
+    setRetirements(null); setRetirementError('')
+    if (showForm && selectedTournamentId) tournamentService.getRetirements(selectedTournamentId)
+      .then(r => { if (active) setRetirements({ ...r.data, torneo: selectedTournamentId }) })
+      .catch(e => { if (active) setRetirementError(e.message || 'No se pudo verificar la participación') })
+    return () => { active = false }
+  }, [showForm, selectedTournamentId])
+  const availableParticipant = (value, type) => {
+    if (!selectedTournamentId) return true
+    if (!retirements || retirements.torneo !== selectedTournamentId) return false
+    if (!retirements[type]?.includes(Number(value))) return true
+    const key = type === 'parejas' ? 'equipo' : 'jugador'
+    return String(editing?.torneo?.id) === selectedTournamentId &&
+      [editing?.[`${key}1`]?.id, editing?.[`${key}2`]?.id].some(id => Number(id) === Number(value))
+  }
   const selectedTournament = torneos.find(
     (tournament) => String(tournament.id) === selectedTournamentId
   )
@@ -127,8 +145,8 @@ export default function GestionPartidos() {
     const list = jugadores.filter(
       (jugador) => jugador.deporte === selectedDeporte || jugador.deporte === 'ambos'
     )
-    return list
-  }, [jugadores, selectedDeporte, editing])
+    return list.filter(p => availableParticipant(p.id, 'jugadores'))
+  }, [jugadores, selectedDeporte, editing, retirements, selectedTournamentId])
 
   const equiposDisponibles = useMemo(() => {
     const list = equipos.filter(
@@ -143,8 +161,8 @@ export default function GestionPartidos() {
             )
           : String(equipo.categoria?.id || '') === selectedCategoryId)
     )
-    return list
-  }, [equipos, selectedDeporte, useGroups, distribution, selectedCategoryId, selectedPhase, selectedGroup, editing])
+    return list.filter(p => availableParticipant(p.id, 'parejas'))
+  }, [equipos, selectedDeporte, useGroups, distribution, selectedCategoryId, selectedPhase, selectedGroup, editing, retirements, selectedTournamentId])
   const [marcadorParticipante1, marcadorParticipante2] = getParticipantNames(showMarcador)
 
   const fetchAll = () => {
@@ -482,6 +500,7 @@ export default function GestionPartidos() {
                 ))}
               </select>
               {errors.torneo_id && <p className='form-error'>{errors.torneo_id.message}</p>}
+              {retirementError && <p role='alert' className='form-error'>{retirementError}. Cierra y vuelve a abrir el formulario para reintentar.</p>}
             </div>
 
             <div className='form-group'>

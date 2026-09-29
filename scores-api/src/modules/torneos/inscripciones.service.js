@@ -158,6 +158,9 @@ exports.inscribirBulk = async (torneoId, equipoIds) => {
     )
     if (active.length !== players.length)
       fail(400, 'Las parejas deben tener ambos jugadores activos')
+    const retirements = await require('./retiros.service').get(torneoId, conn)
+    if (ids.some(id => retirements.parejas.includes(id)))
+      fail(409, 'Hay una pareja retirada del torneo. Reactiva su participación antes de inscribirla.')
     for (const id of ids) {
       const [existing] = await conn.query(
         'SELECT id FROM inscripciones WHERE torneo_id=? AND equipo_id=? FOR UPDATE',
@@ -198,7 +201,7 @@ exports.removeInscripcion = async (torneoId, equipoId) => {
     if (matches.length)
       fail(
         409,
-        'No puedes retirar esta pareja: tiene partidos programados, en juego o finalizados en este torneo. Revisa sus partidos para conservar el historial.'
+        'La pareja tiene partidos. Usa la sección Participación del torneo para registrar su retiro sin borrar el historial.'
       )
     await conn.query('DELETE FROM torneo_grupo_parejas WHERE torneo_id=? AND equipo_id=?', [
       torneoId,

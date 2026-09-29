@@ -47,6 +47,7 @@ test('inscripción repetida se confirma sin duplicar filas', async () => {
       rollback: async () => {},
       release: () => {},
       query: async (sql) => {
+        if (sql.startsWith('SELECT tipo, participante_id, retirado, version FROM torneo_retiros')) return [[]]
         if (sql.includes('FROM torneos'))
           return [[{ id: 1, modalidad: 'dobles', deporte: 'tenis', estado: 'proximo' }]]
         if (sql.includes('FROM equipos_padel'))

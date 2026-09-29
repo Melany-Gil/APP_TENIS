@@ -1,6 +1,10 @@
 import api from './api'
 
 export const tournamentService = {
+  getRetirements: (id) => api.get(`/torneos/${id}/retiros`),
+  getRetirementParticipants: (id) => api.get(`/torneos/${id}/retiros/participantes`),
+  getRetirementAudit: (id) => api.get(`/torneos/${id}/retiros/auditoria`),
+  setRetirement: (id, data) => api.put(`/torneos/${id}/retiros`, data),
   getGroups: (id) => api.get(`/torneos/${id}/grupos`),
   saveGroups: (id, grupos, version) => api.put(`/torneos/${id}/grupos`, { grupos, version }),
   getStandings: (id, management = false) => api.get(`/torneos/${id}/posiciones${management ? '/gestion' : ''}`),

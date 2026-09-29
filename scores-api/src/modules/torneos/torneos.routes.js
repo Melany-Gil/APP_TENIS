@@ -74,6 +74,16 @@ router.get('/:torneo_id/posiciones/gestion', requireAuth,
   require('../../middlewares/auth.middleware').requireDirector,
   require('../posiciones/posiciones.controller').getByTorneo)
 router.get('/:id/inscripciones', require('./inscripciones.controller').getByTorneo)
+const retiros = require('./retiros.service')
+router.use('/:id/retiros', (req, res, next) => { res.setHeader('Cache-Control', 'private, no-store'); next() })
+router.get('/:id/retiros/participantes', requireAuth, requireAdmin, groupAction(req => retiros.participants(req.params.id)))
+router.get('/:id/retiros', groupAction(req => retiros.get(req.params.id)))
+router.put('/:id/retiros', requireAuth, requireAdmin, groupAction(async req => {
+  const result = await retiros.set(req.params.id, req.body, req.user)
+  require('../matches/match-realtime').publishMatchChange({ action: 'participation_updated' })
+  return result
+}))
+router.get('/:id/retiros/auditoria', requireAuth, requireAdmin, groupAction(req => retiros.audit(req.params.id)))
 router.post(
   '/:id/inscripciones',
   requireAuth,

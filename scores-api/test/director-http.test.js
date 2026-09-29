@@ -23,6 +23,7 @@ test('HTTP: rol real protege supervisión y lista de jueces no expone datos priv
   app.use(express.json())
   app.use('/partidos', require('../src/modules/matches/matches.routes'))
   app.use('/users', require('../src/modules/users/users.routes'))
+  app.use('/torneos', require('../src/modules/torneos/torneos.routes'))
   const server = app.listen(0, '127.0.0.1')
   await once(server, 'listening')
   const base = `http://127.0.0.1:${server.address().port}`
@@ -52,6 +53,10 @@ test('HTTP: rol real protege supervisión y lista de jueces no expone datos priv
     assert.equal(admin.status, 403)
     for (const actualRole of ['juez_director', 'juez', 'miembro']) {
       role = actualRole
+      for (const [method, path] of [['GET', '/retiros/auditoria'], ['GET', '/retiros/participantes'], ['PUT', '/retiros']]) {
+        const response = await fetch(`${base}/torneos/1${path}`, { method, headers, ...(method === 'PUT' ? { body: '{}' } : {}) })
+        assert.equal(response.status, 403)
+      }
       for (const [method, path] of [['POST', '/users'], ['PUT', '/users/2'], ['PUT', '/users/2/password'], ['PUT', '/users/2/estado'], ['PUT', '/users/2/avatar'], ['DELETE', '/users/2/avatar'], ['DELETE', '/users/2']]) {
         const response = await fetch(`${base}${path}`, { method, headers, body: '{}' })
         assert.equal(response.status, 403)

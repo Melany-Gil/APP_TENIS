@@ -11,6 +11,7 @@ import {
 import { Link } from 'react-router-dom'
 import MatchStats from '../components/match/MatchStats'
 import MatchJudge from '../components/match/MatchJudge'
+import RetirementNotice from '../components/match/RetirementNotice'
 import MatchPhoto from '../components/match/MatchPhoto'
 import { SPONSORS } from '../data/sponsors'
 import { useMatchRealtime } from '../hooks/useMatchRealtime'
@@ -639,6 +640,7 @@ function ScreenMatch({ match, onFocus, onBack, featured = false }) {
               {match.cancha?.nombre || 'Cancha por confirmar'}
             </p>
             <MatchJudge match={match} dark className='mt-2' />
+            <RetirementNotice match={match} />
           </div>
           <div className='flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end'>
             <span

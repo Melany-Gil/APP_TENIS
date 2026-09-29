@@ -4,6 +4,7 @@ import { X, Search, Users, User, ArrowRight, AlertCircle, Check } from 'lucide-r
 import { matchService } from '../../services/matchService'
 import { teamService } from '../../services/teamService'
 import { playerService } from '../../services/playerService'
+import { tournamentService } from '../../services/tournamentService'
 import { categoriaService } from '../../services/categoriaService'
 import useUIStore from '../../store/useUIStore'
 import { getParticipantName } from '../../utils/matchParticipants'
@@ -59,10 +60,13 @@ export default function ModalSustitucionParticipante({ isOpen, onClose, match, o
       isDoubles
         ? teamService.getAll({ deporte: sport, activo: true })
         : playerService.getAll({ deporte: sport, activo: true }),
+      (match.torneo?.id || match.torneo_id)
+        ? tournamentService.getRetirements(match.torneo?.id || match.torneo_id)
+        : Promise.resolve({ data: {} }),
     ])
-      .then(([catRes, itemsRes]) => {
+      .then(([catRes, itemsRes, retirements]) => {
         setCategories(catRes.data || [])
-        setItems(itemsRes.data || [])
+        setItems((itemsRes.data || []).filter(p => !retirements.data[isDoubles ? 'parejas' : 'jugadores']?.includes(Number(p.id))))
       })
       .catch((err) => {
         setError(err.message || 'Error al cargar los participantes disponibles')

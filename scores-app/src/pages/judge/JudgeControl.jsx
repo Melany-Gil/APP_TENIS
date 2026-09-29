@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import RetirementNotice from '../../components/match/RetirementNotice'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -118,6 +119,7 @@ export default function JudgeControl() {
 
   return (
     <div className='space-y-4 animate-fade-up'>
+      <RetirementNotice match={partido} />
       <div className='flex items-center justify-between gap-3'>
         <Link to='/juez' className='btn-ghost inline-flex items-center gap-2 text-sm'>
           <ArrowLeft className='w-4 h-4' /> Partidos

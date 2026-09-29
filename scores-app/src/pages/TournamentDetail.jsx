@@ -8,12 +8,14 @@ import TournamentTeamsModal from '../components/tournament/TournamentTeamsModal'
 import TournamentRoster from '../components/tournament/TournamentRoster'
 import TournamentStandings from '../components/tournament/TournamentStandings'
 import TournamentMatches from '../components/tournament/TournamentMatches'
+import TournamentRetirements from '../components/tournament/TournamentRetirements'
 import { confirm } from '../utils/confirm'
 export default function TournamentDetail() {
   const { id } = useParams(),
     admin = useAuthStore((s) => s.user?.rol === 'admin')
   const standingsManagement = useAuthStore((s) => s.isAuthenticated && ['admin', 'juez_director'].includes(s.user?.rol))
   const [t, setT] = useState(null),
+    [retirements, setRetirements] = useState(null),
     [tab, setTab] = useState('matches'),
     [data, setData] = useState(null),
     [error, setError] = useState(''),
@@ -45,11 +47,13 @@ export default function TournamentDetail() {
         : tab === 'standings'
           ? tournamentService.getStandings(id, standingsManagement)
           : matchService.getAll({ torneo_id: id }),
+      tournamentService.getRetirements(id),
     ])
-      .then(([meta, content]) => {
+      .then(([meta, content, statuses]) => {
         if (active) {
           setT(meta.data)
           setData(content.data)
+          setRetirements(statuses.data)
         }
       })
       .catch((e) => {
@@ -65,9 +69,9 @@ export default function TournamentDetail() {
   const remove = async (team) => {
     if (
       !(await confirm({
-        title: 'Retirar inscripción',
-        message: `¿Retirar a ${team.nombre}? No elimina la pareja ni sus jugadores.`,
-        confirmLabel: 'Retirar',
+        title: 'Quitar inscripción',
+        message: `¿Quitar la inscripción de ${team.nombre}? Solo se permite si no tiene partidos. Para registrar un retiro conservando el historial, usa la sección Participación. No elimina la pareja ni sus jugadores.`,
+        confirmLabel: 'Quitar inscripción',
       }))
     )
       return
@@ -117,6 +121,7 @@ export default function TournamentDetail() {
               ['matches', 'Partidos'],
               ...(t.modalidad === 'dobles' ? [['teams', 'Parejas inscritas']] : []),
               ['standings', 'Posiciones'],
+              ...(admin ? [['participation', 'Participación']] : []),
             ].map(([v, l]) => (
               <button
                 key={v}
@@ -161,6 +166,7 @@ export default function TournamentDetail() {
           <TournamentRoster
             tournament={t}
             data={data}
+            retirements={retirements}
             admin={admin}
             remove={remove}
             removing={removing}
@@ -168,7 +174,8 @@ export default function TournamentDetail() {
           />
         </div>
       )}
-      {data && tab === 'standings' && <TournamentStandings data={data} />}
+      {data && tab === 'standings' && <TournamentStandings data={data} retirements={retirements} />}
+      {admin && tab === 'participation' && <TournamentRetirements tournamentId={id} onChange={refresh} />}
       {adding && (
         <TournamentTeamsModal
           tournament={t}

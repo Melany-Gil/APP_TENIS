@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import RetirementNotice from '../../components/match/RetirementNotice'
 import { useOutletContext } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -1208,6 +1209,7 @@ export default function JuezPartidos() {
                   </button>
                 </div>
               )}
+              <RetirementNotice match={match} />
               <div
                 className='judge-scoreboard judge-scoreboard-sets'
                 style={{ '--set-count': state.raw_marcador?.sets?.length || 1 }}

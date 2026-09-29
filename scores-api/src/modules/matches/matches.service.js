@@ -9,6 +9,7 @@ const { rethrowDeleteConflict } = require('../../utils/deleteConflict')
 const { computeBreakpoint } = require('./score.engine')
 
 const groupsService = require('../torneos/grupos.service')
+const retirosService = require('../torneos/retiros.service')
 const MAX_SETS = 127
 
 const MATCH_SELECT = `
@@ -16,6 +17,12 @@ const MATCH_SELECT = `
     p.id,
     p.control_version,
     p.torneo_id,
+    EXISTS (SELECT 1 FROM torneo_retiros r WHERE r.torneo_id=p.torneo_id AND r.retirado=1 AND
+      ((r.tipo='pareja' AND r.participante_id=p.equipo1_id) OR
+       (r.tipo='jugador' AND r.participante_id IN (p.jugador1_id,e1.jugador1_id,e1.jugador2_id)))) AS retiro1,
+    EXISTS (SELECT 1 FROM torneo_retiros r WHERE r.torneo_id=p.torneo_id AND r.retirado=1 AND
+      ((r.tipo='pareja' AND r.participante_id=p.equipo2_id) OR
+       (r.tipo='jugador' AND r.participante_id IN (p.jugador2_id,e2.jugador1_id,e2.jugador2_id)))) AS retiro2,
     p.deporte,
     p.estado,
     p.ganador,
@@ -457,7 +464,7 @@ exports.updateMarcador = async (id, { sets, estado, ganador }, actor) => {
   const requester = normalizeActor(actor)
   const [existing] = await db.query(
     `SELECT p.id, p.deporte, p.jugador1_id, p.jugador2_id, p.equipo1_id, p.equipo2_id,
-            p.juez_id, p.created_by, t.modalidad
+            p.juez_id, p.created_by, p.torneo_id, p.estado, t.modalidad
      FROM partidos p
      LEFT JOIN torneos t ON t.id = p.torneo_id
      WHERE p.id = ?`,
@@ -472,6 +479,8 @@ exports.updateMarcador = async (id, { sets, estado, ganador }, actor) => {
   if (!['programado', 'en_vivo', 'finalizado', 'cancelado'].includes(estado)) {
     throw { status: 400, message: 'Estado de partido inválido' }
   }
+  if (estado === 'en_vivo' && existing[0].estado !== 'en_vivo')
+    await retirosService.assertAvailable(existing[0], db)
   if (ganador && !['jugador1', 'jugador2'].includes(ganador)) {
     throw { status: 400, message: 'Ganador inválido' }
   }
@@ -644,6 +653,7 @@ exports.updateParticipants = async (id, data, user) => {
       }
     }
     const ids = allowed.map((key) => Number(data[key] ?? match[key])).filter(Boolean)
+    await retirosService.assertAvailable({ ...match, ...data }, db, match)
     if (new Set(ids).size !== ids.length) {
       throw { status: 400, message: 'Los participantes del partido deben ser diferentes' }
     }
@@ -864,6 +874,11 @@ async function validateBasicMatch(body, currentMatchId = null) {
     )
   }
 
+  const [[previous] = []] = currentMatchId
+    ? await db.query('SELECT * FROM partidos WHERE id = ?', [currentMatchId]) : [[]]
+  await retirosService.assertAvailable({ torneo_id: torneoId, jugador1_id: resolvedPlayer1,
+    jugador2_id: resolvedPlayer2, equipo1_id: resolvedTeam1, equipo2_id: resolvedTeam2 }, db,
+    estado === 'en_vivo' && previous?.estado !== 'en_vivo' ? null : previous)
   return {
     torneo_id: torneoId,
     deporte,
@@ -1085,10 +1100,11 @@ function getWinnerParticipantId(match, winner) {
 }
 
 async function propagateWinner(connection, match, estado, ganador) {
-  const participantId =
+  let participantId =
     estado === 'finalizado' && ganador ? getWinnerParticipantId(match, ganador) : null
   const participantColumn =
     match.modalidad === 'dobles' || match.equipo1_id || match.equipo2_id ? 'equipo' : 'jugador'
+  participantId = await retirosService.eligibleWinner(match, participantColumn, participantId, connection)
 
   await connection.query(
     `UPDATE partidos
@@ -1124,6 +1140,7 @@ function formatSummary(row, sets = []) {
   const match = {
     id: row.id,
     control_version: Number(row.control_version || 0),
+    retiros: { jugador1: Boolean(row.retiro1), jugador2: Boolean(row.retiro2) },
     deporte: row.deporte,
     modalidad: row.torneo_modalidad || (row.e1_id || row.e2_id ? 'dobles' : 'individual'),
     torneo: row.torneo_id
@@ -1271,14 +1288,12 @@ for (const method of ['create', 'update', 'updateParticipants']) {
     let tournamentId = positiveId(body?.torneo_id)
     if (
       method === 'updateParticipants' &&
-      ['equipo1_id', 'equipo2_id'].some((k) => body?.[k] !== undefined)
+      ['equipo1_id', 'equipo2_id', 'jugador1_id', 'jugador2_id'].some((k) => body?.[k] !== undefined)
     ) {
       const [[m]] = await pool.query('SELECT * FROM partidos WHERE id = ?', [args[0]])
       tournamentId = m?.torneo_id
     }
     if (!tournamentId) return original(...args)
-    const [[t]] = await pool.query('SELECT sistema FROM torneos WHERE id=?', [tournamentId])
-    if (t?.sistema !== 'grupos_eliminacion') return original(...args)
     const conn = await pool.getConnection()
     try {
       await conn.beginTransaction()

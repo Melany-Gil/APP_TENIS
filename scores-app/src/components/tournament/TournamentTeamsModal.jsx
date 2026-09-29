@@ -14,14 +14,14 @@ export default function TournamentTeamsModal({ tournament, enrolledTeamIds, onCl
   useEffect(() => {
     let active = true
     setLoading(true)
-    teamService
-      .getAll({ deporte: tournament.deporte })
-      .then((r) => {
+    Promise.all([teamService.getAll({ deporte: tournament.deporte }), tournamentService.getRetirements(tournament.id)])
+      .then(([r, retiros]) => {
         if (active) {
           setTeams(
             r.data.filter(
               (t) =>
                 t.activo &&
+                !retiros.data.parejas?.includes(Number(t.id)) &&
                 (!tournament.categoria?.id ||
                   Number(t.categoria?.id) === Number(tournament.categoria.id))
             )

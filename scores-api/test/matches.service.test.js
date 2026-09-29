@@ -6,6 +6,14 @@ const dbPath = require.resolve('../src/config/db')
 const servicePath = require.resolve('../src/modules/matches/matches.service')
 
 const loadService = (fakeDb) => {
+  const originalQuery = fakeDb.query.bind(fakeDb)
+  fakeDb.query = async (sql, params) => {
+    if (sql.startsWith('SELECT tipo, participante_id, retirado, version FROM torneo_retiros')) return [[]]
+    if (sql === 'SELECT id FROM torneos WHERE id=? FOR UPDATE') return [[{ id: params[0] }]]
+    return originalQuery(sql, params)
+  }
+  fakeDb.getConnection ||= async () => ({ query: fakeDb.query, beginTransaction: async () => {},
+    commit: async () => {}, rollback: async () => {}, release: () => {} })
   delete require.cache[servicePath]
   require.cache[dbPath] = {
     id: dbPath,

@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom'
 import ParticipantAvatar from '../ui/ParticipantAvatar'
 import useAuthStore from '../../store/useAuthStore'
 import { ChevronDown, BarChart3 } from 'lucide-react'
+import { RetirementBadge } from '../match/RetirementNotice'
 
-export default function TournamentStandings({ data }) {
+export default function TournamentStandings({ data, retirements }) {
   const management = useAuthStore(s => s.isAuthenticated && ['admin', 'juez_director'].includes(s.user?.rol)) && data.puede_ver_gestion === true
   const [category, setCategory] = useState(''),
     [group, setGroup] = useState('')
@@ -92,6 +93,7 @@ export default function TournamentStandings({ data }) {
                   />
                   <span className='font-semibold text-sm break-words flex-1'>
                     {r.participante.nombre}
+                    {retirements?.[data.modalidad === 'dobles' ? 'parejas' : 'jugadores']?.includes(Number(r.participante.id || r.id)) && <span className='block mt-1'><RetirementBadge /></span>}
                   </span>
                   <span className='text-right shrink-0'>
                     <strong className='text-lg text-[var(--color-brand)]'>{r.puntos}</strong>

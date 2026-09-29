@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import RetirementNotice from '../components/match/RetirementNotice'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -532,6 +533,7 @@ function PlayerMatchRow({ match, playerId }) {
       className='block p-4 transition-colors hover:bg-[var(--bg-hover)]'
     >
       {/* Línea superior: Torneo / Categoría / Fecha / Estado */}
+      <RetirementNotice match={match} />
       <div className='flex items-center justify-between gap-2 mb-2.5 flex-wrap'>
         <div className='flex items-center gap-2 flex-wrap'>
           {match.categoria?.nombre && (

@@ -77,6 +77,18 @@ const columnForeignKeyExists = async (tableName, columnName) => {
 }
 
 exports.ensureSchema = async () => {
+  await db.query(`CREATE TABLE IF NOT EXISTS torneo_retiros (
+    torneo_id BIGINT NOT NULL, tipo VARCHAR(10) NOT NULL, participante_id BIGINT NOT NULL,
+    retirado BOOLEAN NOT NULL DEFAULT TRUE, version INT NOT NULL DEFAULT 1,
+    PRIMARY KEY (torneo_id,tipo,participante_id)
+  ) ENGINE=InnoDB`)
+  // No cascading FK: the audit survives tournament deletion.
+  await db.query(`CREATE TABLE IF NOT EXISTS auditoria_retiros (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, torneo_id BIGINT NOT NULL,
+    tipo VARCHAR(10) NOT NULL, participante_id BIGINT NOT NULL, actor_id BIGINT NOT NULL,
+    retirado BOOLEAN NOT NULL, motivo VARCHAR(500) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_retiros_torneo (torneo_id,id)
+  ) ENGINE=InnoDB`)
   // No foreign keys: deletion history survives the original entity and account.
   await db.query(`CREATE TABLE IF NOT EXISTS auditoria_eliminaciones (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,

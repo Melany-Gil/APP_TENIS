@@ -226,9 +226,10 @@ exports.correctScore = (id, body, user) =>
     )
     if ((match.ganador || null) !== state.winner) {
       const type = match.equipo1_id ? 'equipo' : 'jugador'
-      const participant = state.winner
+      let participant = state.winner
         ? match[`${type}${state.winner === 'jugador1' ? 1 : 2}_id`]
         : null
+      participant = await require('../torneos/retiros.service').eligibleWinner(match, type, participant, conn)
       for (const side of [1, 2])
         await conn.query(
           `UPDATE partidos SET ${type}${side}_id = ?, control_version = control_version + 1 WHERE origen_partido${side}_id = ?`,
@@ -275,6 +276,7 @@ exports.substitute = (id, body, user) =>
       fail(400, 'Selecciona un lado y un participante registrado')
     const type = doubles ? 'equipo' : 'jugador'
     const field = `${type}${side}_id`
+    await require('../torneos/retiros.service').assertAvailable({ ...match, [field]: newId }, conn, match)
     const other = match[`${type}${side === 1 ? 2 : 1}_id`]
     if (Number(other) === newId || Number(match[field]) === newId)
       fail(400, 'Elige un participante distinto a los dos actuales')

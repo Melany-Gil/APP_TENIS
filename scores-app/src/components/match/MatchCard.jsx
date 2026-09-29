@@ -10,6 +10,7 @@ import { useLoginRequired } from '../../hooks/useLoginRequired'
 import { getParticipantName } from '../../utils/matchParticipants'
 import { useMatchTimer } from '../../hooks/useMatchTimer'
 import ParticipantAvatar from '../ui/ParticipantAvatar'
+import RetirementNotice from './RetirementNotice'
 
 export default function MatchCard({ match, compact = false, to }) {
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
@@ -29,6 +30,7 @@ export default function MatchCard({ match, compact = false, to }) {
     <Link to={to || `/match/${match.id}`} className='block h-full'>
       <div className={cn('card-hover group h-full flex flex-col justify-between', isLive && 'match-card-live')}>
         {/* Header */}
+        <RetirementNotice match={match} />
         <div
           className={cn(
             'flex items-center justify-between',
