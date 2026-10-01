@@ -31,7 +31,15 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.rol === 'admin'
 
-  const [data, setData] = useState(null)
+  const [rawData, setData] = useState(null)
+  const [participantType, setParticipantType] = useState(null)
+  const pairCount = rawData?.participants.filter(p => p.tipo === 'pareja').length || 0
+  const playerCount = rawData?.participants.filter(p => p.tipo === 'jugador').length || 0
+  const activeType = participantType || (pairCount ? 'pareja' : 'jugador')
+  const pairsView = activeType === 'pareja'
+  const data = useMemo(() => rawData && ({ ...rawData,
+    participants: rawData.participants.filter(p => p.tipo === activeType),
+  }), [rawData, activeType])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
@@ -49,6 +57,15 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
   // Modales
   const [selectedAction, setSelectedAction] = useState(null)
   const [showAuditModal, setShowAuditModal] = useState(false)
+  const changeParticipantType = (type) => {
+    setParticipantType(type)
+    setSearch('')
+    setCategoryFilter('')
+    setStatusFilter('todos')
+    setSelectedParticipantKey('')
+    setIsListExpanded(false)
+    setError('')
+  }
 
   useEffect(() => {
     if (!isAdmin) {
@@ -266,7 +283,7 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
           ) : (
             <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/25'>
               <span className='w-1.5 h-1.5 rounded-full bg-slate-400' />
-              Inscrito (Sin grupo)
+              {p.tipo === 'pareja' ? 'Inscrito (Sin grupo)' : 'Activo en el torneo'}
             </span>
           )}
         </div>
@@ -282,7 +299,7 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
           {/* Grupo */}
           {retired ? (
             <span className='px-2 py-0.5 rounded-md font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'>
-              Cupo liberado del grupo
+              {p.tipo === 'pareja' ? 'Cupo liberado del grupo' : 'Retirado de este torneo'}
             </span>
           ) : p.grupo ? (
             <span className='px-2 py-0.5 rounded-md font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1'>
@@ -291,7 +308,7 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
             </span>
           ) : (
             <span className='px-2 py-0.5 rounded-md font-medium bg-[var(--bg-hover)] text-[var(--text-muted)] border border-[var(--border-color)]/50'>
-              Sin grupo asignado
+              {p.tipo === 'pareja' ? 'Sin grupo asignado' : 'Participación individual'}
             </span>
           )}
 
@@ -396,6 +413,16 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
         </button>
       </header>
 
+      <div className='flex flex-wrap gap-2' role='group' aria-label='Tipo de participante'>
+        {[[ 'pareja', `Parejas (${pairCount})` ], [ 'jugador', `Jugadores (${playerCount})` ]].map(([type, label]) =>
+          <button key={type} type='button' aria-pressed={activeType === type}
+            className={`${activeType === type ? 'btn-primary' : 'btn-secondary'} px-4 py-2 rounded-xl text-sm`}
+            onClick={() => changeParticipantType(type)}>{label}</button>)}
+      </div>
+      <p className='text-xs text-[var(--text-secondary)]'>
+        {pairsView ? 'Los contadores incluyen solo parejas. Sus integrantes se gestionan por separado en Jugadores.' : 'Jugadores vinculados a este torneo. No se cuentan como parejas sin grupo. Un retiro individual afecta a sus parejas en este torneo.'}
+      </p>
+
       {/* Métricas KPI compactas (2 columnas en móvil, 4 en desktop) */}
       <div className='grid grid-cols-2 sm:grid-cols-4 gap-2.5'>
         <div className='card p-2.5 sm:p-3 border border-[var(--border-color)] flex items-center gap-2.5'>
@@ -403,14 +430,14 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
             <Users className='w-4 h-4' />
           </div>
           <div className='min-w-0'>
-            <p className='text-[10px] sm:text-xs text-[var(--text-secondary)] truncate'>Inscritos</p>
+            <p className='text-[10px] sm:text-xs text-[var(--text-secondary)] truncate'>{pairsView ? 'Parejas' : 'Jugadores'}</p>
             <p className='text-sm sm:text-base font-bold text-[var(--text-primary)] leading-tight'>
               {totalCount}
             </p>
           </div>
         </div>
 
-        <div className='card p-2.5 sm:p-3 border border-[var(--border-color)] flex items-center gap-2.5'>
+        {pairsView && <><div className='card p-2.5 sm:p-3 border border-[var(--border-color)] flex items-center gap-2.5'>
           <div className='p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0'>
             <Layers className='w-4 h-4' />
           </div>
@@ -432,7 +459,7 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
               {unassignedCount}
             </p>
           </div>
-        </div>
+        </div></>}
 
         <div className='card p-2.5 sm:p-3 border border-[var(--border-color)] flex items-center gap-2.5'>
           <div className='p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0'>
@@ -484,12 +511,12 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
                     ? 'Cupo liberado'
                     : p.grupo
                     ? formatGroupName(p.grupo)
-                    : 'Sin grupo asignado'
+                    : p.tipo === 'pareja' ? 'Sin grupo asignado' : 'Jugador del torneo'
                   const statusTag = retired
                     ? '❌ Retirado'
                     : p.grupo
                     ? '✓ En competencia'
-                    : '⏳ Inscrito (Sin grupo)'
+                    : p.tipo === 'pareja' ? '⏳ Inscrito (Sin grupo)' : 'Activo'
                   return (
                     <option
                       key={`${p.tipo}:${p.participante_id}`}
@@ -574,7 +601,7 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
             >
               Todos ({totalCount})
             </button>
-            <button
+            {pairsView && <><button
               type='button'
               onClick={() => setStatusFilter('en_grupo')}
               className={`px-2.5 py-1 rounded-lg font-medium transition-colors text-xs ${
@@ -595,7 +622,7 @@ export default function TournamentRetirements({ tournamentId, onChange }) {
               }`}
             >
               Sin grupo ({unassignedCount})
-            </button>
+            </button></>}
             <button
               type='button'
               onClick={() => setStatusFilter('retirados')}

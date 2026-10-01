@@ -86,7 +86,11 @@ async function checkTournamentRetirements(browser) {
   const admin = { id: 99, rol: 'admin', nombre: 'Admin', apellido: 'QA', email: 'qa@example.com', numero_documento: '12345678' }
   const tournament = { id: 1, nombre: 'Torneo QA', modalidad: 'dobles', estado: 'en_curso', sistema: 'grupos_eliminacion', deporte: 'tenis' }
   let retired = false, version = 0, writes = 0
-  const participants = [{ tipo: 'pareja', participante_id: 1, nombre: 'GÓMEZ / PÉREZ' }]
+  const participants = [
+    { tipo: 'pareja', participante_id: 1, nombre: 'GÓMEZ / PÉREZ' },
+    ...Array.from({ length: 148 }, (_, i) => ({ tipo: 'pareja', participante_id: i + 2, nombre: `Pareja QA ${i + 2}`, grupo: i < 128 ? 'GRUPO 1' : null })),
+    ...Array.from({ length: 265 }, (_, i) => ({ tipo: 'jugador', participante_id: i + 1, nombre: `Jugador QA ${i + 1}` })),
+  ]
   const audit = []
   const routeHandler = async route => {
     const req = route.request(), url = new URL(req.url()), endpoint = url.pathname.replace(/^\/api/, '')
@@ -113,6 +117,16 @@ async function checkTournamentRetirements(browser) {
   try {
     await page.goto('http://127.0.0.1:4173/torneo/1')
     await page.getByRole('button', { name: 'Participación', exact: true }).click()
+    await page.getByRole('button', { name: 'Todos (149)', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'En grupos (128)', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Sin grupo (21)', exact: true }).click()
+    await page.getByText('21 mostradas', { exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Jugadores (265)', exact: true }).click()
+    await page.getByRole('button', { name: 'Todos (265)', exact: true }).waitFor()
+    assert.equal(await page.getByRole('button', { name: /^Sin grupo \(/ }).count(), 0)
+    assert.equal(await page.locator('#quick-participant-select option').count(), 266)
+    await page.getByRole('button', { name: 'Parejas (149)', exact: true }).click()
+    assert.equal(await page.locator('#quick-participant-select option').count(), 150)
     await page.getByRole('button', { name: 'Retirar del torneo', exact: true }).first().click()
     await page.getByRole('dialog').getByRole('textbox').fill('Motivo privado QA')
     await page.getByRole('dialog').getByRole('button', { name: 'Confirmar Retiro', exact: true }).click()
