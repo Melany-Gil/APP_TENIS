@@ -21,6 +21,8 @@ export default function TournamentRoster({
 }) {
   const { addToast } = useUIStore()
   const [retiringAction, setRetiringAction] = useState(null)
+  const [loadError, setLoadError] = useState('')
+  const [loadRevision, setLoadRevision] = useState(0)
   const [groups, setGroups] = useState([]),
     [categories, setCategories] = useState([]),
     [issues, setIssues] = useState([])
@@ -85,12 +87,14 @@ export default function TournamentRoster({
       setVersion(g.data.version)
       setIssues(g.data.incidencias)
     } catch (e) {
-      setError(e.message || 'No se pudo recargar la distribución')
+      setLoadError(e.message || 'No se pudo recargar la distribución')
     }
   }
 
   useEffect(() => {
     let active = true
+    setBusy(true)
+    setLoadError('')
     Promise.all([
       grouped
         ? tournamentService.getGroups(tournament.id)
@@ -116,14 +120,14 @@ export default function TournamentRoster({
       })
       .catch((e) => {
         if (active) {
-          setError(e.message || 'No se pudo cargar la distribución')
+          setLoadError(e.message || 'No se pudo cargar la distribución')
           setBusy(false)
         }
       })
     return () => {
       active = false
     }
-  }, [tournament.id, grouped, tournament.deporte])
+  }, [tournament.id, grouped, tournament.deporte, loadRevision])
 
   useEffect(() => {
     if (!dirty && grouped && retirements) {
@@ -333,13 +337,18 @@ export default function TournamentRoster({
       )}
     </article>
   )
+  if (loadError) return <section className='card p-4 space-y-3' role='alert'>
+    <h2 className='font-bold'>No pudimos cargar la distribución</h2>
+    <p className='text-sm'>{loadError}</p>
+    <p className='text-sm text-[var(--text-secondary)]'>Esto no significa que los grupos estén vacíos. No se ha modificado la distribución guardada.</p>
+    <button type='button' className='btn-secondary px-4 py-2' onClick={() => setLoadRevision(v => v + 1)}>Reintentar</button>
+  </section>
   return (
     <div className='space-y-4 min-w-0'>
       <div className='card p-4 space-y-3'>
         <h2 className='font-bold'>Parejas y grupos</h2>
         <p className='text-sm text-[var(--text-secondary)]'>
-          {teams.length} inscritas · {groups.length} grupos ·{' '}
-          {teams.filter((p) => !assigned.has(Number(p.equipo_id))).length} sin asignar
+          {busy ? 'Consultando distribución…' : `${teams.length} inscritas · ${groups.length} grupos · ${teams.filter((p) => !assigned.has(Number(p.equipo_id))).length} sin asignar`}
         </p>
         <div className='grid gap-2 sm:grid-cols-2'>
           <input

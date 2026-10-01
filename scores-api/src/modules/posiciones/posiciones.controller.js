@@ -18,6 +18,6 @@ exports.getByTorneo = async (req, res) => {
     res.setHeader('Cache-Control', 'private, no-store')
     return success(res, data)
   } catch (err) {
-    return error(res, err.message || 'Error al obtener posiciones', err.status || 500)
+    return error(res, err.status ? err.message : 'No se pudieron cargar las posiciones. Intenta actualizar de nuevo.', err.status || 500)
   }
 }

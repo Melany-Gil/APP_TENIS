@@ -30,7 +30,8 @@ exports.groupKey = key
 const historyColumns = [1, 2].map(side => `EXISTS (
   SELECT 1 FROM torneo_grupo_historial h WHERE h.torneo_id=partidos.torneo_id
     AND h.equipo_id=partidos.equipo${side}_id AND h.categoria_id=partidos.categoria_id
-    AND h.grupo=partidos.grupo) AS historico${side}`).join(', ')
+    AND CONVERT(h.grupo USING utf8mb4) COLLATE utf8mb4_unicode_ci =
+        CONVERT(partidos.grupo USING utf8mb4) COLLATE utf8mb4_unicode_ci) AS historico${side}`).join(', ')
 exports.isHistoricalCompatible = (match, assignments) => match.estado === 'finalizado' &&
   [1, 2].every(side => {
     const a = assignments.get(Number(match[`equipo${side}_id`]))

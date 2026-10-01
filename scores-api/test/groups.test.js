@@ -24,6 +24,17 @@ const match = {
   equipo1_id: 1,
   equipo2_id: 2,
 }
+
+test('consultas de historial normalizan ambas columnas sin depender de la collation de producción', async () => {
+  const queries = []
+  const svc = load({ query: async sql => { queries.push(sql); return [[]] } })
+  await svc.get(8)
+  const history = queries.find(sql => sql.includes('FROM torneo_grupo_historial'))
+  assert.ok(history)
+  assert.match(history, /CONVERT\(h\.grupo USING utf8mb4\) COLLATE utf8mb4_unicode_ci/)
+  assert.match(history, /CONVERT\(partidos\.grupo USING utf8mb4\) COLLATE utf8mb4_unicode_ci/)
+  assert.ok(!history.includes('h.grupo=partidos.grupo'))
+})
 const fake = (duplicate = false) => ({
   query: async (sql) => {
     if (sql.includes('SELECT sistema')) return [[{ sistema: 'grupos_eliminacion' }]]

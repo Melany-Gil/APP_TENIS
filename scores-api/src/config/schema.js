@@ -111,7 +111,7 @@ exports.ensureSchema = async () => {
     torneo_id INT NOT NULL, equipo_id INT NOT NULL, categoria_id INT NOT NULL,
     grupo VARCHAR(20) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (torneo_id,equipo_id,categoria_id,grupo)
-  ) ENGINE=InnoDB`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
   // Almacenamiento persistente de fotos de perfil y multimedia frente a despliegues efímeros
   await db.query(`CREATE TABLE IF NOT EXISTS media_storage (
     path VARCHAR(255) NOT NULL PRIMARY KEY,
