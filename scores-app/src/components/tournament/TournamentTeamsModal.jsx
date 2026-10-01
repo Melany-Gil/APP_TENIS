@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import ActionDialog from '../common/ActionDialog'
 import { teamService } from '../../services/teamService'
 import { tournamentService } from '../../services/tournamentService'
+import useUIStore from '../../store/useUIStore'
+
 export default function TournamentTeamsModal({ tournament, enrolledTeamIds, onClose, onSuccess }) {
+  const { addToast } = useUIStore()
   const [teams, setTeams] = useState([]),
     [search, setSearch] = useState(''),
     [category, setCategory] = useState(''),
@@ -66,6 +69,10 @@ export default function TournamentTeamsModal({ tournament, enrolledTeamIds, onCl
     setError('')
     try {
       await tournamentService.inscribirEquiposBulk(tournament.id, selected)
+      addToast(
+        `${selected.length} ${selected.length === 1 ? 'pareja inscrita' : 'parejas inscritas'} correctamente`,
+        'success'
+      )
       onSuccess()
       onClose()
     } catch (e) {

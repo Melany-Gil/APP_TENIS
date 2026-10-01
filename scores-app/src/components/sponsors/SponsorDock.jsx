@@ -19,8 +19,8 @@ export default function SponsorDock() {
   const sponsor = SPONSORS[activeIndex]
   if (!sponsor) return null
   return (
-    <aside className='sponsor-dock is-minimized' style={{ '--dock-accent': sponsor.accent }} aria-label='Patrocinador destacado'>
-      <div className='sponsor-dock-pill' style={{ cursor: 'default' }}>
+    <aside className='sponsor-dock is-minimized' style={{ '--dock-accent': sponsor.accent, pointerEvents: 'none' }} aria-label='Patrocinador destacado'>
+      <div className='sponsor-dock-pill' style={{ cursor: 'default', pointerEvents: 'none' }}>
         <img src={sponsor.image} alt='' aria-hidden='true' loading='lazy' decoding='async' />
         <span className='sponsor-dock-pill-copy'>
           <span>Patrocinado por</span>

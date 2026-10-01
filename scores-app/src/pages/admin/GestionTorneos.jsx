@@ -1,5 +1,5 @@
 import BulkDelete from '../../components/ui/BulkDelete'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   ArrowRight,
@@ -11,6 +11,7 @@ import {
   Trophy,
   UsersRound,
   X,
+  Search,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { tournamentService } from '../../services/tournamentService'
@@ -19,6 +20,7 @@ import useUIStore from '../../store/useUIStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
+import Tabs from '../../components/ui/Tabs'
 import { formatDate } from '../../utils/formatDate'
 
 const ESTADOS = [
@@ -26,6 +28,12 @@ const ESTADOS = [
   { value: 'en_curso', label: 'En curso' },
   { value: 'finalizado', label: 'Finalizado' },
   { value: 'cancelado', label: 'Cancelado' },
+]
+const STATUS_TABS = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'en_curso', label: 'En curso' },
+  { value: 'proximo', label: 'Próximos' },
+  { value: 'finalizado', label: 'Finalizados' },
 ]
 const ESTADO_BADGE = {
   proximo: 'badge-brand',
@@ -62,6 +70,9 @@ export default function GestionTorneos() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [search, setSearch] = useState('')
+  const [statusTab, setStatusTab] = useState('todos')
+  const [deporteFilter, setDeporteFilter] = useState('todos')
   const { addToast } = useUIStore()
   const {
     register,
@@ -73,6 +84,20 @@ export default function GestionTorneos() {
 
   const selectedSystem = watch('sistema') || 'por_definir'
   const systemInfo = SISTEMAS.find((system) => system.value === selectedSystem)
+
+  const filtered = useMemo(() => {
+    return torneos.filter((t) => {
+      if (statusTab !== 'todos' && t.estado !== statusTab) return false
+      if (deporteFilter !== 'todos' && t.deporte !== deporteFilter) return false
+      if (search.trim()) {
+        const q = search.toLowerCase().trim()
+        const nombre = (t.nombre || '').toLowerCase()
+        const cat = (t.categoria?.nombre || '').toLowerCase()
+        if (!nombre.includes(q) && !cat.includes(q)) return false
+      }
+      return true
+    })
+  }, [torneos, statusTab, deporteFilter, search])
 
   const fetchAll = () => {
     setLoading(true)
@@ -301,9 +326,69 @@ export default function GestionTorneos() {
         </div>
       </Modal>
 
+      {/* Barra de búsqueda y filtros */}
+      <div className='card p-4 space-y-3'>
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+          <div className='relative'>
+            <Search
+              className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none'
+              style={{ color: 'var(--text-muted)' }}
+            />
+            <input
+              type='text'
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder='Buscar torneo por nombre o categoría...'
+              className='form-input pl-9 text-xs sm:text-sm'
+            />
+            {search && (
+              <button
+                type='button'
+                onClick={() => setSearch('')}
+                className='absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              >
+                <X className='w-3.5 h-3.5' />
+              </button>
+            )}
+          </div>
+          <div>
+            <select
+              value={deporteFilter}
+              onChange={(e) => setDeporteFilter(e.target.value)}
+              className='form-input text-xs sm:text-sm'
+            >
+              <option value='todos'>Todos los deportes (Tenis y Pádel)</option>
+              <option value='tenis'>Solo Tenis</option>
+              <option value='padel'>Solo Pádel</option>
+            </select>
+          </div>
+        </div>
+
+        <div className='flex items-center justify-between text-xs text-[var(--text-muted)] pt-1'>
+          <span>
+            Mostrando <strong className='text-[var(--text-primary)]'>{filtered.length}</strong> de {torneos.length} torneos
+          </span>
+          {(search || statusTab !== 'todos' || deporteFilter !== 'todos') && (
+            <button
+              type='button'
+              onClick={() => {
+                setSearch('')
+                setStatusTab('todos')
+                setDeporteFilter('todos')
+              }}
+              className='text-[var(--color-brand)] hover:underline font-medium'
+            >
+              Restablecer filtros
+            </button>
+          )}
+        </div>
+      </div>
+
+      <Tabs tabs={STATUS_TABS} activeTab={statusTab} onChange={setStatusTab} />
+
       <section className='space-y-3'>
         <BulkDelete
-          records={torneos}
+          records={filtered}
           remove={tournamentService.remove}
           onComplete={fetchAll}
           disabled={loading}
@@ -315,21 +400,25 @@ export default function GestionTorneos() {
           Array.from({ length: 3 }, (_, index) => (
             <div key={index} className='skeleton h-36 rounded-2xl' />
           ))
-        ) : torneos.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className='card p-10 text-center'>
             <Trophy className='w-10 h-10 mx-auto mb-3' style={{ color: 'var(--text-muted)' }} />
             <p className='font-semibold' style={{ color: 'var(--text-primary)' }}>
-              Aún no hay torneos
+              No se encontraron torneos
             </p>
             <p className='text-sm mt-1 mb-4' style={{ color: 'var(--text-muted)' }}>
-              Crea el primero para comenzar a organizar sus partidos.
+              {torneos.length === 0
+                ? 'Crea el primero para comenzar a organizar sus partidos.'
+                : 'Intenta ajustar los filtros de búsqueda o estado.'}
             </p>
-            <Button onClick={openCreate} leftIcon={<Plus className='w-4 h-4' />}>
-              Crear torneo
-            </Button>
+            {torneos.length === 0 && (
+              <Button onClick={openCreate} leftIcon={<Plus className='w-4 h-4' />}>
+                Crear torneo
+              </Button>
+            )}
           </div>
         ) : (
-          torneos.map((tournament) => (
+          filtered.map((tournament) => (
             <article key={tournament.id} className='card p-4 sm:p-5'>
               <div className='flex flex-col lg:flex-row lg:items-center gap-4'>
                 <div
@@ -384,6 +473,14 @@ export default function GestionTorneos() {
                     className='btn-secondary px-3 py-2 flex items-center gap-1.5 text-xs'
                   >
                     Partidos <ArrowRight className='w-3.5 h-3.5' />
+                  </Link>
+                  <Link
+                    to={`/admin/partidos?torneo=${tournament.id}&crear=1`}
+                    className='btn-secondary px-3 py-2 flex items-center gap-1.5 text-xs'
+                    title='Programar un nuevo partido en este torneo'
+                  >
+                    <Plus className='w-3.5 h-3.5 text-[var(--color-brand)]' />
+                    <span>Crear partido</span>
                   </Link>
                   <button
                     onClick={() => openEdit(tournament)}

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Clock3, MapPin, Star } from 'lucide-react'
 import LiveBadge from './LiveBadge'
 import MatchJudge from './MatchJudge'
@@ -13,6 +13,7 @@ import ParticipantAvatar from '../ui/ParticipantAvatar'
 import RetirementNotice from './RetirementNotice'
 
 export default function MatchCard({ match, compact = false, to }) {
+  const location = useLocation()
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
   const isFav = isPartidoFavorite(match.id)
@@ -27,7 +28,11 @@ export default function MatchCard({ match, compact = false, to }) {
   const p1Name = getParticipantName(match, 1)
   const p2Name = getParticipantName(match, 2)
   return (
-    <Link to={to || `/match/${match.id}`} className='block h-full'>
+    <Link
+      to={to || `/match/${match.id}`}
+      state={{ from: `${location.pathname}${location.search}` }}
+      className='block h-full'
+    >
       <div className={cn('card-hover group h-full flex flex-col justify-between', isLive && 'match-card-live')}>
         {/* Header */}
         <RetirementNotice match={match} />

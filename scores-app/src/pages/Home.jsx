@@ -7,6 +7,7 @@ import { MatchCardSkeleton } from '../components/ui/Skeleton'
 import SectionHeader from '../components/common/SectionHeader'
 import { useMatches } from '../hooks/useMatches'
 import { newsService } from '../services/newsService'
+import { getMediaUrl } from '../utils/getMediaUrl'
 import { formatFriendlyDateTime, formatRelative } from '../utils/formatDate'
 import { cn } from '../utils/cn'
 
@@ -131,7 +132,7 @@ export default function Home() {
 
           <div className='flex flex-wrap gap-2.5 mt-6 sm:mt-7'>
             <Link
-              to={live.length > 0 ? '/pantalla' : '/tennis'}
+              to={live.length > 0 ? '/pantalla' : '/tennis?tab=upcoming'}
               onClick={() => window.scrollTo(0, 0)}
               className='inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-bold'
               style={{ backgroundColor: 'var(--club-green-light)', color: 'var(--club-green-dark)' }}
@@ -140,7 +141,7 @@ export default function Home() {
               {live.length > 0 ? 'Ver partidos en vivo' : 'Ver programación en Tenis'}
             </Link>
             <Link
-              to='/tennis'
+              to='/tennis?tab=results'
               className='inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-semibold text-white'
               style={{
                 backgroundColor: 'rgba(255,255,255,.08)',
@@ -165,12 +166,14 @@ export default function Home() {
               value={lf ? '—' : latestSlotMatches.length}
               label='Último turno'
               accent='var(--club-green-light)'
+              to='/tennis?tab=results'
             />
             <HeroStat
               icon={CalendarDays}
               value={lu ? '—' : upcoming.length}
               label='Próximos'
               accent='var(--club-white)'
+              to='/tennis?tab=upcoming'
             />
           </div>
         </div>
@@ -238,7 +241,7 @@ export default function Home() {
           }
           action={
             <Link
-              to='/tennis'
+              to='/tennis?tab=results'
               className='flex items-center gap-1 text-xs font-medium'
               style={{ color: 'var(--color-brand)' }}
             >
@@ -274,7 +277,7 @@ export default function Home() {
               </p>
               <div className='pt-2'>
                 <Link
-                  to='/tennis'
+                  to='/tennis?tab=results'
                   className='inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[var(--bg-hover)] text-[var(--text-primary)] hover:border-[var(--color-brand)] border border-[var(--border-color)] transition-all'
                 >
                   <History size={14} className='text-[var(--color-brand)]' />
@@ -298,7 +301,7 @@ export default function Home() {
             }
             action={
               <Link
-                to='/tennis'
+                to='/tennis?tab=upcoming'
                 className='flex items-center gap-1 text-xs font-medium'
                 style={{ color: 'var(--color-brand)' }}
               >
@@ -375,7 +378,19 @@ export default function Home() {
       {/* Anuncios del Club */}
       {news.length > 0 && (
         <section>
-          <SectionHeader title='Anuncios del club' />
+          <SectionHeader
+            title='Anuncios del club'
+            subtitle='Noticias, eventos y comunicados oficiales'
+            action={
+              <Link
+                to='/anuncios'
+                className='text-xs font-semibold text-[var(--color-brand)] flex items-center gap-1 hover:underline'
+              >
+                <span>Ver todos</span>
+                <ChevronRight size={14} />
+              </Link>
+            }
+          />
           <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
             {news.map((n) => (
               <NewsCard key={n.id} article={n} />
@@ -400,7 +415,7 @@ export default function Home() {
           </div>
         </div>
         <Link
-          to='/tennis'
+          to='/tennis?tab=upcoming'
           className='btn-primary text-xs px-4 py-2.5 rounded-xl shrink-0 whitespace-nowrap font-bold flex items-center gap-1.5'
         >
           <span>Ir a Tenis</span>
@@ -441,18 +456,40 @@ function NewsCard({ article }) {
     aviso: { label: 'Aviso', class: 'badge-live' },
   }
   const tipo = tipos[article.tipo] || tipos.noticia
+  const mediaUrl = article.imagen_url ? getMediaUrl(article.imagen_url) : null
 
   return (
-    <div className='card-hover p-4'>
-      <div className='flex items-center gap-2 mb-2'>
-        <span className={tipo.class}>{tipo.label}</span>
+    <Link
+      to={`/anuncios?id=${article.id}`}
+      className='card card-hover p-4 flex gap-3.5 items-start group transition-all duration-200 border border-[var(--border-color)] hover:border-[var(--color-brand)]/50'
+    >
+      {mediaUrl && (
+        <div className='w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-black/20 shrink-0 border border-[var(--border-color)]'>
+          <img
+            src={mediaUrl}
+            alt={article.titulo}
+            className='w-full h-full object-cover group-hover:scale-105 transition-transform duration-300'
+            loading='lazy'
+          />
+        </div>
+      )}
+      <div className='flex-1 min-w-0'>
+        <div className='flex items-center gap-2 mb-1.5 flex-wrap'>
+          <span className={tipo.class}>{tipo.label}</span>
+          <span className='text-[10px] text-[var(--text-muted)]'>
+            {formatRelative(article.created_at)}
+          </span>
+        </div>
+        <h3
+          className='text-sm font-semibold leading-snug group-hover:text-[var(--color-brand)] transition-colors line-clamp-2'
+          style={{ color: 'var(--text-primary)' }}
+        >
+          {article.titulo}
+        </h3>
+        <p className='text-xs text-[var(--text-muted)] line-clamp-1 mt-1'>
+          {article.contenido}
+        </p>
       </div>
-      <h3 className='text-sm font-medium leading-snug' style={{ color: 'var(--text-primary)' }}>
-        {article.titulo}
-      </h3>
-      <p className='text-[10px] mt-2' style={{ color: 'var(--text-muted)' }}>
-        {formatRelative(article.created_at)}
-      </p>
-    </div>
+    </Link>
   )
 }

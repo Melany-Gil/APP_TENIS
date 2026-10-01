@@ -198,6 +198,7 @@ exports.remove = async (id, actorId = null) => {
     await conn.query('DELETE FROM torneo_grupo_parejas WHERE torneo_id=?', [id])
     await conn.query('DELETE FROM torneo_grupos WHERE torneo_id=?', [id])
     await conn.query('DELETE FROM torneo_retiros WHERE torneo_id=?', [id])
+    await conn.query('DELETE FROM torneo_grupo_historial WHERE torneo_id=?', [id])
     await conn.query('DELETE FROM torneos WHERE id=?', [id])
     await conn.commit()
     return {

@@ -42,12 +42,13 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
         })
         .catch(() => {})
     load()
+    if (match?.estado !== 'en_vivo') return () => { active = false }
     const interval = setInterval(load, 60000)
     return () => {
       active = false
       clearInterval(interval)
     }
-  }, [matchId])
+  }, [matchId, match?.estado])
 
   useMatchRealtime(
     useCallback(

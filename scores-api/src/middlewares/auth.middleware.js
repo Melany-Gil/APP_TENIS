@@ -68,3 +68,37 @@ exports.requireAdmin = exports.requireRoles('admin')
 exports.requireDirector = exports.requireRoles('admin', 'juez_director')
 exports.requireScorer = exports.requireRoles('admin', 'juez')
 exports.requireOfficial = exports.requireRoles('admin', 'juez_director', 'juez')
+
+/**
+ * Middleware que verifica opcionalmente el token JWT de sesión.
+ * Si existe y es válido, asigna req.user sin interrumpir si no está autenticado.
+ */
+exports.optionalAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  const cookieToken = req.headers.cookie
+    ?.split(';')
+    .map((cookie) => cookie.trim().split('='))
+    .find(([name]) => name === 'cu_session')?.[1]
+  const token = bearerToken || cookieToken
+
+  if (!token) return next()
+
+  let decoded
+  try {
+    decoded = jwt.verify(decodeURIComponent(token), process.env.JWT_SECRET)
+  } catch { return next() }
+  try {
+    const [rows] = await db.query(
+      'SELECT rol, activo, session_version FROM users WHERE id = ? AND activo = TRUE LIMIT 1',
+      [decoded.id]
+    )
+    if (rows.length && Number(decoded.session_version || 0) === Number(rows[0].session_version || 0)) {
+      req.user = { ...decoded, rol: rows[0].rol }
+      req.sessionChecked = true
+    }
+  } catch {
+    return error(res, 'No se pudo verificar la sesión temporalmente. Reintenta sin cerrar la página.', 503)
+  }
+  return next()
+}

@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { ArrowLeft, ChevronRight, Star } from 'lucide-react'
 import useFavoritesStore from '../store/useFavoritesStore'
@@ -8,11 +8,23 @@ import { useLoginRequired } from '../hooks/useLoginRequired'
 import Avatar from '../components/ui/Avatar'
 
 export default function Team() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams()
   const [team, setTeam] = useState(null)
   const [loading, setLoading] = useState(true)
   const { toggleEquipo, isEquipoFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
+
+  const handleBack = () => {
+    if (location.state?.from) {
+      navigate(location.state.from)
+    } else if (window.history.length > 1) {
+      navigate(-1)
+    } else {
+      navigate(team?.deporte === 'tenis' ? '/tennis' : '/padel')
+    }
+  }
 
   useEffect(() => {
     teamService
@@ -35,13 +47,15 @@ export default function Team() {
   return (
     <div className='space-y-5 animate-fade-up'>
       <div className='flex items-center justify-between'>
-        <Link
-          to={team.deporte === 'tenis' ? '/tennis' : '/padel'}
-          className='flex items-center gap-2 text-sm transition-colors'
+        <button
+          type='button'
+          onClick={handleBack}
+          className='flex items-center gap-2 text-sm transition-colors hover:text-[var(--text-primary)]'
           style={{ color: 'var(--text-secondary)' }}
+          aria-label='Volver'
         >
-          <ArrowLeft className='w-4 h-4' /> {team.deporte === 'tenis' ? 'Tenis' : 'Pádel'}
-        </Link>
+          <ArrowLeft className='w-4 h-4' /> Volver
+        </button>
         <button
           onClick={() => {
             if (requireLogin('Para guardar parejas en favoritos debes iniciar sesión.')) {

@@ -53,7 +53,7 @@ test('inscripción repetida se confirma sin duplicar filas', async () => {
         if (sql.includes('FROM equipos_padel'))
           return [[{ id: 2, activo: 1, deporte: 'tenis', jugador1_id: 3, jugador2_id: 4 }]]
         if (sql.includes('FROM jugadores')) return [[{ id: 3 }, { id: 4 }]]
-        if (sql.includes('SELECT id FROM inscripciones')) return [[{ id: 9 }]]
+        if (sql.includes('FROM inscripciones')) return [[{ id: 9, equipo_id: 2 }]]
         if (sql.startsWith('INSERT')) inserts++
         if (sql.startsWith('UPDATE')) updates++
         return [{}]

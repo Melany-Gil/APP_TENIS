@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import MatchCard from '../components/match/MatchCard'
 import TeamCard from '../components/team/TeamCard'
 import SectionHeader from '../components/common/SectionHeader'
@@ -13,12 +14,27 @@ const VIEW_TABS = [
 ]
 
 export default function Padel() {
-  const [view, setView] = useState('results')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawTab = searchParams.get('tab') || searchParams.get('view') || 'results'
+  const initialTab = ['results', 'upcoming', 'teams'].includes(rawTab) ? rawTab : 'results'
+  const [view, setView] = useState(initialTab)
   const [teams, setTeams] = useState([])
 
   const { matches: live } = useMatches({ estado: 'en_vivo', deporte: 'padel' })
   const { matches: finished } = useMatches({ estado: 'finalizado', deporte: 'padel' })
   const { matches: upcoming } = useMatches({ estado: 'programado', deporte: 'padel' })
+
+  useEffect(() => {
+    const t = searchParams.get('tab') || searchParams.get('view')
+    if (t && ['results', 'upcoming', 'teams'].includes(t) && t !== view) {
+      setView(t)
+    }
+  }, [searchParams])
+
+  const handleTabChange = (nextTab) => {
+    setView(nextTab)
+    setSearchParams({ tab: nextTab }, { replace: true })
+  }
 
   useEffect(() => {
     teamService
@@ -32,7 +48,7 @@ export default function Padel() {
       <h1 className='text-xl font-bold' style={{ color: 'var(--text-primary)' }}>
         Pádel
       </h1>
-      <Tabs tabs={VIEW_TABS} activeTab={view} onChange={setView} />
+      <Tabs tabs={VIEW_TABS} activeTab={view} onChange={handleTabChange} />
 
       {view === 'results' && (
         <div className='space-y-6'>

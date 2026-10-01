@@ -30,8 +30,13 @@ const useUIStore = create(
 
       // ── Toasts ──────────────────────────────────────
       toasts: [],
-      addToast: ({ type = 'info', title, message, duration = 3500 }) => {
-        const id = Date.now()
+      addToast: (toastOrTitle, maybeType = 'info') => {
+        const payload =
+          typeof toastOrTitle === 'string'
+            ? { title: toastOrTitle, type: maybeType }
+            : toastOrTitle || {}
+        const { type = 'info', title, message, duration = 3500 } = payload
+        const id = Date.now() + Math.random()
         set((s) => ({ toasts: [...s.toasts, { id, type, title, message }] }))
         setTimeout(() => {
           set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))

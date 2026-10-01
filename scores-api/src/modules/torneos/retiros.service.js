@@ -12,30 +12,115 @@ const id = (value) => {
 exports.participants = async (torneoId, connection = db) => {
   torneoId = id(torneoId)
   const [teams] = await connection.query(
-    `SELECT DISTINCT e.id, e.nombre, e.jugador1_id, e.jugador2_id
-    FROM equipos_padel e WHERE e.id IN (
-      SELECT equipo_id FROM inscripciones WHERE torneo_id=?
-      UNION SELECT equipo1_id FROM partidos WHERE torneo_id=?
-      UNION SELECT equipo2_id FROM partidos WHERE torneo_id=?
-      UNION SELECT participante_id FROM torneo_retiros WHERE torneo_id=? AND tipo='pareja')`,
-    [torneoId, torneoId, torneoId, torneoId]
+    `SELECT DISTINCT e.id, e.nombre, e.categoria_id, cat.nombre AS categoria_nombre, cat.orden AS categoria_orden,
+            e.jugador1_id, j1.nombre AS j1_nombre, j1.apellido AS j1_apellido, j1.foto AS j1_foto,
+            e.jugador2_id, j2.nombre AS j2_nombre, j2.apellido AS j2_apellido, j2.foto AS j2_foto,
+            gp.grupo
+     FROM equipos_padel e
+     LEFT JOIN categorias cat ON cat.id = e.categoria_id
+     LEFT JOIN jugadores j1 ON j1.id = e.jugador1_id
+     LEFT JOIN jugadores j2 ON j2.id = e.jugador2_id
+     LEFT JOIN torneo_grupo_parejas gp ON gp.torneo_id = ? AND gp.equipo_id = e.id
+     WHERE e.id IN (
+       SELECT equipo_id FROM inscripciones WHERE torneo_id=?
+       UNION SELECT equipo1_id FROM partidos WHERE torneo_id=?
+       UNION SELECT equipo2_id FROM partidos WHERE torneo_id=?
+       UNION SELECT participante_id FROM torneo_retiros WHERE torneo_id=? AND tipo='pareja')
+     ORDER BY COALESCE(cat.orden, 99) ASC, e.nombre ASC`,
+    [torneoId, torneoId, torneoId, torneoId, torneoId]
   )
+
+  const [partidos] = await connection.query(
+    `SELECT equipo1_id, equipo2_id, ganador FROM partidos WHERE torneo_id=? AND estado='finalizado'`,
+    [torneoId]
+  )
+  const statsMap = new Map()
+  for (const m of partidos) {
+    if (m.equipo1_id) {
+      if (!statsMap.has(m.equipo1_id)) statsMap.set(m.equipo1_id, { pj: 0, pg: 0, pp: 0 })
+      const s = statsMap.get(m.equipo1_id)
+      s.pj += 1
+      if (m.ganador === 'jugador1') s.pg += 1
+      else if (m.ganador === 'jugador2') s.pp += 1
+    }
+    if (m.equipo2_id) {
+      if (!statsMap.has(m.equipo2_id)) statsMap.set(m.equipo2_id, { pj: 0, pg: 0, pp: 0 })
+      const s = statsMap.get(m.equipo2_id)
+      s.pj += 1
+      if (m.ganador === 'jugador2') s.pg += 1
+      else if (m.ganador === 'jugador1') s.pp += 1
+    }
+  }
+
+  const [audits] = await connection.query(
+    `SELECT a.tipo, a.participante_id, a.motivo, a.created_at, u.nombre AS actor_nombre
+     FROM auditoria_retiros a
+     LEFT JOIN users u ON u.id = a.actor_id
+     WHERE a.torneo_id = ?
+     ORDER BY a.id DESC`,
+    [torneoId]
+  )
+  const auditMap = new Map()
+  for (const a of audits) {
+    const k = `${a.tipo}:${a.participante_id}`
+    if (!auditMap.has(k)) auditMap.set(k, a)
+  }
+
   const memberIds = [
     ...new Set(teams.flatMap((t) => [t.jugador1_id, t.jugador2_id]).filter(Boolean)),
   ]
   const [players] = await connection.query(
-    `SELECT j.id, CONCAT_WS(' ',j.nombre,j.apellido) AS nombre
-    FROM jugadores j WHERE j.id IN (SELECT jugador_id FROM inscripciones WHERE torneo_id=?
-      UNION SELECT jugador1_id FROM partidos WHERE torneo_id=?
-      UNION SELECT jugador2_id FROM partidos WHERE torneo_id=?
-      UNION SELECT participante_id FROM torneo_retiros WHERE torneo_id=? AND tipo='jugador')
-      ${memberIds.length ? 'OR j.id IN (?)' : ''}`,
+    `SELECT j.id, CONCAT_WS(' ',j.nombre,j.apellido) AS nombre, j.foto
+     FROM jugadores j WHERE j.id IN (SELECT jugador_id FROM inscripciones WHERE torneo_id=?
+       UNION SELECT jugador1_id FROM partidos WHERE torneo_id=?
+       UNION SELECT jugador2_id FROM partidos WHERE torneo_id=?
+       UNION SELECT participante_id FROM torneo_retiros WHERE torneo_id=? AND tipo='jugador')
+       ${memberIds.length ? 'OR j.id IN (?)' : ''}
+     ORDER BY j.nombre ASC`,
     [torneoId, torneoId, torneoId, torneoId, ...(memberIds.length ? [memberIds] : [])]
   )
-  return [
-    ...teams.map((t) => ({ tipo: 'pareja', participante_id: Number(t.id), nombre: t.nombre })),
-    ...players.map((p) => ({ tipo: 'jugador', participante_id: Number(p.id), nombre: p.nombre })),
-  ]
+
+  const teamsResult = teams.map((t) => {
+    const st = statsMap.get(t.id) || { pj: 0, pg: 0, pp: 0 }
+    const lastAudit = auditMap.get(`pareja:${t.id}`)
+    return {
+      tipo: 'pareja',
+      participante_id: Number(t.id),
+      equipo_id: Number(t.id),
+      nombre: t.nombre,
+      categoria_id: t.categoria_id ? Number(t.categoria_id) : null,
+      categoria_nombre: t.categoria_nombre || 'Sin categoría',
+      grupo: t.grupo || null,
+      jugador1: t.jugador1_id
+        ? { id: t.jugador1_id, nombre: t.j1_nombre, apellido: t.j1_apellido, foto: t.j1_foto }
+        : null,
+      jugador2: t.jugador2_id
+        ? { id: t.jugador2_id, nombre: t.j2_nombre, apellido: t.j2_apellido, foto: t.j2_foto }
+        : null,
+      pj: st.pj,
+      pg: st.pg,
+      pp: st.pp,
+      ultimo_motivo: lastAudit?.motivo || null,
+      ultimo_actor: lastAudit?.actor_nombre || null,
+      ultima_fecha: lastAudit?.created_at || null,
+    }
+  })
+
+  const playersResult = players.map((p) => {
+    const lastAudit = auditMap.get(`jugador:${p.id}`)
+    return {
+      tipo: 'jugador',
+      participante_id: Number(p.id),
+      jugador_id: Number(p.id),
+      nombre: p.nombre,
+      foto: p.foto || null,
+      ultimo_motivo: lastAudit?.motivo || null,
+      ultimo_actor: lastAudit?.actor_nombre || null,
+      ultima_fecha: lastAudit?.created_at || null,
+    }
+  })
+
+  return [...teamsResult, ...playersResult]
 }
 
 exports.get = async (torneoId, connection = db) => {
@@ -118,6 +203,12 @@ exports.set = async (torneoId, body, actor) => {
     const participants = await exports.participants(torneoId, conn)
     if (!participants.some((p) => p.tipo === body.tipo && p.participante_id === participant))
       fail(400, 'El participante no pertenece a este torneo')
+    if (body.tipo === 'pareja' && !body.retirado) {
+      const [blocked] = await conn.query(`SELECT r.participante_id FROM torneo_retiros r
+        JOIN equipos_padel e ON e.id=? AND r.participante_id IN (e.jugador1_id,e.jugador2_id)
+        WHERE r.torneo_id=? AND r.tipo='jugador' AND r.retirado=1`, [participant, torneoId])
+      if (blocked.length) fail(409, 'Reactiva primero a los jugadores retirados de esta pareja. Su retiro sigue vigente en este torneo.')
+    }
     const [[prev]] = await conn.query(
       'SELECT retirado,version FROM torneo_retiros WHERE torneo_id=? AND tipo=? AND participante_id=? FOR UPDATE',
       [torneoId, body.tipo, participant]
@@ -137,11 +228,31 @@ exports.set = async (torneoId, body, actor) => {
       'INSERT INTO auditoria_retiros (torneo_id,tipo,participante_id,actor_id,retirado,motivo) VALUES (?,?,?,?,?,?)',
       [torneoId, body.tipo, participant, actor.id, body.retirado, motivo]
     )
+    if (body.retirado) {
+      await conn.query(`INSERT IGNORE INTO torneo_grupo_historial (torneo_id,equipo_id,categoria_id,grupo)
+        SELECT torneo_id,equipo_id,categoria_id,grupo FROM torneo_grupo_parejas
+        WHERE torneo_id=? AND ${body.tipo === 'pareja' ? 'equipo_id=?' :
+          'equipo_id IN (SELECT id FROM equipos_padel WHERE jugador1_id=? OR jugador2_id=?)'}`,
+        [torneoId, participant, ...(body.tipo === 'jugador' ? [participant] : [])])
+      if (body.tipo === 'pareja') {
+        await conn.query('DELETE FROM torneo_grupo_parejas WHERE torneo_id=? AND equipo_id=?', [
+          torneoId,
+          participant,
+        ])
+      } else if (body.tipo === 'jugador') {
+        await conn.query(
+          `DELETE FROM torneo_grupo_parejas WHERE torneo_id=? AND equipo_id IN (
+            SELECT id FROM equipos_padel WHERE jugador1_id=? OR jugador2_id=?
+          )`,
+          [torneoId, participant, participant]
+        )
+      }
+    }
     await conn.commit()
     return {
       message: body.retirado
-        ? 'Retiro registrado. Revisa los partidos pendientes; no se cancelaron ni se asignaron resultados.'
-        : 'Participación reactivada en este torneo.',
+        ? 'Retiro registrado y cupo del grupo liberado. Se conserva el grupo histórico de los resultados. Revisa los partidos pendientes: no se cancelaron automáticamente.'
+        : 'Participación reactivada en este torneo. Revisa su asignación de grupo antes de programar partidos; no se ocupa automáticamente un cupo.',
     }
   } catch (e) {
     await conn.rollback()
@@ -153,7 +264,20 @@ exports.set = async (torneoId, body, actor) => {
 
 exports.audit = async (torneoId) => {
   const [rows] = await db.query(
-    'SELECT id,tipo,participante_id,actor_id,retirado,motivo,created_at FROM auditoria_retiros WHERE torneo_id=? ORDER BY id DESC LIMIT 100',
+    `SELECT a.id, a.tipo, a.participante_id, a.actor_id, a.retirado, a.motivo, a.created_at,
+            u.nombre AS actor_nombre, u.email AS actor_email, u.rol AS actor_rol,
+            CASE
+              WHEN a.tipo = 'pareja' THEN e.nombre
+              WHEN a.tipo = 'jugador' THEN CONCAT_WS(' ', j.nombre, j.apellido)
+              ELSE NULL
+            END AS participante_nombre
+     FROM auditoria_retiros a
+     LEFT JOIN users u ON u.id = a.actor_id
+     LEFT JOIN equipos_padel e ON a.tipo = 'pareja' AND e.id = a.participante_id
+     LEFT JOIN jugadores j ON a.tipo = 'jugador' AND j.id = a.participante_id
+     WHERE a.torneo_id=?
+     ORDER BY a.id DESC
+     LIMIT 100`,
     [id(torneoId)]
   )
   return rows

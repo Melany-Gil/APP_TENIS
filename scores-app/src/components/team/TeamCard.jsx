@@ -1,16 +1,17 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import useFavoritesStore from '../../store/useFavoritesStore'
 import { cn } from '../../utils/cn'
 import { useLoginRequired } from '../../hooks/useLoginRequired'
 
 export default function TeamCard({ team }) {
+  const location = useLocation()
   const { toggleEquipo, isEquipoFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
   const isFav = isEquipoFavorite(team.id)
 
   return (
-    <Link to={`/team/${team.id}`}>
+    <Link to={`/team/${team.id}`} state={{ from: `${location.pathname}${location.search}` }}>
       <div className='card-hover p-4'>
         <div className='flex items-center gap-3'>
           <span

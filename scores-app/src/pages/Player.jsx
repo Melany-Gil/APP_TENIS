@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { Link, useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import RetirementNotice from '../components/match/RetirementNotice'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Calendar,
@@ -25,10 +25,22 @@ import { formatClockTime, formatDate } from '../utils/formatDate'
 import { getParticipantName } from '../utils/matchParticipants'
 
 export default function Player() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const [tick, setTick] = useState(0)
   const { player, loading } = usePlayer(id, tick)
+
+  const handleBack = () => {
+    if (location.state?.from) {
+      navigate(location.state.from)
+    } else if (window.history.length > 1) {
+      navigate(-1)
+    } else {
+      navigate('/tennis?tab=players')
+    }
+  }
   const { toggleJugador, isJugadorFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
 
@@ -133,12 +145,13 @@ export default function Player() {
         <p className='text-sm' style={{ color: 'var(--text-muted)' }}>
           Jugador no encontrado
         </p>
-        <Link
-          to='/tennis'
+        <button
+          type='button'
+          onClick={handleBack}
           className='btn-outline inline-flex items-center gap-2 mt-4 text-xs px-3 py-1.5'
         >
-          <ArrowLeft className='w-3.5 h-3.5' /> Volver a Tenis
-        </Link>
+          <ArrowLeft className='w-3.5 h-3.5' /> Volver
+        </button>
       </div>
     )
   }
@@ -175,13 +188,15 @@ export default function Player() {
     <div className='space-y-5 animate-fade-up'>
       {/* Barra de navegación superior */}
       <div className='flex items-center justify-between'>
-        <Link
-          to='/tennis'
-          className='flex items-center gap-2 text-sm transition-colors'
+        <button
+          type='button'
+          onClick={handleBack}
+          className='flex items-center gap-2 text-sm transition-colors hover:text-[var(--text-primary)]'
           style={{ color: 'var(--text-secondary)' }}
+          aria-label='Volver'
         >
-          <ArrowLeft className='w-4 h-4' /> Tenis
-        </Link>
+          <ArrowLeft className='w-4 h-4' /> Volver
+        </button>
         <button
           type='button'
           onClick={() => {

@@ -4,7 +4,10 @@ import { tournamentService } from '../../services/tournamentService'
 import { categoriaService } from '../../services/categoriaService'
 import ParticipantAvatar from '../ui/ParticipantAvatar'
 import { confirm } from '../../utils/confirm'
+import useUIStore from '../../store/useUIStore'
 import { RetirementBadge } from '../match/RetirementNotice'
+import { UserMinus, RefreshCw } from 'lucide-react'
+import ModalRetiroParticipante from './ModalRetiroParticipante'
 
 export default function TournamentRoster({
   tournament,
@@ -14,7 +17,10 @@ export default function TournamentRoster({
   remove,
   removing,
   onDirtyChange,
+  onRefresh,
 }) {
+  const { addToast } = useUIStore()
+  const [retiringAction, setRetiringAction] = useState(null)
   const [groups, setGroups] = useState([]),
     [categories, setCategories] = useState([]),
     [issues, setIssues] = useState([])
@@ -66,6 +72,23 @@ export default function TournamentRoster({
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
   const grouped = tournament.sistema === 'grupos_eliminacion'
+  const reloadGroups = async () => {
+    if (!grouped) return
+    try {
+      const g = await tournamentService.getGroups(tournament.id)
+      setGroups(g.data.grupos)
+      setSavedCategories(
+        Object.fromEntries(
+          (g.data.parejas || []).map((p) => [p.equipo_id, Number(p.categoria_id)])
+        )
+      )
+      setVersion(g.data.version)
+      setIssues(g.data.incidencias)
+    } catch (e) {
+      setError(e.message || 'No se pudo recargar la distribución')
+    }
+  }
+
   useEffect(() => {
     let active = true
     Promise.all([
@@ -101,6 +124,12 @@ export default function TournamentRoster({
       active = false
     }
   }, [tournament.id, grouped, tournament.deporte])
+
+  useEffect(() => {
+    if (!dirty && grouped && retirements) {
+      reloadGroups()
+    }
+  }, [retirements])
   useEffect(() => {
     if (!dirty) return
     const warn = (e) => {
@@ -139,6 +168,27 @@ export default function TournamentRoster({
     )
     setDirty(true)
   }
+  const getPairVersion = (p) => {
+    const s = retirements?.estados?.find(
+      (e) => e.tipo === 'pareja' && Number(e.participante_id) === Number(p.equipo_id)
+    )
+    return Number(s?.version || 0)
+  }
+  const handleRemoveInscripcion = (p) => {
+    if (p.pj > 0) {
+      setRetiringAction({
+        participant: {
+          ...p,
+          tipo: 'pareja',
+          participante_id: p.equipo_id,
+        },
+        isRetiring: true,
+        version: getPairVersion(p),
+      })
+      return
+    }
+    remove(p)
+  }
   const save = async () => {
     setBusy(true)
     setError('')
@@ -151,6 +201,7 @@ export default function TournamentRoster({
       setVersion(r.data.version)
       setIssues(r.data.incidencias)
       setDirty(false)
+      addToast('Distribución de grupos guardada correctamente', 'success')
     } catch (e) {
       setError(e.message || 'No se guardó la distribución')
     } finally {
@@ -235,13 +286,50 @@ export default function TournamentRoster({
         </label>
       )}
       {admin && (
-        <button
-          className='btn-ghost text-xs min-h-9'
-          disabled={removing || dirty || busy}
-          onClick={() => remove(p)}
-        >
-          Quitar inscripción
-        </button>
+        <div className='flex items-center gap-2 flex-wrap pt-1'>
+          {retirements?.parejas?.includes(Number(p.equipo_id)) ? (
+            <button
+              type='button'
+              className='btn-ghost text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 flex items-center gap-1.5'
+                disabled={busy || dirty || [p.jugador1?.id, p.jugador2?.id].some(id => retirements?.jugadores?.includes(Number(id)))}
+              onClick={() =>
+                setRetiringAction({
+                  participant: { ...p, tipo: 'pareja', participante_id: p.equipo_id },
+                  isRetiring: false,
+                  version: getPairVersion(p),
+                })
+              }
+                title={[p.jugador1?.id, p.jugador2?.id].some(id => retirements?.jugadores?.includes(Number(id))) ? 'Reactiva primero al jugador retirado desde Participación' : 'Reactivar participación en este torneo'}
+            >
+              <RefreshCw className='w-3.5 h-3.5' /> Reactivar pareja
+            </button>
+          ) : (
+            <button
+              type='button'
+              className='btn-ghost text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 flex items-center gap-1.5'
+              disabled={removing || dirty || busy}
+              onClick={() =>
+                setRetiringAction({
+                  participant: { ...p, tipo: 'pareja', participante_id: p.equipo_id },
+                  isRetiring: true,
+                  version: getPairVersion(p),
+                })
+              }
+              title='Registrar retiro conservando estadísticas e historial'
+            >
+              <UserMinus className='w-3.5 h-3.5' /> Retirar del torneo
+            </button>
+          )}
+          <button
+            type='button'
+            className='btn-ghost text-xs text-[var(--text-muted)] hover:text-red-500'
+            disabled={removing || dirty || busy}
+            onClick={() => handleRemoveInscripcion(p)}
+            title={p.pj > 0 ? 'Retirar del torneo y liberar cupo en el grupo (tiene partidos)' : 'Quitar inscripción'}
+          >
+            Quitar inscripción
+          </button>
+        </div>
       )}
     </article>
   )
@@ -542,6 +630,32 @@ export default function TournamentRoster({
           )
           .map(row)}
       </section>
+      {retiringAction && (
+        <ModalRetiroParticipante
+          isOpen={Boolean(retiringAction)}
+          onClose={() => setRetiringAction(null)}
+          participant={retiringAction.participant}
+          tournamentId={tournament.id}
+          isRetiring={retiringAction.isRetiring}
+          currentVersion={retiringAction.version}
+          onSuccess={async () => {
+            const teamId =
+              retiringAction?.participant?.equipo_id ||
+              retiringAction?.participant?.participante_id
+            setRetiringAction(null)
+            if (teamId) {
+              setGroups((old) =>
+                old.map((g) => ({
+                  ...g,
+                  equipo_ids: g.equipo_ids.filter((eid) => Number(eid) !== Number(teamId)),
+                }))
+              )
+            }
+            await reloadGroups()
+            onRefresh?.()
+          }}
+        />
+      )}
     </div>
   )
 }

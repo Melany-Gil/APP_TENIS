@@ -34,22 +34,32 @@ exports.getByTorneo = async (torneoId) => {
   const catNames = new Map(categoryRows.map((c) => [Number(c.id), c.nombre]))
   const label = (c, g) => (catNames.get(Number(c)) || 'Sin categoría') + ' · ' + g
   const invalidIds = new Set((structure?.incidencias || []).map((i) => Number(i.partido_id)))
+  const historicalIds = new Set(structure?.partidos_historicos || [])
   const validMatch = (p) =>
     !authoritative ||
     (!invalidIds.has(Number(p.id)) &&
       p.fase === 'grupos' &&
-      require('../torneos/grupos.service').isCompatible(
+      (require('../torneos/grupos.service').isCompatible(
         { ...p, equipo1_id: p.p1_id, equipo2_id: p.p2_id },
         assignment
-      ))
-  const groupKey = (p) =>
-    authoritative
-      ? assignment.has(Number(p.p1_id))
-        ? label(assignment.get(Number(p.p1_id)).categoria_id, assignment.get(Number(p.p1_id)).grupo)
-        : null
-      : p.fase === 'grupos'
-        ? p.categoria_nombre + ' · ' + (p.grupo?.trim() || 'Sin grupo')
-        : null
+      ) ||
+        (p.estado === 'finalizado' && historicalIds.has(Number(p.id)))))
+  const groupKey = (p) => {
+    if (authoritative) {
+      if (p.estado === 'finalizado' && historicalIds.has(Number(p.id)))
+        return p.categoria_id && p.grupo ? label(p.categoria_id, p.grupo) : null
+      if (assignment.has(Number(p.p1_id))) {
+        return label(assignment.get(Number(p.p1_id)).categoria_id, assignment.get(Number(p.p1_id)).grupo)
+      }
+      if (assignment.has(Number(p.p2_id))) {
+        return label(assignment.get(Number(p.p2_id)).categoria_id, assignment.get(Number(p.p2_id)).grupo)
+      }
+      return p.categoria_id && p.grupo ? label(p.categoria_id, p.grupo) : null
+    }
+    return p.fase === 'grupos'
+      ? p.categoria_nombre + ' · ' + (p.grupo?.trim() || 'Sin grupo')
+      : null
+  }
   // Collect participants and map them to their groups
   // participantId -> Set of groups
   const participantGroups = new Map()
@@ -77,7 +87,8 @@ exports.getByTorneo = async (torneoId) => {
     for (const a of structure.parejas) {
       const pid = Number(a.equipo_id)
       allParticipantIds.add(pid)
-      participantGroups.set(pid, new Set([label(a.categoria_id, a.grupo)]))
+      if (!participantGroups.has(pid)) participantGroups.set(pid, new Set())
+      participantGroups.get(pid).add(label(a.categoria_id, a.grupo))
     }
   }
 

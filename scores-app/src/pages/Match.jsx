@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft,
   BarChart3,
@@ -27,12 +27,24 @@ import { useMatchTimer } from '../hooks/useMatchTimer'
 import ParticipantAvatar from '../components/ui/ParticipantAvatar'
 
 export default function Match() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const user = useAuthStore((store) => store.user)
   const { id } = useParams()
   const { match, loading } = useMatch(id)
   const { togglePartido, isPartidoFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
   const matchTimer = useMatchTimer(match?.en_vivo, match?.estado)
+
+  const handleBack = () => {
+    if (location.state?.from) {
+      navigate(location.state.from)
+    } else if (window.history.length > 1) {
+      navigate(-1)
+    } else {
+      navigate(match?.deporte === 'padel' ? '/padel' : '/tennis?tab=results')
+    }
+  }
 
   if (loading)
     return (
@@ -84,13 +96,15 @@ export default function Match() {
   return (
     <div className='space-y-5 animate-fade-up'>
       <div className='flex items-center justify-between'>
-        <Link
-          to='/'
-          className='flex items-center gap-2 text-sm transition-colors'
+        <button
+          type='button'
+          onClick={handleBack}
+          className='flex items-center gap-2 text-sm transition-colors hover:text-[var(--text-primary)]'
           style={{ color: 'var(--text-secondary)' }}
+          aria-label='Volver'
         >
           <ArrowLeft className='w-4 h-4' /> Volver
-        </Link>
+        </button>
         <button
           onClick={() => {
             if (requireLogin('Para guardar partidos en favoritos debes iniciar sesión.')) {
@@ -236,7 +250,7 @@ export default function Match() {
               por separado.
             </p>
           )}
-          <MatchStats matchId={match.id} player1={p1.name} player2={p2.name} />
+          <MatchStats matchId={match.id} player1={p1.name} player2={p2.name} isLive={isLive} />
         </section>
       )}
     </div>

@@ -1,13 +1,14 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { resolveApiUrl } from '../services/api'
 
 export function getMediaUrl(value) {
   if (!value) return null
   const mediaPath = String(value)
   if (/^https?:\/\//i.test(mediaPath) || mediaPath.startsWith('data:')) return mediaPath
   if (!mediaPath.startsWith('/')) return mediaPath
-  if (API_BASE.startsWith('/')) return mediaPath
+  const apiBase = resolveApiUrl()
+  if (apiBase.startsWith('/')) return mediaPath
   try {
-    return `${new URL(API_BASE).origin}${mediaPath}`
+    return `${new URL(apiBase).origin}${mediaPath}`
   } catch {
     return mediaPath
   }

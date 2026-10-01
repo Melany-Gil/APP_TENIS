@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import MatchCard from '../components/match/MatchCard'
 import PlayerCard from '../components/player/PlayerCard'
@@ -19,20 +20,66 @@ const VIEW_TABS = [
   { value: 'players', label: 'Jugadores' },
 ]
 
+function normalizeTab(raw) {
+  const val = String(raw || '').toLowerCase().trim()
+  if (['results', 'resultados'].includes(val)) return 'results'
+  if (['upcoming', 'proximos', 'programacion', 'partidos'].includes(val)) return 'upcoming'
+  if (['tournaments', 'torneos'].includes(val)) return 'tournaments'
+  if (['players', 'jugadores', 'ranking'].includes(val)) return 'players'
+  return 'results'
+}
+
 export default function Tennis() {
-  const [view, setView] = useState('results')
-  const [playerSearch, setPlayerSearch] = useState('')
-  const [date, setDate] = useState('')
-  const [categoryId, setCategoryId] = useState('')
-  const [upcomingPlayerSearch, setUpcomingPlayerSearch] = useState('')
-  const [upcomingDate, setUpcomingDate] = useState('')
-  const [upcomingCategoryId, setUpcomingCategoryId] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const initialTab = normalizeTab(searchParams.get('tab') || searchParams.get('view'))
+  const [view, setView] = useState(initialTab)
+
+  const [playerSearch, setPlayerSearch] = useState(() => searchParams.get('jugador') || searchParams.get('q') || '')
+  const [date, setDate] = useState(() => searchParams.get('date') || searchParams.get('fecha') || '')
+  const [categoryId, setCategoryId] = useState(() => searchParams.get('categoria') || searchParams.get('categoria_id') || '')
+
+  const [upcomingPlayerSearch, setUpcomingPlayerSearch] = useState(
+    () => searchParams.get('upcoming_jugador') || (initialTab === 'upcoming' ? (searchParams.get('jugador') || searchParams.get('q')) : '') || ''
+  )
+  const [upcomingDate, setUpcomingDate] = useState(
+    () => searchParams.get('upcoming_date') || (initialTab === 'upcoming' ? (searchParams.get('date') || searchParams.get('fecha')) : '') || ''
+  )
+  const [upcomingCategoryId, setUpcomingCategoryId] = useState(
+    () => searchParams.get('upcoming_categoria') || (initialTab === 'upcoming' ? (searchParams.get('categoria') || searchParams.get('categoria_id')) : '') || ''
+  )
+
   const [categories, setCategories] = useState([])
-  const [playerCategoryId, setPlayerCategoryId] = useState('')
-  const [playerSearchQuery, setPlayerSearchQuery] = useState('')
-  const [playerOrder, setPlayerOrder] = useState('alphabetical')
+  const [playerCategoryId, setPlayerCategoryId] = useState(() => searchParams.get('player_categoria') || '')
+  const [playerSearchQuery, setPlayerSearchQuery] = useState(() => searchParams.get('player_q') || '')
+  const [playerOrder, setPlayerOrder] = useState(() => searchParams.get('orden') || 'alphabetical')
   const debouncedPlayer = useDebounce(playerSearch.trim(), 350)
   const debouncedUpcomingPlayer = useDebounce(upcomingPlayerSearch.trim(), 350)
+
+  // Sincronizar estados si los parámetros de la URL cambian (ej. al pulsar Volver en el navegador o en un partido)
+  useEffect(() => {
+    const rawTab = searchParams.get('tab') || searchParams.get('view')
+    if (rawTab) {
+      const norm = normalizeTab(rawTab)
+      setView((v) => (v !== norm ? norm : v))
+    }
+    const d = searchParams.get('date') || searchParams.get('fecha') || ''
+    setDate((v) => (v !== d ? d : v))
+    const c = searchParams.get('categoria') || searchParams.get('categoria_id') || ''
+    setCategoryId((v) => (v !== c ? c : v))
+    const p = searchParams.get('jugador') || searchParams.get('q') || ''
+    setPlayerSearch((v) => (v !== p ? p : v))
+
+    const activeTab = normalizeTab(rawTab)
+    if (activeTab === 'upcoming') {
+      const ud = searchParams.get('upcoming_date') || searchParams.get('date') || searchParams.get('fecha') || ''
+      setUpcomingDate((v) => (v !== ud ? ud : v))
+      const uc = searchParams.get('upcoming_categoria') || searchParams.get('categoria') || searchParams.get('categoria_id') || ''
+      setUpcomingCategoryId((v) => (v !== uc ? uc : v))
+      const up = searchParams.get('upcoming_jugador') || searchParams.get('jugador') || searchParams.get('q') || ''
+      setUpcomingPlayerSearch((v) => (v !== up ? up : v))
+    }
+  }, [searchParams])
 
   useEffect(() => {
     categoriaService
@@ -98,16 +145,88 @@ export default function Tennis() {
   const hasFilters = Boolean(playerSearch || date || categoryId)
   const hasUpcomingFilters = Boolean(upcomingPlayerSearch || upcomingDate || upcomingCategoryId)
 
+  const updateUrlParams = (changes) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        Object.entries(changes).forEach(([k, v]) => {
+          if (v) next.set(k, v)
+          else next.delete(k)
+        })
+        return next
+      },
+      { replace: true }
+    )
+  }
+
+  const handleTabChange = (nextTab) => {
+    setView(nextTab)
+    updateUrlParams({ tab: nextTab })
+  }
+
+  const handleDateChange = (val) => {
+    setDate(val)
+    updateUrlParams({ date: val })
+  }
+
+  const handleCategoryChange = (val) => {
+    setCategoryId(val)
+    updateUrlParams({ categoria: val })
+  }
+
+  const handlePlayerSearchChange = (val) => {
+    setPlayerSearch(val)
+    updateUrlParams({ jugador: val.trim() })
+  }
+
+  const handleUpcomingDateChange = (val) => {
+    setUpcomingDate(val)
+    updateUrlParams({ upcoming_date: val })
+  }
+
+  const handleUpcomingCategoryChange = (val) => {
+    setUpcomingCategoryId(val)
+    updateUrlParams({ upcoming_categoria: val })
+  }
+
+  const handleUpcomingPlayerSearchChange = (val) => {
+    setUpcomingPlayerSearch(val)
+    updateUrlParams({ upcoming_jugador: val.trim() })
+  }
+
   const clearFilters = () => {
     setPlayerSearch('')
     setDate('')
     setCategoryId('')
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('date')
+        next.delete('fecha')
+        next.delete('categoria')
+        next.delete('categoria_id')
+        next.delete('jugador')
+        next.delete('q')
+        return next
+      },
+      { replace: true }
+    )
   }
 
   const clearUpcomingFilters = () => {
     setUpcomingPlayerSearch('')
     setUpcomingDate('')
     setUpcomingCategoryId('')
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('upcoming_date')
+        next.delete('upcoming_categoria')
+        next.delete('upcoming_jugador')
+        return next
+      },
+      { replace: true }
+    )
   }
 
   return (
@@ -115,7 +234,7 @@ export default function Tennis() {
       <h1 className='text-xl font-bold' style={{ color: 'var(--text-primary)' }}>
         Tenis
       </h1>
-      <Tabs tabs={VIEW_TABS} activeTab={view} onChange={setView} />
+      <Tabs tabs={VIEW_TABS} activeTab={view} onChange={handleTabChange} />
       {view === 'tournaments' && <TournamentDirectory/>}
 
       {view === 'results' && (
@@ -163,7 +282,7 @@ export default function Tennis() {
                   <input
                     className='form-input pl-10'
                     value={playerSearch}
-                    onChange={(event) => setPlayerSearch(event.target.value)}
+                    onChange={(event) => handlePlayerSearchChange(event.target.value)}
                     placeholder='Nombre del jugador'
                     aria-label='Buscar por jugador'
                   />
@@ -172,13 +291,13 @@ export default function Tennis() {
                   type='date'
                   className='form-input'
                   value={date}
-                  onChange={(event) => setDate(event.target.value)}
+                  onChange={(event) => handleDateChange(event.target.value)}
                   aria-label='Buscar por fecha'
                 />
                 <select
                   className='form-input'
                   value={categoryId}
-                  onChange={(event) => setCategoryId(event.target.value)}
+                  onChange={(event) => handleCategoryChange(event.target.value)}
                   aria-label='Buscar por categoría'
                 >
                   <option value=''>Todas las categorías</option>
@@ -243,7 +362,7 @@ export default function Tennis() {
                 <input
                   className='form-input pl-10'
                   value={upcomingPlayerSearch}
-                  onChange={(event) => setUpcomingPlayerSearch(event.target.value)}
+                  onChange={(event) => handleUpcomingPlayerSearchChange(event.target.value)}
                   placeholder='Nombre del jugador'
                   aria-label='Filtrar próximos partidos por jugador'
                 />
@@ -252,13 +371,13 @@ export default function Tennis() {
                 type='date'
                 className='form-input'
                 value={upcomingDate}
-                onChange={(event) => setUpcomingDate(event.target.value)}
+                onChange={(event) => handleUpcomingDateChange(event.target.value)}
                 aria-label='Filtrar próximos partidos por fecha'
               />
               <select
                 className='form-input'
                 value={upcomingCategoryId}
-                onChange={(event) => setUpcomingCategoryId(event.target.value)}
+                onChange={(event) => handleUpcomingCategoryChange(event.target.value)}
                 aria-label='Filtrar próximos partidos por categoría'
               >
                 <option value=''>Todas las categorías</option>

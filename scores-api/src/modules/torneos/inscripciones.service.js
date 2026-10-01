@@ -159,23 +159,29 @@ exports.inscribirBulk = async (torneoId, equipoIds) => {
     if (active.length !== players.length)
       fail(400, 'Las parejas deben tener ambos jugadores activos')
     const retirements = await require('./retiros.service').get(torneoId, conn)
-    if (ids.some(id => retirements.parejas.includes(id)))
+    if (ids.some((id) => retirements.parejas.includes(id)))
       fail(409, 'Hay una pareja retirada del torneo. Reactiva su participación antes de inscribirla.')
-    for (const id of ids) {
-      const [existing] = await conn.query(
-        'SELECT id FROM inscripciones WHERE torneo_id=? AND equipo_id=? FOR UPDATE',
-        [torneoId, id]
+
+    const [existing] = await conn.query(
+      'SELECT id, equipo_id FROM inscripciones WHERE torneo_id=? AND equipo_id IN (?) FOR UPDATE',
+      [torneoId, ids]
+    )
+    const existingSet = new Set(existing.map((r) => Number(r.equipo_id ?? r.id)))
+    const toUpdate = ids.filter((id) => existingSet.has(id))
+    const toInsert = ids.filter((id) => !existingSet.has(id))
+
+    if (toUpdate.length > 0) {
+      await conn.query(
+        "UPDATE inscripciones SET estado='confirmado' WHERE torneo_id=? AND equipo_id IN (?)",
+        [torneoId, toUpdate]
       )
-      if (existing.length)
-        await conn.query(
-          "UPDATE inscripciones SET estado='confirmado' WHERE torneo_id=? AND equipo_id=?",
-          [torneoId, id]
-        )
-      else
-        await conn.query(
-          "INSERT INTO inscripciones (torneo_id,equipo_id,estado) VALUES (?,?,'confirmado')",
-          [torneoId, id]
-        )
+    }
+    if (toInsert.length > 0) {
+      const insertRows = toInsert.map((id) => [torneoId, id, 'confirmado'])
+      await conn.query(
+        'INSERT INTO inscripciones (torneo_id, equipo_id, estado) VALUES ?',
+        [insertRows]
+      )
     }
     await conn.commit()
     return { total_procesadas: ids.length, message: ids.length + ' parejas confirmadas' }

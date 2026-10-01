@@ -1,7 +1,7 @@
 import BulkDelete from '../../components/ui/BulkDelete'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, X, Users } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Users, Search } from 'lucide-react'
 import { teamService } from '../../services/teamService'
 import { playerService } from '../../services/playerService'
 import { categoriaService } from '../../services/categoriaService'
@@ -18,6 +18,8 @@ export default function GestionEquipos() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [search, setSearch] = useState('')
+  const [deporteFilter, setDeporteFilter] = useState('todos')
   const { addToast } = useUIStore()
 
   const {
@@ -84,6 +86,23 @@ export default function GestionEquipos() {
   const categoriasDisponibles = categorias.filter(
     (categoria) => categoria.deporte === selectedDeporte || categoria.deporte === 'ambos'
   )
+
+  const filtered = useMemo(() => {
+    return equipos.filter((e) => {
+      if (deporteFilter !== 'todos' && e.deporte !== deporteFilter) return false
+      if (search.trim()) {
+        const q = search.toLowerCase().trim()
+        const nombre = (e.nombre || '').toLowerCase()
+        const j1 = `${e.jugador1?.nombre || ''} ${e.jugador1?.apellido || ''}`.toLowerCase()
+        const j2 = `${e.jugador2?.nombre || ''} ${e.jugador2?.apellido || ''}`.toLowerCase()
+        const cat = (e.categoria?.nombre || '').toLowerCase()
+        if (!nombre.includes(q) && !j1.includes(q) && !j2.includes(q) && !cat.includes(q)) {
+          return false
+        }
+      }
+      return true
+    })
+  }, [equipos, deporteFilter, search])
 
   const onSubmit = async (data) => {
     try {
@@ -245,8 +264,65 @@ export default function GestionEquipos() {
         </div>
       </Modal>
 
+      {/* Barra de búsqueda y filtros */}
+      <div className='card p-4 space-y-3'>
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+          <div className='relative'>
+            <Search
+              className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none'
+              style={{ color: 'var(--text-muted)' }}
+            />
+            <input
+              type='text'
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder='Buscar por nombre de pareja o jugador...'
+              className='form-input pl-9 text-xs sm:text-sm'
+            />
+            {search && (
+              <button
+                type='button'
+                onClick={() => setSearch('')}
+                className='absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              >
+                <X className='w-3.5 h-3.5' />
+              </button>
+            )}
+          </div>
+          <div>
+            <select
+              value={deporteFilter}
+              onChange={(e) => setDeporteFilter(e.target.value)}
+              className='form-input text-xs sm:text-sm'
+            >
+              <option value='todos'>Todos los deportes (Tenis y Pádel)</option>
+              <option value='tenis'>Solo Tenis</option>
+              <option value='padel'>Solo Pádel</option>
+            </select>
+          </div>
+        </div>
+
+        <div className='flex items-center justify-between text-xs text-[var(--text-muted)] pt-1'>
+          <span>
+            Mostrando <strong className='text-[var(--text-primary)]'>{filtered.length}</strong> de {equipos.length} parejas
+          </span>
+          {(search || deporteFilter !== 'todos') && (
+            <button
+              type='button'
+              onClick={() => {
+                setSearch('')
+                setDeporteFilter('todos')
+              }}
+              className='text-[var(--color-brand)] hover:underline font-medium'
+            >
+              Restablecer filtros
+            </button>
+          )}
+        </div>
+      </div>
+
       <BulkDelete
-        records={equipos}
+        records={filtered}
         remove={teamService.remove}
         onComplete={fetchAll}
         disabled={loading}
@@ -260,12 +336,12 @@ export default function GestionEquipos() {
           Array(3)
             .fill(0)
             .map((_, i) => <div key={i} className='skeleton h-16 m-3 rounded-lg' />)
-        ) : equipos.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <p className='text-center py-12 text-sm' style={{ color: 'var(--text-muted)' }}>
-            No hay parejas registradas
+            {equipos.length === 0 ? 'No hay parejas registradas' : 'No se encontraron parejas con los filtros aplicados'}
           </p>
         ) : (
-          equipos.map((e, i) => (
+          filtered.map((e, i) => (
             <div
               key={e.id}
               className='list-row'

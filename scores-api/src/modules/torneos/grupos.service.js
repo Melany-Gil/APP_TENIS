@@ -27,6 +27,16 @@ const key = (c, g) =>
     .trim()
     .toLocaleLowerCase('es')}`
 exports.groupKey = key
+const historyColumns = [1, 2].map(side => `EXISTS (
+  SELECT 1 FROM torneo_grupo_historial h WHERE h.torneo_id=partidos.torneo_id
+    AND h.equipo_id=partidos.equipo${side}_id AND h.categoria_id=partidos.categoria_id
+    AND h.grupo=partidos.grupo) AS historico${side}`).join(', ')
+exports.isHistoricalCompatible = (match, assignments) => match.estado === 'finalizado' &&
+  [1, 2].every(side => {
+    const a = assignments.get(Number(match[`equipo${side}_id`]))
+    return Number(match[`historico${side}`]) === 1 ||
+      (a && key(a.categoria_id, a.grupo) === key(match.categoria_id, match.grupo))
+  })
 exports.isCompatible = (match, assignments) => {
   const a = assignments.get(Number(match.equipo1_id)),
     b = assignments.get(Number(match.equipo2_id))
@@ -47,7 +57,9 @@ exports.get = async (id, conn = db) => {
     [id]
   )
   const [matches] = await conn.query(
-    "SELECT id,categoria_id,grupo,equipo1_id,equipo2_id FROM partidos WHERE torneo_id=? AND fase='grupos' AND estado<>'cancelado'",
+    `SELECT id,categoria_id,grupo,equipo1_id,equipo2_id,estado,
+            ${historyColumns}
+     FROM partidos WHERE torneo_id=? AND fase='grupos' AND estado<>'cancelado'`,
     [id]
   )
   const map = new Map(parejas.map((p) => [Number(p.equipo_id), p]))
@@ -74,8 +86,13 @@ exports.get = async (id, conn = db) => {
         .map((p) => Number(p.equipo_id)),
     })),
     parejas,
+    partidos_historicos: matches.filter(m => exports.isHistoricalCompatible(m, map) && !duplicateIds.has(m.id)).map(m => Number(m.id)),
     incidencias: matches
-      .filter((m) => duplicateIds.has(m.id) || !exports.isCompatible(m, map))
+      .filter((m) => {
+        if (duplicateIds.has(m.id)) return true
+        if (exports.isHistoricalCompatible(m, map)) return false
+        return !exports.isCompatible(m, map)
+      })
       .map((m) => ({
         partido_id: m.id,
         message: duplicateIds.has(m.id)
@@ -157,32 +174,39 @@ exports.save = async (id, groups, expectedVersion) => {
       g.equipo_ids.forEach((e) => after.set(e, { categoria_id: g.categoria_id, grupo: g.nombre }))
     )
     const [matches] = await conn.query(
-      "SELECT id,categoria_id,grupo,equipo1_id,equipo2_id FROM partidos WHERE torneo_id=? AND fase='grupos' AND estado<>'cancelado' FOR UPDATE",
+      `SELECT id,categoria_id,grupo,equipo1_id,equipo2_id,estado,
+              ${historyColumns}
+       FROM partidos WHERE torneo_id=? AND fase='grupos' AND estado<>'cancelado' FOR UPDATE`,
       [id]
     )
-    const conflicts = matches.filter(
-      (m) => exports.isCompatible(m, before) && !exports.isCompatible(m, after)
-    )
+    const conflicts = matches.filter((m) => {
+      const compatible = map => exports.isCompatible(m, map) || exports.isHistoricalCompatible(m, map)
+      return compatible(before) && !compatible(after)
+    })
     if (conflicts.length)
       fail(
         `La redistribución alteraría los partidos ${conflicts.map((m) => m.id).join(', ')}. Corrige o cancela esos encuentros primero.`
       )
     await conn.query('DELETE FROM torneo_grupo_parejas WHERE torneo_id=?', [id])
     await conn.query('DELETE FROM torneo_grupos WHERE torneo_id=?', [id])
-    for (const g of normalized) {
-      await conn.query('INSERT INTO torneo_grupos (torneo_id,categoria_id,nombre) VALUES (?,?,?)', [
-        id,
-        g.categoria_id,
-        g.nombre,
-      ])
-      for (const e of g.equipo_ids)
+    if (normalized.length > 0) {
+      const groupRows = normalized.map((g) => [id, g.categoria_id, g.nombre])
+      await conn.query(
+        'INSERT INTO torneo_grupos (torneo_id, categoria_id, nombre) VALUES ?',
+        [groupRows]
+      )
+      const pairRows = normalized.flatMap((g) =>
+        g.equipo_ids.map((e) => [id, e, g.categoria_id, g.nombre])
+      )
+      if (pairRows.length > 0) {
         await conn.query(
-          'INSERT INTO torneo_grupo_parejas (torneo_id,equipo_id,categoria_id,grupo) VALUES (?,?,?,?)',
-          [id, e, g.categoria_id, g.nombre]
+          'INSERT INTO torneo_grupo_parejas (torneo_id, equipo_id, categoria_id, grupo) VALUES ?',
+          [pairRows]
         )
+      }
     }
     await conn.commit()
-    return exports.get(id)
+    return await exports.get(id, conn)
   } catch (e) {
     await conn.rollback()
     throw e
@@ -202,7 +226,17 @@ exports.validateMatch = async (match, conn = db) => {
   if (match.fase === 'grupos') {
     if (match.origen_partido1_id || match.origen_partido2_id)
       fail('En grupos selecciona parejas inscritas, no ganadores de otros partidos')
-    if (!exports.isCompatible(match, map))
+    let preserved = false
+    if (!exports.isCompatible(match, map) && match.id) {
+      const [[original]] = await conn.query(
+        `SELECT *, ${historyColumns} FROM partidos WHERE id=? AND torneo_id=?`,
+        [match.id, match.torneo_id]
+      )
+      const unchanged = original && ['categoria_id', 'grupo', 'fase', 'equipo1_id', 'equipo2_id']
+        .every(field => String(original[field] ?? '') === String(match[field] ?? ''))
+      preserved = unchanged && exports.isHistoricalCompatible({ ...original, estado: 'finalizado' }, map)
+    }
+    if (!exports.isCompatible(match, map) && !preserved)
       fail(
         'Las dos parejas deben estar asignadas a esta categoría y al mismo grupo. Organiza los grupos del torneo antes de crear el cruce.'
       )

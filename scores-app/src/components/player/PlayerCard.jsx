@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ChevronRight, Star } from 'lucide-react'
 import useFavoritesStore from '../../store/useFavoritesStore'
 import { cn } from '../../utils/cn'
@@ -6,6 +6,7 @@ import { useLoginRequired } from '../../hooks/useLoginRequired'
 import Avatar from '../ui/Avatar'
 
 export default function PlayerCard({ player, categoryId }) {
+  const location = useLocation()
   const { toggleJugador, isJugadorFavorite } = useFavoritesStore()
   const requireLogin = useLoginRequired()
   const isFav = isJugadorFavorite(player.id)
@@ -14,7 +15,7 @@ export default function PlayerCard({ player, categoryId }) {
     player.stats?.categoria?.nombre || player.categoria?.nombre || player.categoria_nombre
 
   return (
-    <Link to={playerUrl}>
+    <Link to={playerUrl} state={{ from: `${location.pathname}${location.search}` }}>
       <div className='card-hover p-3.5 sm:p-4'>
         <div className='flex items-center gap-3.5'>
           <Avatar

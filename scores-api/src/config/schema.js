@@ -105,6 +105,13 @@ exports.ensureSchema = async () => {
     torneo_id INT NOT NULL, equipo_id INT NOT NULL, categoria_id INT NOT NULL, grupo VARCHAR(20) NOT NULL,
     PRIMARY KEY (torneo_id,equipo_id), KEY idx_grupo (torneo_id,categoria_id,grupo)
   ) ENGINE=InnoDB`)
+  // Immutable membership evidence for results after a tournament withdrawal.
+  // Separate from the current group roster; reactivation must not erase it.
+  await db.query(`CREATE TABLE IF NOT EXISTS torneo_grupo_historial (
+    torneo_id INT NOT NULL, equipo_id INT NOT NULL, categoria_id INT NOT NULL,
+    grupo VARCHAR(20) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (torneo_id,equipo_id,categoria_id,grupo)
+  ) ENGINE=InnoDB`)
   // Almacenamiento persistente de fotos de perfil y multimedia frente a despliegues efímeros
   await db.query(`CREATE TABLE IF NOT EXISTS media_storage (
     path VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -113,6 +120,18 @@ exports.ensureSchema = async () => {
     size INT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+  await db.query(`CREATE TABLE IF NOT EXISTS anuncios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(255) NOT NULL,
+    contenido TEXT NOT NULL,
+    imagen_url VARCHAR(255) NULL,
+    tipo ENUM('noticia','evento','resultado','aviso') NOT NULL DEFAULT 'noticia',
+    publicado TINYINT(1) NOT NULL DEFAULT 1,
+    created_by INT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_anuncios_tipo_publicado (tipo, publicado),
+    KEY idx_anuncios_created_at (created_at DESC)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
   // Nullable identities preserve unknown data; never invent documents/emails.
   if ((await getColumn('users', 'numero_documento'))?.isNullable === 'NO') {

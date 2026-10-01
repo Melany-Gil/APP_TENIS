@@ -5,6 +5,7 @@ const { requireAuth, requireAdmin, requireOfficial, requireDirector, requireScor
 // GET  /api/partidos?estado=en_vivo&deporte=tenis&categoria_id=1
 router.get('/', controller.getAll)
 router.get('/stream', controller.stream)
+router.get('/live-version', controller.liveVersion)
 router.get('/mios', requireAuth, controller.getMyMatches)
 router.get('/gestion/mis-partidos', requireAuth, requireOfficial, controller.getManaged)
 router.use('/:id/foto', require('./match-photo.routes'))

@@ -1,7 +1,7 @@
 import BulkDelete from '../../components/ui/BulkDelete'
 import { useState, useEffect, useMemo } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, X, Radio, Gavel, SlidersHorizontal, MapPin } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Radio, Gavel, SlidersHorizontal, MapPin, Search, Trophy } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { matchService } from '../../services/matchService'
 import MatchAuditButton from '../../components/match/MatchAuditButton'
@@ -32,6 +32,7 @@ const FILTER_TABS = [
   { value: 'en_vivo', label: 'En vivo' },
   { value: 'programado', label: 'Programados' },
   { value: 'finalizado', label: 'Finalizados' },
+  { value: 'cancelado', label: 'Cancelados' },
 ]
 const MAX_SETS = 127
 
@@ -49,9 +50,12 @@ export default function GestionPartidos() {
   const [editing, setEditing] = useState(null)
   const [submitError, setSubmitError] = useState('')
   const [filterTab, setFilterTab] = useState('todos')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [filterTorneo, setFilterTorneo] = useState(() => searchParams.get('torneo') || 'todos')
+  const [filterDeporte, setFilterDeporte] = useState('todos')
+  const [search, setSearch] = useState('')
   const [setNumbers, setSetNumbers] = useState([1, 2, 3])
   const { addToast } = useUIStore()
-  const [searchParams] = useSearchParams()
 
   const {
     register,
@@ -208,10 +212,23 @@ export default function GestionPartidos() {
     fetchAll()
   }, [])
 
+  useEffect(() => {
+    const t = searchParams.get('torneo')
+    setFilterTorneo(t || 'todos')
+    if (searchParams.get('crear') === '1') {
+      openCreate()
+      const next = new URLSearchParams(searchParams)
+      next.delete('crear')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams])
+
   const openCreate = () => {
     setSubmitError('')
+    const selectedTorneo = searchParams.get('torneo') || filterTorneo
+    const defaultTorneo = /^\d+$/.test(selectedTorneo) ? selectedTorneo : ''
     reset({
-      torneo_id: searchParams.get('torneo') || '',
+      torneo_id: defaultTorneo,
       deporte: 'tenis',
       modalidad: 'individual',
       categoria_id: '',
@@ -424,7 +441,35 @@ export default function GestionPartidos() {
     }
   }
 
-  const filtered = partidos.filter((p) => (filterTab === 'todos' ? true : p.estado === filterTab))
+  const filtered = useMemo(() => {
+    return partidos.filter((p) => {
+      if (filterTab !== 'todos' && p.estado !== filterTab) return false
+      if (filterTorneo === 'sin_torneo') {
+        if (p.torneo?.id) return false
+      } else if (filterTorneo !== 'todos' && String(p.torneo?.id) !== String(filterTorneo)) {
+        return false
+      }
+      if (filterDeporte !== 'todos' && p.deporte !== filterDeporte) return false
+      if (search.trim()) {
+        const q = search.toLowerCase().trim()
+        const p1 = (getParticipantName(p, 1) || '').toLowerCase()
+        const p2 = (getParticipantName(p, 2) || '').toLowerCase()
+        const torneoNombre = (p.torneo?.nombre || '').toLowerCase()
+        const cancha = (p.cancha?.nombre || '').toLowerCase()
+        const juez = (p.juez ? `${p.juez.nombre} ${p.juez.apellido}` : '').toLowerCase()
+        if (
+          !p1.includes(q) &&
+          !p2.includes(q) &&
+          !torneoNombre.includes(q) &&
+          !cancha.includes(q) &&
+          !juez.includes(q)
+        ) {
+          return false
+        }
+      }
+      return true
+    })
+  }, [partidos, filterTab, filterTorneo, filterDeporte, search])
 
   return (
     <div className='space-y-6 animate-fade-up'>
@@ -1042,7 +1087,116 @@ export default function GestionPartidos() {
         </div>
       </Modal>
 
-      {/* Filtros */}
+      {/* Filtros y Búsqueda */}
+      <div className='card p-4 space-y-3'>
+        {filterTorneo !== 'todos' && (
+          <div
+            className='flex items-center justify-between p-2.5 rounded-xl text-xs font-semibold'
+            style={{ backgroundColor: 'var(--color-brand-dim)', color: 'var(--color-brand)' }}
+          >
+            <span className='flex items-center gap-1.5'>
+              <Trophy className='w-4 h-4' />
+              Filtrando por torneo: {torneos.find((t) => String(t.id) === String(filterTorneo))?.nombre || `#${filterTorneo}`}
+            </span>
+            <button
+              type='button'
+              onClick={() => {
+                setFilterTorneo('todos')
+                setSearchParams({}, { replace: true })
+              }}
+              className='hover:underline flex items-center gap-1 font-bold'
+            >
+              <X className='w-3.5 h-3.5' /> Mostrar todos los torneos
+            </button>
+          </div>
+        )}
+
+        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
+          {/* Buscador */}
+          <div className='relative'>
+            <Search
+              className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none'
+              style={{ color: 'var(--text-muted)' }}
+            />
+            <input
+              type='text'
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder='Buscar por jugador, pareja, torneo o cancha...'
+              className='form-input pl-9 text-xs sm:text-sm'
+            />
+            {search && (
+              <button
+                type='button'
+                onClick={() => setSearch('')}
+                className='absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              >
+                <X className='w-3.5 h-3.5' />
+              </button>
+            )}
+          </div>
+
+          {/* Filtro por Torneo */}
+          <div>
+            <select
+              value={filterTorneo}
+              onChange={(e) => {
+                setFilterTorneo(e.target.value)
+                if (e.target.value === 'todos') {
+                  setSearchParams({}, { replace: true })
+                } else {
+                  setSearchParams({ torneo: e.target.value }, { replace: true })
+                }
+              }}
+              className='form-input text-xs sm:text-sm'
+            >
+              <option value='todos'>Todos los torneos ({torneos.length})</option>
+              <option value='sin_torneo'>Partidos libres (sin torneo)</option>
+              {torneos.map((t) => (
+                <option key={t.id} value={String(t.id)}>
+                  {t.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro por Deporte */}
+          <div>
+            <select
+              value={filterDeporte}
+              onChange={(e) => setFilterDeporte(e.target.value)}
+              className='form-input text-xs sm:text-sm'
+            >
+              <option value='todos'>Todos los deportes (Tenis y Pádel)</option>
+              <option value='tenis'>Solo Tenis</option>
+              <option value='padel'>Solo Pádel</option>
+            </select>
+          </div>
+        </div>
+
+        <div className='flex items-center justify-between text-xs text-[var(--text-muted)] pt-1'>
+          <span>
+            Mostrando <strong className='text-[var(--text-primary)]'>{filtered.length}</strong> de {partidos.length} partidos
+          </span>
+          {(search || filterTorneo !== 'todos' || filterDeporte !== 'todos' || filterTab !== 'todos') && (
+            <button
+              type='button'
+              onClick={() => {
+                setSearch('')
+                setFilterTorneo('todos')
+                setFilterDeporte('todos')
+                setFilterTab('todos')
+                setSearchParams({}, { replace: true })
+              }}
+              className='text-[var(--color-brand)] hover:underline font-medium'
+            >
+              Restablecer filtros
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filtros por Estado */}
       <Tabs tabs={FILTER_TABS} activeTab={filterTab} onChange={setFilterTab} />
 
       <BulkDelete

@@ -17,6 +17,7 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'scoresapp',
   waitForConnections: true,
+  connectTimeout: 15000,
   connectionLimit: Number.parseInt(process.env.DB_CONNECTION_LIMIT || '5', 10),
   queueLimit: 0,
   enableKeepAlive: true,

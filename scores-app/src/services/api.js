@@ -6,9 +6,31 @@ import { saveSessionRecovery } from '../utils/sessionRecovery'
 // Elimina el almacenamiento usado por la versión anterior, que guardaba el JWT.
 localStorage.removeItem('auth-storage')
 
+export const resolveApiUrl = (configuredUrl = import.meta.env.VITE_API_URL) => {
+  const configured = configuredUrl || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api')
+  if (configured.startsWith('/')) {
+    return configured
+  }
+  // En el navegador, si la URL configurada apunta a localhost pero la app se abrió
+  // desde una IP o dominio distinto (ej: probando desde un celular en http://192.168.1.15:5173),
+  // sustituimos localhost por la IP/host actual del navegador para que las peticiones lleguen a la API.
+  if (import.meta.env.DEV && typeof window !== 'undefined' && window.location?.hostname) {
+    const { hostname, protocol } = window.location
+    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      try {
+        const url = new URL(configured)
+        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+          return `${protocol}//${hostname}:${url.port || '3001'}${url.pathname}`
+        }
+      } catch {}
+    }
+  }
+  return configured
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
-  timeout: 10000,
+  baseURL: resolveApiUrl(),
+  timeout: 20000,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 })

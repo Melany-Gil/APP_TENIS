@@ -95,8 +95,13 @@ test('las operaciones de administración siguen protegidas', () => {
 })
 
 test('las nuevas rutas de perfiles y fotos exigen la autorización adecuada', () => {
-  const memberReads = handlersFor(routes.partidos, 'get', '/mios')
-  assert.ok(memberReads.includes(requireAuth))
+  const memberReads = [
+    handlersFor(routes.partidos, 'get', '/mios'),
+    handlersFor(routes.anuncios, 'get', '/:id'),
+  ]
+  for (const handlers of memberReads) {
+    assert.ok(handlers.includes(requireAuth))
+  }
 
   const adminRoutes = [
     ['get', '/gestion'],

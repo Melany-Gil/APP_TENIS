@@ -14,6 +14,11 @@ const directorError = (res, err) => error(res,
 
 exports.stream = (req, res) => realtime.subscribe(req, res)
 
+exports.liveVersion = (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+  return success(res, realtime.getVersion())
+}
+
 exports.getAll = async (req, res) => {
   try {
     return success(res, await service.getAll(req.query))

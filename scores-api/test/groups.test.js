@@ -39,6 +39,27 @@ const fake = (duplicate = false) => ({
     throw Error(sql)
   },
 })
+
+test('historial de grupo conserva finalizados tras retiro y reactivación en otro grupo', async () => {
+  const svc = load(fake())
+  const current = new Map([[2, memberships[1]], [1, { categoria_id: 3, grupo: 'Grupo 2' }]])
+  assert.equal(svc.isHistoricalCompatible({ ...match, estado: 'finalizado', historico1: 1 }, current), true)
+  assert.equal(svc.isHistoricalCompatible({ ...match, estado: 'programado', historico1: 1 }, current), false)
+  assert.equal(svc.isHistoricalCompatible({ ...match, estado: 'finalizado' }, current), false)
+})
+
+test('edición conserva cruce archivado pero nunca autoriza nuevos cruces ni moverlo de grupo', async () => {
+  const conn = { query: async sql => {
+    if (sql.startsWith('SELECT *, ')) return [[{ ...match, estado: 'programado', historico1: 1 }]]
+    if (sql.includes('FROM torneo_grupo_parejas')) return [[memberships[1]]]
+    return fake().query(sql)
+  } }
+  const svc = load(conn)
+  assert.equal(await svc.validateMatch(match, conn), true)
+  await assert.rejects(svc.validateMatch({ ...match, id: null }, conn))
+  await assert.rejects(svc.validateMatch({ ...match, grupo: 'Grupo 2' }, conn))
+  await assert.rejects(svc.validateMatch({ ...match, equipo2_id: 3 }, conn))
+})
 test('grupos: acepta solo cruces del mismo grupo y categoría', async () => {
   const db = fake(),
     svc = load(db)
@@ -173,6 +194,7 @@ test('posiciones: incluye inscritos sin partidos y separa pendientes e incidenci
         return [[1, 2, 3, 4].map((equipo_id) => ({ equipo_id }))]
       if (sql.includes('FROM equipos_padel'))
         return [[1, 2, 3, 4].map((id) => ({ id, nombre: 'Pareja ' + id }))]
+      if (sql.includes('FROM torneo_retiros')) return [[]]
       throw Error(sql)
     },
   }
@@ -224,10 +246,14 @@ test('grupos: revisión antigua no sobrescribe distribución y guardado confirma
       writes.push(sql)
       if (sql.startsWith('DELETE FROM torneo_grupo_parejas')) storedPairs = []
       if (sql.startsWith('DELETE FROM torneo_grupos')) storedGroups = []
-      if (sql.startsWith('INSERT INTO torneo_grupos '))
-        storedGroups.push({ categoria_id: args[1], nombre: args[2] })
-      if (sql.startsWith('INSERT INTO torneo_grupo_parejas'))
-        storedPairs.push({ equipo_id: args[1], categoria_id: args[2], grupo: args[3] })
+      if (sql.startsWith('INSERT INTO torneo_grupos')) {
+        const rows = Array.isArray(args[0]) && Array.isArray(args[0][0]) ? args[0] : [[null, args[1], args[2]]]
+        for (const r of rows) storedGroups.push({ categoria_id: r[1], nombre: r[2] })
+      }
+      if (sql.startsWith('INSERT INTO torneo_grupo_parejas')) {
+        const rows = Array.isArray(args[0]) && Array.isArray(args[0][0]) ? args[0] : [[null, args[1], args[2], args[3]]]
+        for (const r of rows) storedPairs.push({ equipo_id: r[1], categoria_id: r[2], grupo: r[3] })
+      }
       return [{}]
     },
   }

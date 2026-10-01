@@ -30,7 +30,7 @@ const ROWS = [
   ['Errores no forzados cometidos', 'errores_no_forzados'],
 ]
 
-export default function MatchStats({ matchId, player1, player2, initialStats = null }) {
+export default function MatchStats({ matchId, player1, player2, initialStats = null, isLive = false }) {
   const [stats, setStats] = useState(initialStats)
   const [walkover, setWalkover] = useState(initialStats?.walkover || null)
   const [totalSets, setTotalSets] = useState(0)
@@ -39,6 +39,7 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
   const [hasCorrections, setHasCorrections] = useState(false)
   const [view, setView] = useState('chart')
   const sequence = useRef(0)
+  const refreshTimer = useRef(null)
 
   const loadStats = useCallback(({ silent = false } = {}) => {
     if (!matchId) return
@@ -60,12 +61,27 @@ export default function MatchStats({ matchId, player1, player2, initialStats = n
 
   useEffect(() => {
     loadStats()
-    return () => { sequence.current++ }
-  }, [loadStats])
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadStats({ silent: true })
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      sequence.current++
+      clearTimeout(refreshTimer.current)
+      refreshTimer.current = null
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [loadStats, isLive])
 
   useMatchRealtime(useCallback((event) => {
     if (event.matchId === null || Number(event.matchId) === Number(matchId)) {
-      loadStats({ silent: true })
+      if (document.visibilityState !== 'visible' || refreshTimer.current !== null) return
+      refreshTimer.current = setTimeout(() => {
+        refreshTimer.current = null
+        if (document.visibilityState === 'visible') loadStats({ silent: true })
+      }, 250)
     }
   }, [loadStats, matchId]))
 
