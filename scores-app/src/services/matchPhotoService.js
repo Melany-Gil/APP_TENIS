@@ -9,6 +9,7 @@ export const sendPhoto = (id, item, signal) => {
   form.append('expected', item.expected)
   form.append('momento', item.momento)
   form.append('consentimiento', 'true')
+  if (item.encuadre) form.append('encuadre', JSON.stringify(item.encuadre))
   form.append('foto', item.blob, 'partido.webp')
   return api.put(`/partidos/${id}/foto`, form, { headers: { 'Content-Type': undefined }, timeout: 60000, signal })
 }

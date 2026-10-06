@@ -21,7 +21,7 @@ test('HTTP photo authorization, multipart, public image, replacement and forged 
       if (sql.includes('FROM users')) return [[{ rol: 'juez', activo: true }]]
       if (sql.includes('FROM partidos')) return [Number(args[0]) === 30 ? [{ id: 30, juez_id: 12 }] : []]
       if (sql.includes('FROM fotos_partido')) return [row ? [{ ...row }] : []]
-      if (sql.startsWith('INSERT')) { writes++; row = { partido_id: args[0], version: args[1], momento: args[2], created_by: args[3], updated_at: 'now' }; return [{}] }
+      if (sql.startsWith('INSERT')) { writes++; row = { partido_id: args[0], version: args[1], momento: args[2], created_by: args[3], encuadre: args[5], updated_at: 'now' }; return [{}] }
       throw new Error(sql)
     },
     async getConnection() { return { query: db.query, beginTransaction: async () => {}, commit: async () => {}, rollback: async () => {}, release() {} } },
@@ -56,7 +56,8 @@ test('HTTP photo authorization, multipart, public image, replacement and forged 
     assert.equal(writes, 1)
     assert.equal((await upload(12, randomUUID())).status, 409)
     const metadata = (await (await fetch(base)).json()).data
-    assert.deepEqual(Object.keys(metadata).sort(), ['momento', 'updated_at', 'version'])
+    assert.deepEqual(Object.keys(metadata).sort(), ['encuadre', 'momento', 'updated_at', 'version'])
+    assert.deepEqual(metadata.encuadre, { zoom: 1, x: 50, y: 50 })
     const image = await fetch(`${base}/imagen?v=${version}`)
     assert.equal(image.status, 200); assert.match(image.headers.get('content-type'), /image\/webp/)
     assert.equal((await sharp(Buffer.from(await image.arrayBuffer())).metadata()).format, 'webp')

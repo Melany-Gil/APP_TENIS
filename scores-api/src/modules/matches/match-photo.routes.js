@@ -6,7 +6,7 @@ const { success, error } = require('../../utils/response')
 const { createPhotoService, publicError } = require('./match-photo.service')
 const service = createPhotoService(require('../../config/db'))
 const realtime = require('./match-realtime')
-const receive = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1, fields: 4, parts: 6 } }).single('foto')
+const receive = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1, fields: 5, parts: 7 } }).single('foto')
 const uploads = rateLimit({ windowMs: 60000, limit: 8, keyGenerator: req => String(req.user.id), message: { ok: false, message: 'Espera un minuto antes de volver a subir una foto' } })
 let activeUploads = 0
 function report(res, err) {

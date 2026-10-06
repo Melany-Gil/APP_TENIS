@@ -10,6 +10,14 @@ Las solicitudes y respuestas conservan autoría: una cuenta con ese historial de
 
 ## Alcance de esta etapa
 
+### Agenda y cambios de programación
+
+Administración dispone de `/admin/agenda` y dirección de `/director/agenda`: lista cronológica móvil y columnas por cancha en escritorio, con fecha (Colombia), filtro de cancha y actualización manual. Incluye partidos sin cancha, pero los que no tienen fecha se revisan desde el panel de pendientes.
+
+Los cambios de fecha/hora, cancha, cancelación y suspensión desde mesa de juez generan avisos internos a las cuentas activas vinculadas a los participantes (incluidos ambos integrantes de cada pareja). No se envían motivos privados, correos ni push de estos cambios. En la campana se puede desactivar esta categoría. Guardar sin cambios no vuelve a notificar; aviso y edición se confirman juntos en una transacción. Los jugadores sin cuenta vinculada no reciben avisos.
+
+El arranque añade la tabla `preferencias_avisos` sin modificar registros existentes. Desplegar backend y frontend juntos. No se envían avisos retrospectivos.
+
 - Incluido: solicitudes, historial, respuesta y estado, campana interna para avisos de soporte.
 - Incluido: push opcional por dispositivo para avisos de soporte, sujeto a configuración del servidor y permiso del navegador.
 - Pendiente: recordatorios de partidos y avisos automáticos de asignación/inicio/finalización.
