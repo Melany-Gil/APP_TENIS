@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Download, Maximize2, SlidersHorizontal } from 'lucide-react'
+import { Download, Maximize2, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { useMatchRealtime } from '../../hooks/useMatchRealtime'
-import { getPhoto, photoUrl } from '../../services/matchPhotoService'
+import { getPhoto, photoUrl, removePhoto } from '../../services/matchPhotoService'
+import useAuthStore from '../../store/useAuthStore'
+import { confirm } from '../../utils/confirm'
 import { PHOTOCALL_SPONSORS } from '../../data/photocallSponsors'
 import { getParticipantName } from '../../utils/matchParticipants'
 import { exportMatchPhoto } from '../../utils/exportMatchPhoto'
 import './matchPhoto.css'
 
 export default function MatchPhoto({ matchId, match, dark = false }) {
+  const isAdmin = useAuthStore(store => store.user?.rol === 'admin')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [photo, setPhoto] = useState(null)
   const [expanded, setExpanded] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -86,6 +91,21 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
     }
   }
 
+  const handleDelete = async () => {
+    if (!isAdmin || !photo || deleting || downloading) return
+    const version = photo.version
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      if (!await confirm({ title: 'Eliminar foto del partido', message: 'Se eliminará la fotografía publicada. El partido y su marcador se conservarán. Esta acción no se puede deshacer.', danger: true, confirmLabel: 'Eliminar foto' })) return
+      await removePhoto(matchId, version)
+      setPhoto(null)
+    } catch (error) {
+      setDeleteError(error.message || 'No se pudo eliminar la foto. Intenta nuevamente.')
+      if (error.status === 409) refresh()
+    } finally { setDeleting(false) }
+  }
+
   if (!photo) return null
 
   const marker = match?.marcador_actual
@@ -125,7 +145,9 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
           {[['zoom', 'Acercamiento', 1, 2.5, .05], ['x', 'Posición horizontal', 0, 100, 1], ['y', 'Posición vertical', 0, 100, 1]].map(([key, label, min, max, step]) => <label key={key}>{label}<input type='range' min={min} max={max} step={step} value={crop[key]} disabled={key !== 'zoom' && crop.zoom === 1} onChange={e => setCrop(c => ({ ...(c || crop), [key]: Number(e.target.value) }))} /></label>)}
           <button type='button' className='photocall-download-btn' onClick={() => setCrop({ zoom: 1, x: 50, y: 50 })}>Restablecer foto completa</button>
         </fieldset>}
-        <button type='button' className='photocall-download-btn' disabled={downloading} onClick={handleDownload}><Download size={14} /> {downloading ? 'Preparando imagen…' : 'Descargar foto con marco'}</button>{downloadError && <p role='alert'>{downloadError}</p>}
+        <button type='button' className='photocall-download-btn' disabled={downloading || deleting} onClick={handleDownload}><Download size={14} /> {downloading ? 'Preparando imagen…' : 'Descargar foto con marco'}</button>{downloadError && <p role='alert'>{downloadError}</p>}
+        {isAdmin && <button type='button' className='photocall-download-btn' disabled={deleting || downloading} onClick={handleDelete}><Trash2 size={14} /> {deleting ? 'Eliminando…' : 'Eliminar foto'}</button>}
+        {deleteError && <p role='alert'>{deleteError}</p>}
       </div>
     </section>
   )

@@ -9,6 +9,7 @@ import AdminRoute from './AdminRoute'
 import OfficialRoute from './OfficialRoute'
 import DirectorRoute from './DirectorRoute'
 import JudgeLayout from '../layouts/JudgeLayout'
+import TrafficMeasurement from '../components/common/TrafficMeasurement'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -56,6 +57,7 @@ const GestionTorneos = lazy(() => import('../pages/admin/GestionTorneos'))
 const GestionPartidos = lazy(() => import('../pages/admin/GestionPartidos'))
 const CourtAgenda = lazy(() => import('../pages/admin/CourtAgenda'))
 const Caddies = lazy(() => import('../pages/admin/Caddies'))
+const Traffic = lazy(() => import('../pages/admin/Traffic'))
 const GestionAnuncios = lazy(() => import('../pages/admin/GestionAnuncios'))
 const GestionSedes = lazy(() => import('../pages/admin/GestionSedes'))
 const GestionCategorias = lazy(() => import('../pages/admin/GestionCategorias'))
@@ -88,6 +90,7 @@ export default function AppRouter() {
   return (
     <>
       <ScrollToTop />
+      <TrafficMeasurement />
       <Routes>
       {/* Auth */}
       <Route element={<AuthLayout />}>
@@ -184,6 +187,7 @@ export default function AppRouter() {
         <Route path='/admin' element={<Dashboard />} />
         <Route path='/admin/auditoria' element={<AuditHistory />} />
         <Route path='/admin/caddies' element={<Caddies />} />
+        <Route path='/admin/visitas' element={<Traffic />} />
         <Route path='/admin/jugadores' element={<GestionJugadores />} />
         <Route path='/admin/equipos' element={<GestionEquipos />} />
         <Route path='/admin/torneos' element={<GestionTorneos />} />

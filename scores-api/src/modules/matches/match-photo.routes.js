@@ -1,7 +1,7 @@
 const router = require('express').Router({ mergeParams: true })
 const multer = require('multer')
 const { rateLimit } = require('express-rate-limit')
-const { requireAuth, requireOfficial } = require('../../middlewares/auth.middleware')
+const { requireAuth, requireOfficial, requireAdmin } = require('../../middlewares/auth.middleware')
 const { success, error } = require('../../utils/response')
 const { createPhotoService, publicError } = require('./match-photo.service')
 const service = createPhotoService(require('../../config/db'))
@@ -50,5 +50,14 @@ router.put('/', requireAuth, requireOfficial, uploads, async (req, res, next) =>
     } catch (err) { report(res, err) }
     finally { activeUploads-- }
   })
+})
+router.delete('/', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await service.remove(req.params.id, req.user, req.body?.expected)
+    realtime.publishMatchChange({ matchId: Number(req.params.id), action: 'photo' })
+    success(res, null)
+  } catch (err) {
+    error(res, err.status ? err.message : 'No se pudo eliminar la foto. Intenta nuevamente.', err.status || 500)
+  }
 })
 module.exports = router

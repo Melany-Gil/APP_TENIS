@@ -108,7 +108,7 @@ export default function MatchPhotoCapture({ matchId, userId, finished, deferUplo
     } catch { setMessage('Conéctate para consultar la foto actual antes de descartar la pendiente.') }
   }
   return <>
-    <button className='judge-tool' disabled={disabled} onClick={() => { setOpen(true); if (!known || !storageReady) retryNow() }} aria-label={pending ? 'Foto del partido pendiente' : 'Foto del partido'}><Camera size={17} /><span className='text-xs'>{pending ? 'Pendiente' : 'Foto'}</span></button>
+    <button className='judge-tool' disabled={disabled} onClick={() => { setOpen(true); retryNow() }} aria-label={pending ? 'Foto del partido pendiente' : 'Foto del partido'}><Camera size={17} /><span className='text-xs'>{pending ? 'Pendiente' : 'Foto'}</span></button>
     <dialog ref={dialog} onCancel={() => setOpen(false)} className='rounded-2xl p-5 w-[min(94vw,520px)] max-h-[90dvh] overflow-auto backdrop:bg-black/60' style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
       <div className='flex items-center justify-between mb-3'><h2 className='font-bold'>Una foto del partido</h2><button onClick={() => setOpen(false)} aria-label='Cerrar fotografía'><X /></button></div>
       <p className='text-sm mb-3'>Puedes tomarla al inicio o al final. No es obligatoria para marcar puntos.</p>

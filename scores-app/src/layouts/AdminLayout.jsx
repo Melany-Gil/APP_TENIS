@@ -28,6 +28,7 @@ const NAV = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/admin/jugadores', icon: Users, label: 'Jugadores' },
   { to: '/admin/caddies', icon: Users, label: 'Caddies' },
+  { to: '/admin/visitas', icon: History, label: 'Visitas' },
   { to: '/admin/equipos', icon: Swords, label: 'Parejas' },
   { to: '/admin/torneos', icon: Trophy, label: 'Torneos' },
   { to: '/admin/partidos', icon: CalendarDays, label: 'Partidos' },

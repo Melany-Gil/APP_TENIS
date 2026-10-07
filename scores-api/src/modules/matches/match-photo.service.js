@@ -134,7 +134,36 @@ function createPhotoService(db, directory = process.env.MATCH_PHOTOS_DIR) {
     }
     return get(id)
   }
-  return { get, check, save, file, status }
+  async function remove(id, user, expected) {
+    if (user?.rol !== 'admin') throw fail(403, 'Solo los administradores pueden eliminar fotos')
+    if (typeof expected !== 'string' || !uuid.test(expected)) throw fail(400, 'Identificador de fotografía inválido')
+    root()
+    const conn = await db.getConnection()
+    try {
+      await conn.beginTransaction()
+      const [matches] = await conn.query('SELECT id, juez_id FROM partidos WHERE id = ? FOR UPDATE', [id])
+      if (!matches.length) throw fail(404, 'Partido no encontrado')
+      const [rows] = await conn.query('SELECT * FROM fotos_partido WHERE partido_id = ? FOR UPDATE', [id])
+      if (rows[0] && rows[0].version !== expected) throw fail(409, 'La foto cambió. Revisa la foto actual antes de eliminarla.')
+      if (rows[0]) {
+        await conn.query('DELETE FROM fotos_partido WHERE partido_id = ? AND version = ?', [id, expected])
+        await conn.query('INSERT INTO auditoria_control_partido (partido_id, created_by, accion, detalle) VALUES (?, ?, ?, ?)',
+          [id, user.id, 'eliminar_foto', JSON.stringify({ version: expected, momento: rows[0].momento })])
+      }
+      await conn.commit()
+    } catch (error) {
+      await conn.rollback().catch(() => {})
+      throw error
+    } finally { conn.release() }
+    // Never remove files before a confirmed commit. Missing metadata already blocks public access.
+    for (const thumbnail of [false, true]) {
+      await fs.unlink(file(expected, thumbnail)).catch(error => {
+        if (error.code !== 'ENOENT') console.warn('Photo cleanup failed:', error.code)
+      })
+    }
+    return null
+  }
+  return { get, check, save, file, status, remove }
 }
 
 module.exports = { createPhotoService, authorize, validate, normalize, publicError, framing }

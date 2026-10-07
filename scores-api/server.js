@@ -72,6 +72,7 @@ app.use('/api/torneos', torneosRoutes)
 app.use('/api/auditoria', require('./src/modules/audit/audit.routes'))
 app.use('/api/partidos', partidosRoutes)
 app.use('/api/caddies', require('./src/modules/caddies/caddies.routes'))
+app.use('/api/analytics', require('./src/modules/analytics/routes'))
 app.use('/api/anuncios', anunciosRoutes)
 app.use('/api/favoritos', favoritosRoutes)
 app.use('/api/categorias', categoriasRoutes)
@@ -156,6 +157,7 @@ app.ensureSchemaOnce = () => {
   if (!schemaPromise) {
     schemaPromise = readiness.start().then(() => {
       require('./src/modules/support/push.service').start()
+      require('./src/modules/analytics/runtime').start()
     }).catch((error) => {
       console.error('❌  No fue posible actualizar el esquema:', error.message)
       throw error
