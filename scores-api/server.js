@@ -35,7 +35,7 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .map((origin) => origin.trim())
   .filter(Boolean)
 
-app.use(helmet())
+app.use(helmet(require('./src/config/securityHeaders')))
 // SSE must flush each event immediately; never buffer the live stream.
 app.use(compression({ filter: (req, res) => req.originalUrl.split('?')[0] !== '/api/partidos/stream' && compression.filter(req, res) }))
 app.use(

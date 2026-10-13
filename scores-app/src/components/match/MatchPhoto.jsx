@@ -85,7 +85,9 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
       link.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (error) {
-      setDownloadError(error.message || 'No se pudo descargar el marco. Intenta nuevamente.')
+      setDownloadError(error.name === 'EncodingError'
+        ? 'No se pudo abrir una imagen para generar el marco. Recarga la página e intenta nuevamente.'
+        : error.message || 'No se pudo descargar el marco. Intenta nuevamente.')
     } finally {
       setDownloading(false)
     }

@@ -469,6 +469,12 @@ async function checkTournamentRetirements(browser) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data }) })
       }
       if (url.hostname !== '127.0.0.1') return route.abort()
+      if (req.resourceType() === 'document') {
+        const response = await route.fetch()
+        const { imgSrc } = require('../scores-api/src/config/securityHeaders').contentSecurityPolicy.directives
+        // Vite uses a separate mocked API origin; production serves /api on self.
+        return route.fulfill({ response, headers: { ...response.headers(), 'content-security-policy': `img-src ${imgSrc.join(' ')} http://localhost:3001 http://127.0.0.1:3001` } })
+      }
       return route.continue()
     }
     await page.route('**/*', mockRoute)
