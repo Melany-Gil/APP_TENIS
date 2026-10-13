@@ -44,7 +44,7 @@ async function normalize(buffer) {
     const metadata = await image.metadata()
     if (!['jpeg', 'png', 'webp'].includes(metadata.format) || (metadata.pages || 1) > 1) throw new Error('format')
     // Re-encoding without withMetadata strips EXIF, including GPS.
-    const full = await image.rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 78 }).toBuffer()
+    const full = await image.rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 88 }).toBuffer()
     const thumb = await sharp(full).resize({ width: 480, height: 480, fit: 'inside', withoutEnlargement: true }).webp({ quality: 70 }).toBuffer()
     return { full, thumb }
   } catch { throw fail(400, 'Imagen inválida. Usa una foto JPEG, PNG o WebP de hasta 24 megapíxeles.') }

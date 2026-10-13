@@ -45,7 +45,8 @@ export async function compressPhoto(file) {
     canvas.width = Math.max(1, Math.round(bitmap.width * scale))
     canvas.height = Math.max(1, Math.round(bitmap.height * scale))
     canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.78))
+    // Preserve facial detail before the server's metadata-stripping re-encode.
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.92))
     if (!blob || blob.size > 8 * 1024 * 1024) throw new Error('No se pudo reducir la foto. Selecciona otra.')
     return blob
   } finally { bitmap.close() }

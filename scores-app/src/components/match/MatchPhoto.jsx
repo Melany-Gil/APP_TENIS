@@ -123,7 +123,10 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
         {failed ? <p role='status'>No se pudo cargar la fotografía. <button onClick={refresh}>Reintentar</button></p> :
           <button type='button' className='photocall-photo-btn' data-expanded={expanded || undefined} onClick={() => setExpanded(!expanded)} aria-label={expanded ? 'Reducir foto' : 'Ampliar foto'}>
             <span className='photocall-photo-backdrop' aria-hidden='true' style={{ backgroundImage: `url("${photoUrl(matchId, photo.version, true)}")` }} />
-            <img src={photoUrl(matchId, photo.version, !expanded && !framing)} alt='Jugadores del partido' loading='lazy' decoding='async' onLoad={e => setDimensions({ version: photo.version, width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} onError={() => setFailed(true)} className='photocall-photo-img' style={{ transform: `scale(${crop.zoom})`, transformOrigin: `${crop.x}% ${crop.y}%` }} />
+            {/* Native lazy loading requests the full photo near the viewport. The
+                thumbnail backdrop remains visible while it loads; never upscale
+                that thumbnail as the foreground, even in the collapsed view. */}
+            <img src={photoUrl(matchId, photo.version, false)} alt='Jugadores del partido' loading='lazy' decoding='async' onLoad={e => setDimensions({ version: photo.version, width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} onError={() => setFailed(true)} className='photocall-photo-img' style={{ transform: `scale(${crop.zoom})`, transformOrigin: `${crop.x}% ${crop.y}%` }} />
             <span className='photocall-expand' aria-hidden='true'><Maximize2 size={15} /></span>
           </button>}
       </div>
