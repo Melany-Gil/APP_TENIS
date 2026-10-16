@@ -6,7 +6,9 @@ exports.assertNeutral = async (conn, matchId, userId) => {
 }
 exports.guard = async (req, res, next) => {
   try {
-    await exports.assertNeutral(require('../../config/db'), req.params.matchId, req.user.id)
+    const matchId = req.params.matchId || req.params.id
+    if (!/^[1-9]\d*$/.test(String(matchId)) || !Number.isSafeInteger(Number(matchId))) return res.status(400).json({ ok: false, message: 'Partido inválido' })
+    await exports.assertNeutral(require('../../config/db'), matchId, req.user.id)
     next()
   } catch (e) { res.status(e.status || 503).json({ ok: false, message: e.status ? e.message : 'No se pudo verificar la participación. Reintenta.' }) }
 }

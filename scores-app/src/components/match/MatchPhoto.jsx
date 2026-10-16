@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Download, Maximize2, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { Check, Download, Maximize2, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { useMatchRealtime } from '../../hooks/useMatchRealtime'
-import { getPhoto, photoUrl, removePhoto } from '../../services/matchPhotoService'
+import { getPhoto, photoUrl, removePhoto, updatePhotoFraming } from '../../services/matchPhotoService'
 import useAuthStore from '../../store/useAuthStore'
 import { confirm } from '../../utils/confirm'
 import { PHOTOCALL_SPONSORS } from '../../data/photocallSponsors'
@@ -20,6 +20,9 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
   const [downloadError, setDownloadError] = useState('')
   const [framing, setFraming] = useState(false)
   const [manualCrop, setCrop] = useState(null)
+  const [savingFraming, setSavingFraming] = useState(false)
+  const [framingNotice, setFramingNotice] = useState('')
+  const [framingError, setFramingError] = useState('')
   const [dimensions, setDimensions] = useState(null)
   // Legacy portrait photos receive a gentle, reversible zoom. Saved framing wins.
   const portrait = dimensions?.version === photo?.version && dimensions?.height > dimensions?.width
@@ -28,6 +31,8 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
   useEffect(() => {
     setCrop(null)
     setFraming(false)
+    setFramingNotice('')
+    setFramingError('')
   }, [matchId, photo?.version])
 
   const refresh = useCallback(() => {
@@ -69,7 +74,7 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
   )
 
   const handleDownload = async () => {
-    if (!photo || downloading) return
+    if (!photo || downloading || savingFraming || deleting) return
     setDownloading(true)
     setDownloadError('')
     try {
@@ -93,8 +98,31 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
     }
   }
 
+  const handleSaveFraming = async () => {
+    if (!isAdmin || !photo || savingFraming || downloading || deleting) return
+    setSavingFraming(true)
+    setFramingError('')
+    setFramingNotice('')
+    try {
+      const payload = {
+        zoom: Number(Number(crop.zoom).toFixed(2)),
+        x: Math.round(Number(crop.x)),
+        y: Math.round(Number(crop.y)),
+      }
+      const response = await updatePhotoFraming(matchId, photo.version, payload, photo.encuadre ?? null)
+      setPhoto(response.data)
+      setCrop(null)
+      setFramingNotice('Encuadre guardado para todos.')
+    } catch (error) {
+      setFramingError(error.message || 'No se pudo guardar el encuadre. Intenta nuevamente.')
+      if (error.status === 409) refresh()
+    } finally {
+      setSavingFraming(false)
+    }
+  }
+
   const handleDelete = async () => {
-    if (!isAdmin || !photo || deleting || downloading) return
+    if (!isAdmin || !photo || deleting || downloading || savingFraming) return
     const version = photo.version
     setDeleting(true)
     setDeleteError('')
@@ -143,15 +171,50 @@ export default function MatchPhoto({ matchId, match, dark = false }) {
         {PHOTOCALL_SPONSORS.map(sponsor => <div className={`photocall-logo${sponsor.name === 'Metrollantas' ? ' photocall-logo-large' : ''}${sponsor.name === 'Supermercados Más x Menos' ? ' photocall-logo-mxm' : ''}`} key={sponsor.image} title={sponsor.name}><img src={sponsor.image} alt={sponsor.name} loading='eager' decoding='async' /></div>)}
       </div>
       <div className='photocall-actions'>
-        <button type='button' className='photocall-download-btn' disabled={downloading || failed} aria-expanded={framing} onClick={() => { setFraming(!framing); setExpanded(false) }}><SlidersHorizontal size={14} /> Ajustar encuadre</button>
-        {framing && <fieldset className='photocall-framing' disabled={downloading}>
+        <button type='button' className='photocall-download-btn' disabled={downloading || failed || savingFraming || deleting} aria-expanded={framing} onClick={() => { setFraming(!framing); setExpanded(false); setFramingNotice(''); setFramingError('') }}><SlidersHorizontal size={14} /> Ajustar encuadre</button>
+        {framing && <fieldset className='photocall-framing' disabled={downloading || savingFraming || deleting}>
           <legend>Encuadra a los jugadores</legend>
-          <p>Acerca y mueve la foto sin cortar cabezas ni pies. Este ajuste solo se aplica a tu descarga; no cambia la foto guardada.</p>
-          {[['zoom', 'Acercamiento', 1, 2.5, .05], ['x', 'Posición horizontal', 0, 100, 1], ['y', 'Posición vertical', 0, 100, 1]].map(([key, label, min, max, step]) => <label key={key}>{label}<input type='range' min={min} max={max} step={step} value={crop[key]} disabled={key !== 'zoom' && crop.zoom === 1} onChange={e => setCrop(c => ({ ...(c || crop), [key]: Number(e.target.value) }))} /></label>)}
-          <button type='button' className='photocall-download-btn' onClick={() => setCrop({ zoom: 1, x: 50, y: 50 })}>Restablecer foto completa</button>
+          <p>
+            {isAdmin
+              ? 'Ajusta la foto y guarda el encuadre para todos. La imagen original se conserva.'
+              : 'Acerca y mueve la foto sin cortar cabezas ni pies. Este ajuste solo se aplica a tu descarga; no cambia la foto guardada.'}
+          </p>
+          {[['zoom', `Acercamiento (${Math.round(crop.zoom * 100)}%)`, 1, 2.5, .05], ['x', `Posición horizontal (${Math.round(crop.x)}%)`, 0, 100, 1], ['y', `Posición vertical (${Math.round(crop.y)}%)`, 0, 100, 1]].map(([key, label, min, max, step]) => (
+            <label key={key}>
+              {label}
+              <input
+                type='range'
+                aria-label={label.split(' (')[0]}
+                min={min}
+                max={max}
+                step={step}
+                value={crop[key]}
+                onChange={e => {
+                  const val = Number(e.target.value)
+                  setFramingNotice('')
+                  setCrop(c => {
+                    const base = c || crop
+                    const nextZoom = key !== 'zoom' && base.zoom === 1 ? 1.15 : base.zoom
+                    return { ...base, zoom: nextZoom, [key]: val }
+                  })
+                }}
+              />
+            </label>
+          ))}
+          <div className='photocall-framing-actions'>
+            <button type='button' className='photocall-download-btn' onClick={() => { setFramingNotice(''); setCrop({ zoom: 1, x: 50, y: 50 }) }}>Restablecer foto completa</button>
+            {isAdmin && (
+              <button type='button' className='photocall-save-framing-btn' disabled={savingFraming} onClick={handleSaveFraming}>
+                <Check size={14} />
+                {savingFraming ? 'Guardando encuadre…' : 'Guardar encuadre permanente'}
+              </button>
+            )}
+          </div>
+          {framingNotice && <p role='status' className='photocall-framing-ok'>{framingNotice}</p>}
+          {framingError && <p role='alert' className='photocall-framing-err'>{framingError}</p>}
         </fieldset>}
-        <button type='button' className='photocall-download-btn' disabled={downloading || deleting} onClick={handleDownload}><Download size={14} /> {downloading ? 'Preparando imagen…' : 'Descargar foto con marco'}</button>{downloadError && <p role='alert'>{downloadError}</p>}
-        {isAdmin && <button type='button' className='photocall-download-btn' disabled={deleting || downloading} onClick={handleDelete}><Trash2 size={14} /> {deleting ? 'Eliminando…' : 'Eliminar foto'}</button>}
+        <button type='button' className='photocall-download-btn' disabled={downloading || deleting || savingFraming} onClick={handleDownload}><Download size={14} /> {downloading ? 'Preparando imagen…' : 'Descargar foto con marco'}</button>{downloadError && <p role='alert'>{downloadError}</p>}
+        {isAdmin && <button type='button' className='photocall-download-btn' disabled={deleting || downloading || savingFraming} onClick={handleDelete}><Trash2 size={14} /> {deleting ? 'Eliminando…' : 'Eliminar foto'}</button>}
         {deleteError && <p role='alert'>{deleteError}</p>}
       </div>
     </section>
