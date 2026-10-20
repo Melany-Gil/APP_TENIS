@@ -869,15 +869,26 @@ async function validateBasicMatch(body, currentMatchId = null) {
   const resolvedTeam2 =
     modalidad === 'dobles' ? (source2Id ? source2.participantId : equipo2Id) : null
 
+  const allowPendingSide1 =
+    fase === 'eliminacion' &&
+    estado === 'programado' &&
+    body.participante1_tipo === 'por_definir'
+  const allowPendingSide2 =
+    fase === 'eliminacion' &&
+    estado === 'programado' &&
+    body.participante2_tipo === 'por_definir'
+
   if (
     modalidad === 'individual' &&
-    ((!resolvedPlayer1 && !source1Id) || (!resolvedPlayer2 && !source2Id))
+    ((!resolvedPlayer1 && !source1Id && !allowPendingSide1) ||
+      (!resolvedPlayer2 && !source2Id && !allowPendingSide2))
   ) {
     throw { status: 400, message: 'Selecciona un jugador o un partido de origen para cada lado' }
   }
   if (
     modalidad === 'dobles' &&
-    ((!resolvedTeam1 && !source1Id) || (!resolvedTeam2 && !source2Id))
+    ((!resolvedTeam1 && !source1Id && !allowPendingSide1) ||
+      (!resolvedTeam2 && !source2Id && !allowPendingSide2))
   ) {
     throw { status: 400, message: 'Selecciona una pareja o un partido de origen para cada lado' }
   }
@@ -1317,6 +1328,9 @@ function formatMatchSource(row, position) {
     participante2: participant2 || null,
   }
 }
+
+Object.assign(exports, require('./bracket-management')({ pool, transaction, create: exports.create, update: exports.update,
+  getById: (...args) => exports.getById(...args), getAll: (...args) => exports.getAll(...args), normalizeActor }))
 // Serialize scheduling with group edits on the same tournament. The write and
 // validation use the SAME connection, including FK checks and duplicate checks.
 for (const method of ['create', 'update', 'updateParticipants']) {
