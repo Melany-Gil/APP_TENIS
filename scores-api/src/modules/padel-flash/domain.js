@@ -32,6 +32,8 @@ function phone(value) {
     fail('El número de Colombia debe tener 10 dígitos')
   return `+${digits}`
 }
+const MIN_PAREJAS = 4
+const MAX_PAREJAS = 60
 function eventInput(b) {
   const fecha = String(b.fecha || '')
   if (
@@ -56,13 +58,12 @@ function eventInput(b) {
     out.pausa_fin < out.cierre
   ))
     fail('Revisa el orden de los horarios')
-  slots(out)
   return out
 }
-function slots(e) {
+function slots(e, turnsNeeded) {
   const turns = []
   let t = Number(e.inicio)
-  while (turns.length < 7 && t + 20 <= Number(e.cierre)) {
+  while (turns.length < turnsNeeded && t + 20 <= Number(e.cierre)) {
     if (t < e.pausa_fin && t + 25 > e.pausa_inicio) {
       t = Number(e.pausa_fin)
       continue
@@ -70,8 +71,8 @@ function slots(e) {
     turns.push(t)
     t += 25
   }
-  if (turns.length < 7)
-    fail('No caben los siete turnos de 20 minutos y sus rotaciones en este horario')
+  if (turns.length < turnsNeeded)
+    fail(`No caben los ${turnsNeeded} turnos de 20 minutos y sus rotaciones en este horario`)
   return turns
 }
 function shuffle(values, rng = randomInt) {
@@ -83,34 +84,43 @@ function shuffle(values, rng = randomInt) {
   return a
 }
 function drawFixture(ids, event, rng = randomInt) {
-  if (ids.length !== 14 || new Set(ids).size !== 14)
-    fail('El sorteo requiere 14 parejas diferentes')
-  const times = slots(event)
+  const n = ids.length
+  if (n < MIN_PAREJAS || n > MAX_PAREJAS || new Set(ids).size !== n)
+    fail(`El sorteo requiere entre ${MIN_PAREJAS} y ${MAX_PAREJAS} parejas diferentes`)
+  const turnsNeeded = Math.ceil(n / 2)
+  const times = slots(event, turnsNeeded)
   const a = shuffle(ids, rng)
-  // Two alternating matchings of a shuffled cycle give each pair two distinct rivals.
-  const edges = [0, 1].flatMap((offset) =>
-    Array.from({ length: 7 }, (_, k) => [a[k * 2 + offset], a[(k * 2 + offset + 1) % 14]])
-  )
+  // A shuffled cycle gives every pair exactly two distinct rivals, for any N.
+  const edges = Array.from({ length: n }, (_, k) => [a[k], a[(k + 1) % n]])
   const used = new Set(),
     last = new Map(),
     output = []
-  for (let turn = 0; turn < 7; turn++) {
-    let best = null,
-      score = -Infinity
-    for (let i = 0; i < edges.length; i++)
-      for (let j = i + 1; j < edges.length; j++) {
-        if (used.has(i) || used.has(j) || new Set([...edges[i], ...edges[j]]).size !== 4) continue
-        const rest = [...edges[i], ...edges[j]].reduce(
-          (n, id) => n + (last.has(id) ? turn - last.get(id) : 5),
-          0
-        )
-        if (rest > score) {
-          score = rest
-          best = [i, j]
+  for (let turn = 0; turn < turnsNeeded; turn++) {
+    const free = []
+    for (let i = 0; i < edges.length; i++) if (!used.has(i)) free.push(i)
+    let best
+    if (free.length === 1) {
+      best = [free[0]]
+    } else {
+      best = null
+      let score = -Infinity
+      for (let x = 0; x < free.length; x++)
+        for (let y = x + 1; y < free.length; y++) {
+          const i = free[x],
+            j = free[y]
+          if (new Set([...edges[i], ...edges[j]]).size !== 4) continue
+          const rest = [...edges[i], ...edges[j]].reduce(
+            (sum, id) => sum + (last.has(id) ? turn - last.get(id) : 5),
+            0
+          )
+          if (rest > score) {
+            score = rest
+            best = [i, j]
+          }
         }
-      }
-    // A different shuffle resolves a rare final-slot conflict; bounded by the caller below.
-    if (!best) return null
+      // A different shuffle resolves a rare conflict; bounded by the caller below.
+      if (!best) return null
+    }
     best.forEach((idx, court) => {
       used.add(idx)
       edges[idx].forEach((id) => last.set(id, turn))
@@ -163,4 +173,6 @@ module.exports = {
   shuffle,
   generateFixture,
   resultInput,
+  MIN_PAREJAS,
+  MAX_PAREJAS,
 }

@@ -129,7 +129,7 @@ exports.createPadelService = (db) => {
     async pair(eventId, pairId, b, actor) {
       admin(actor)
       const values = [
-        D.integer(b.numero, 1, 14, 'Número de pareja'),
+        D.integer(b.numero, 1, D.MAX_PAREJAS, 'Número de pareja'),
         D.name(b.jugador1, 'Primer jugador'),
         D.name(b.jugador2, 'Segundo jugador'),
         b.disfraz?.trim() ? D.name(b.disfraz, 'Disfraz') : '',
@@ -144,7 +144,7 @@ exports.createPadelService = (db) => {
         const [matches] = await c.query('SELECT id FROM padel_fixture WHERE event_id=? LIMIT 1', [
           e.id,
         ])
-        if (matches.length && !pairId) D.fail('Las 14 parejas ya están incluidas en el sorteo', 409)
+        if (matches.length && !pairId) D.fail('Las parejas ya están incluidas en el sorteo', 409)
         const [all] = await c.query(
           'SELECT id,jugador1,jugador2 FROM padel_pairs WHERE event_id=?',
           [e.id]
@@ -167,7 +167,8 @@ exports.createPadelService = (db) => {
           )
           if (!r.affectedRows) D.fail('Pareja no encontrada', 404)
         } else {
-          if (all.length >= 14) D.fail('El evento tiene sus 14 parejas completas', 409)
+          if (all.length >= D.MAX_PAREJAS)
+            D.fail(`El evento alcanzó el máximo de ${D.MAX_PAREJAS} parejas`, 409)
           const [r] = await c.query(
             'INSERT INTO padel_pairs (numero,jugador1,jugador2,disfraz,event_id) VALUES (?,?,?,?,?)',
             [...values, e.id]
@@ -251,7 +252,9 @@ exports.createPadelService = (db) => {
         const e = await event(c, eventId, true)
         revision(e, b)
         const [rows] = await c.query('SELECT id FROM padel_fixture WHERE event_id=?', [e.id])
-        if (rows.length !== 14) D.fail('Completa el sorteo antes de publicar')
+        const [pairs] = await c.query('SELECT id FROM padel_pairs WHERE event_id=?', [e.id])
+        if (!rows.length || rows.length !== pairs.length)
+          D.fail('Completa el sorteo antes de publicar')
         await c.query('UPDATE padel_events SET publicado=1,version=version+1 WHERE id=?', [e.id])
         await audit(c, e.id, actor, 'publicar_sorteo', {})
         return { ok: true }
@@ -315,11 +318,16 @@ exports.createPadelService = (db) => {
         if (!allowed[e.votacion]?.includes(b.estado))
           D.fail('Ese cambio de votación no está disponible', 409)
         if (b.estado === 'abierta') {
+          const [matches] = await c.query(
+            'SELECT id FROM padel_fixture WHERE event_id=? LIMIT 1',
+            [e.id]
+          )
+          if (!matches.length) D.fail('Realiza el sorteo antes de abrir la votación')
           const [pairs] = await c.query('SELECT id,foto_url FROM padel_pairs WHERE event_id=?', [
             e.id,
           ])
-          if (pairs.length !== 14 || pairs.some((p) => !p.foto_url))
-            D.fail('Completa las 14 parejas y sus fotos antes de abrir la votación')
+          if (!pairs.length || pairs.some((p) => !p.foto_url))
+            D.fail('Completa las fotos de todas las parejas antes de abrir la votación')
         }
         if (b.estado === 'revelada') {
           const counts = await ranking(c, e.id)

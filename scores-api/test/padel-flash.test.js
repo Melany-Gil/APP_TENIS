@@ -42,14 +42,48 @@ test('pádel: 500 sorteos, 14 partidos, dos por pareja, sin repetidos ni colisio
     assert.equal(matches.filter((m) => m.minuto < 1200).length, 8)
   }
 })
+test('pádel: sorteo con número impar de parejas, sin repetir rival', () => {
+  const wideEvent = { ...defaults, inicio: 480, pausa_inicio: 1200, pausa_fin: 1230, cierre: 1439 }
+  for (let k = 0; k < 50; k++) {
+    const ids = Array.from({ length: 15 }, (_, i) => i + 1)
+    const matches = D.generateFixture(ids, wideEvent)
+    assert.equal(matches.length, 15)
+    assert.equal(
+      new Set(matches.map((m) => [m.pareja1, m.pareja2].sort((a, b) => a - b).join(':'))).size,
+      15
+    )
+    for (const id of ids)
+      assert.equal(matches.filter((m) => m.pareja1 === id || m.pareja2 === id).length, 2)
+    const turns = [...new Set(matches.map((m) => m.turno))]
+    assert.equal(turns.length, 8)
+    for (const t of turns) {
+      const turn = matches.filter((m) => m.turno === t)
+      assert.equal(new Set(turn.flatMap((m) => [m.pareja1, m.pareja2])).size, turn.length * 2)
+      assert.equal(new Set(turn.map((m) => m.cancha)).size, turn.length)
+    }
+    assert.equal(turns.filter((t) => matches.filter((m) => m.turno === t).length === 1).length, 1)
+  }
+})
+test('pádel: sorteo con el mínimo de parejas permitido', () => {
+  const matches = D.generateFixture([1, 2, 3, 4], defaults)
+  assert.equal(matches.length, 4)
+  assert.equal(new Set(matches.map((m) => m.turno)).size, 2)
+})
 test('pádel: validaciones de configuración y marcadores por tiempo', () => {
   const withoutCourts = D.eventInput({ ...defaults, cancha1: '', cancha2: undefined })
   assert.equal(withoutCourts.cancha1, 'Pádel 1')
   assert.equal(withoutCourts.cancha2, 'Pádel 2')
-  assert.throws(() => D.generateFixture([1, 2], defaults), /14 parejas/)
+  assert.throws(() => D.generateFixture([1, 2], defaults), /entre 4 y 60 parejas/)
+  assert.throws(
+    () => D.generateFixture(Array.from({ length: 61 }, (_, i) => i + 1), defaults),
+    /entre 4 y 60 parejas/
+  )
   assert.throws(() => D.eventInput({ ...defaults, fecha: '2026-02-30' }), /Fecha/)
   assert.throws(() => D.eventInput({ ...defaults, cancha2: 'Pádel 1' }), /distintas/)
-  assert.throws(() => D.eventInput({ ...defaults, cierre: 1250 }), /siete turnos/)
+  assert.throws(
+    () => D.generateFixture(Array.from({ length: 14 }, (_, i) => i + 1), { ...defaults, cierre: 1231 }),
+    /turnos/
+  )
   assert.deepEqual(D.resultInput({ s1a: 3, s1b: 3, motivo: 'tiempo' }), {
     s1a: 3,
     s1b: 3,
@@ -296,4 +330,123 @@ test('pádel: apertura/cierre/revelación, empate y permisos', async () => {
   )
   assert.equal(f.event.votacion, 'revelada')
   assert.equal(f.event.desempate_pareja, 2)
+})
+
+function store() {
+  const event = {
+    id: 1,
+    version: 0,
+    publicado: 0,
+    votacion: 'pendiente',
+    desempate_pareja: null,
+    desempate_motivo: null,
+    created_by: 1,
+    ...defaults,
+    inicio: 480,
+    cierre: 1439,
+  }
+  let pairs = [],
+    fixture = []
+  let nextPairId = 1,
+    nextFixtureId = 1
+  const query = async (sql, args = []) => {
+    if (
+      sql === 'SELECT * FROM padel_events WHERE id=?' ||
+      sql === 'SELECT * FROM padel_events WHERE id=? FOR UPDATE'
+    )
+      return [[{ ...event }]]
+    if (sql === 'UPDATE padel_events SET version=version+1 WHERE id=?') {
+      event.version++
+      return [{ affectedRows: 1 }]
+    }
+    if (sql === 'UPDATE padel_events SET publicado=1,version=version+1 WHERE id=?') {
+      event.publicado = 1
+      event.version++
+      return [{ affectedRows: 1 }]
+    }
+    if (sql === 'UPDATE padel_events SET votacion=?,version=version+1 WHERE id=?') {
+      event.votacion = args[0]
+      event.version++
+      return [{ affectedRows: 1 }]
+    }
+    if (sql === 'INSERT INTO padel_audit (event_id,user_id,accion,detalle) VALUES (?,?,?,?)')
+      return [{}]
+    if (sql === 'SELECT id FROM padel_fixture WHERE event_id=? LIMIT 1')
+      return [fixture.map(({ id }) => ({ id }))]
+    if (sql === 'SELECT id,jugador1,jugador2 FROM padel_pairs WHERE event_id=?')
+      return [pairs.map(({ id, jugador1, jugador2 }) => ({ id, jugador1, jugador2 }))]
+    if (
+      sql === 'INSERT INTO padel_pairs (numero,jugador1,jugador2,disfraz,event_id) VALUES (?,?,?,?,?)'
+    ) {
+      const [numero, jugador1, jugador2, disfraz] = args
+      if (pairs.some((p) => p.numero === numero)) throw { code: 'ER_DUP_ENTRY' }
+      const row = { id: nextPairId++, numero, jugador1, jugador2, disfraz, foto_url: null }
+      pairs.push(row)
+      return [{ insertId: row.id }]
+    }
+    if (sql === 'SELECT id FROM padel_pairs WHERE event_id=? ORDER BY numero')
+      return [[...pairs].sort((a, b) => a.numero - b.numero).map(({ id }) => ({ id }))]
+    if (sql === 'SELECT id FROM padel_pairs WHERE event_id=?') return [pairs.map(({ id }) => ({ id }))]
+    if (sql === 'SELECT id,foto_url FROM padel_pairs WHERE event_id=?')
+      return [pairs.map(({ id, foto_url }) => ({ id, foto_url }))]
+    if (sql === 'SELECT * FROM padel_fixture WHERE event_id=?') return [fixture.map((m) => ({ ...m }))]
+    if (sql === 'DELETE FROM padel_fixture WHERE event_id=?') {
+      fixture = []
+      return [{}]
+    }
+    if (
+      sql ===
+      'INSERT INTO padel_fixture (event_id,turno,cancha,minuto,pareja1,pareja2) VALUES (?,?,?,?,?,?)'
+    ) {
+      const [event_id, turno, cancha, minuto, pareja1, pareja2] = args
+      fixture.push({ id: nextFixtureId++, event_id, turno, cancha, minuto, pareja1, pareja2, version: 0 })
+      return [{ insertId: fixture.length }]
+    }
+    if (sql === 'SELECT id FROM padel_fixture WHERE event_id=?') return [fixture.map(({ id }) => ({ id }))]
+    throw Error(`Unexpected query: ${sql}`)
+  }
+  const db = {
+    query,
+    getConnection: async () => ({
+      query,
+      beginTransaction: async () => {},
+      commit: async () => {},
+      rollback: async () => {},
+      release: () => {},
+    }),
+  }
+  return {
+    service: createPadelService(db),
+    event,
+    pairs: () => pairs,
+    fixtureRows: () => fixture,
+  }
+}
+test('pádel: inscripción, sorteo y votación con más de 14 parejas', async () => {
+  const f = store()
+  for (let i = 1; i <= 15; i++)
+    await f.service.pair(
+      1,
+      null,
+      { version: f.event.version, numero: i, jugador1: `Uno ${i}`, jugador2: `Dos ${i}` },
+      admin
+    )
+  assert.equal(f.pairs().length, 15)
+  await assert.rejects(
+    f.service.voting(1, { version: f.event.version, estado: 'abierta' }, admin),
+    /sorteo/
+  )
+  await f.service.draw(1, { version: f.event.version }, admin)
+  assert.equal(f.fixtureRows().length, 15)
+  for (const id of f.pairs().map((p) => p.id))
+    assert.equal(f.fixtureRows().filter((m) => m.pareja1 === id || m.pareja2 === id).length, 2)
+  await f.service.publish(1, { version: f.event.version }, admin)
+  assert.equal(f.event.publicado, 1)
+  await assert.rejects(
+    f.service.voting(1, { version: f.event.version, estado: 'abierta' }, admin),
+    /fotos/
+  )
+  for (const p of f.pairs()) p.foto_url = `/uploads/${p.id}.webp`
+  await f.service.voting(1, { version: f.event.version, estado: 'abierta' }, admin)
+  assert.equal(f.event.votacion, 'abierta')
 })

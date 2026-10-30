@@ -97,7 +97,7 @@ export default function Padel() {
       {createOpen && <ActionDialog title='Formato del torneo de pádel' onClose={() => setCreateOpen(false)}>
         <div className='grid gap-3 sm:grid-cols-2'>
           <Link className='card-hover p-5 block space-y-2' to='/admin/torneos?deporte=padel&nuevo=1'><strong className='block'>Torneo convencional</strong><span className='text-sm'>Grupos, eliminatorias y resultados deportivos. Configura el sistema de competencia.</span></Link>
-          <Link className='card-hover p-5 block space-y-2' to='/padel/flash?nuevo=1'><strong className='block'>Torneo Flash</strong><span className='text-sm'>14 parejas, encuentros de 20 minutos y premio al mejor disfraz por votación.</span></Link>
+          <Link className='card-hover p-5 block space-y-2' to='/padel/flash?nuevo=1'><strong className='block'>Torneo Flash</strong><span className='text-sm'>Parejas inscritas, encuentros de 20 minutos y premio al mejor disfraz por votación.</span></Link>
         </div>
       </ActionDialog>}
       <Tabs tabs={VIEW_TABS} activeTab={view} onChange={handleTabChange} />

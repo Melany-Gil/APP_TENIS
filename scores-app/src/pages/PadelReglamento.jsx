@@ -4,7 +4,7 @@ import { Clock, Shuffle, Trophy, Users } from 'lucide-react'
 const sections = [
   {
     title: 'Parejas y sorteo', icon: Shuffle,
-    text: 'Participan 14 parejas. Se sortean los enfrentamientos, no los integrantes. Con dos canchas, cada pareja juega dos partidos contra rivales diferentes: 14 encuentros en siete turnos. Una pareja no puede jugar en ambas canchas a la vez.',
+    text: 'Se sortean los enfrentamientos, no los integrantes. Con dos canchas, cada pareja juega dos partidos contra rivales diferentes, repartidos en turnos de 20 minutos. Una pareja no puede jugar en ambas canchas a la vez.',
   },
   {
     title: '20 minutos, hasta dos sets', icon: Clock,
@@ -35,7 +35,7 @@ export default function PadelReglamento() {
             <h1 className='text-2xl sm:text-3xl font-bold'>Reglamento interno · Torneo Flash</h1>
             <p className='text-sm text-[var(--text-secondary)]'>Formato de integración y concurso de disfraces.</p>
             <div className='flex flex-wrap gap-2 text-xs'>
-              {['14 parejas', '2 canchas', '20 minutos', 'Mejor disfraz'].map(label => <span key={label} className='badge-brand'>{label}</span>)}
+              {['Parejas inscritas', '2 canchas', '20 minutos', 'Mejor disfraz'].map(label => <span key={label} className='badge-brand'>{label}</span>)}
             </div>
           </header>
           <div className='reglamento-cards-2'>

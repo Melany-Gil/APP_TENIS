@@ -285,7 +285,7 @@ export default function PadelFlash() {
         <div className='pf-facts'>
           <span>
             <Users size={15} />
-            14 parejas
+            Pádel en parejas
           </span>
           <span>
             <Clock size={15} />
@@ -375,14 +375,14 @@ export default function PadelFlash() {
                 <section className='pf-panel pf-draw'>
                   <div>
                     <span className='pf-eyebrow'>SORTEO DE CRUCES</span>
-                    <h2>{pairs.length} de 14 parejas</h2>
+                    <h2>{pairs.length} parejas inscritas</h2>
                     <p>Dos encuentros por pareja · Sin repetir rival</p>
                   </div>
                   <div className='pf-toolbar'>
                     {!e.publicado && (
                       <button
                         className='pf-primary'
-                        disabled={busy || pairs.length !== 14}
+                        disabled={busy || pairs.length < 4}
                         onClick={async () => {
                           if (
                             fixture.length &&
@@ -562,14 +562,14 @@ export default function PadelFlash() {
               <div className='pf-section-head'>
                 <div>
                   <h2>Parejas inscritas</h2>
-                  <p>{pairs.length} / 14</p>
+                  <p>{pairs.length} pareja{pairs.length === 1 ? '' : 's'}</p>
                 </div>
-                {admin && e.votacion === 'pendiente' && pairs.length < 14 && (
+                {admin && e.votacion === 'pendiente' && !fixture.length && (
                   <button
                     className='pf-primary'
                     onClick={() =>
                       open('pareja', {
-                        numero: Array.from({ length: 14 }, (_, i) => i + 1).find(
+                        numero: Array.from({ length: pairs.length + 1 }, (_, i) => i + 1).find(
                           (n) => !pairs.some((p) => p.numero === n)
                         ),
                         jugador1: '',
@@ -941,7 +941,7 @@ export default function PadelFlash() {
                   ))}
                 </div>
                 <p className='pf-muted'>
-                  14 parejas · 2 partidos por pareja · 20 min de juego + 5 min de rotación
+                  2 partidos por pareja · 20 min de juego + 5 min de rotación
                 </p>
               </>
             )}
@@ -952,7 +952,10 @@ export default function PadelFlash() {
                     value={form.numero}
                     onChange={(x) => setForm({ ...form, numero: Number(x.target.value) })}
                   >
-                    {Array.from({ length: 14 }, (_, i) => i + 1)
+                    {Array.from(
+                      { length: Math.max(pairs.length + 1, form.numero || 0) },
+                      (_, i) => i + 1
+                    )
                       .filter(
                         (n) =>
                           n === form.numero ||
