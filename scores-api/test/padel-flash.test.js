@@ -433,7 +433,8 @@ function store() {
     cierre: 1439,
   }
   let pairs = [],
-    fixture = []
+    fixture = [],
+    deleted = false
   let nextPairId = 1,
     nextFixtureId = 1
   const query = async (sql, args = []) => {
@@ -495,6 +496,18 @@ function store() {
     if (sql === 'SELECT id FROM padel_pairs WHERE event_id=?') return [pairs.map(({ id }) => ({ id }))]
     if (sql === 'SELECT id,foto_url FROM padel_pairs WHERE event_id=?')
       return [pairs.map(({ id, foto_url }) => ({ id, foto_url }))]
+    if (sql === 'SELECT foto_url FROM padel_pairs WHERE event_id=?')
+      return [pairs.map(({ foto_url }) => ({ foto_url }))]
+    if (sql === 'DELETE FROM padel_votes WHERE event_id=?') return [{}]
+    if (sql === 'DELETE FROM padel_audit WHERE event_id=?') return [{}]
+    if (sql === 'DELETE FROM padel_pairs WHERE event_id=?') {
+      pairs = []
+      return [{}]
+    }
+    if (sql === 'DELETE FROM padel_events WHERE id=?') {
+      deleted = true
+      return [{}]
+    }
     if (sql === 'SELECT * FROM padel_fixture WHERE event_id=?') return [fixture.map((m) => ({ ...m }))]
     if (sql === 'DELETE FROM padel_fixture WHERE event_id=?') {
       fixture = []
@@ -527,6 +540,7 @@ function store() {
     event,
     pairs: () => pairs,
     fixtureRows: () => fixture,
+    deleted: () => deleted,
   }
 }
 test('pádel: inscripción, sorteo y votación con más de 14 parejas', async () => {
@@ -591,4 +605,18 @@ test('pádel: sorteo por grupos desde el servicio asigna grupo a cada pareja', a
   }
   await f.service.publish(1, { version: f.event.version }, admin)
   assert.equal(f.event.publicado, 1)
+})
+test('pádel: eliminar evento borra parejas, cruces y votos en cascada', async () => {
+  const f = store()
+  await f.service.pair(
+    1,
+    null,
+    { version: f.event.version, numero: 1, jugador1: 'Uno', jugador2: 'Dos' },
+    admin
+  )
+  await assert.rejects(f.service.remove(1, { version: f.event.version }, judge), (e) => e.status === 403)
+  await assert.rejects(f.service.remove(1, { version: 99 }, admin), (e) => e.status === 409)
+  await f.service.remove(1, { version: f.event.version }, admin)
+  assert.equal(f.pairs().length, 0)
+  assert.equal(f.deleted(), true)
 })

@@ -1039,6 +1039,40 @@ export default function PadelFlash() {
                   </details>
                 </section>
               )}
+              <section className='pf-panel'>
+                <span className='pf-eyebrow'>ZONA DE PELIGRO</span>
+                <h2>Eliminar evento</h2>
+                <p className='pf-muted'>
+                  Borra el evento junto con sus parejas, fotos, sorteo y votos. No se puede
+                  deshacer.
+                </p>
+                <button
+                  className='pf-secondary pf-danger'
+                  disabled={busy}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Eliminar evento',
+                      message: `Se eliminará "${e.nombre}" junto con sus parejas, fotos, sorteo y votos. Esta acción no se puede deshacer.`,
+                      danger: true,
+                      requireText: e.nombre,
+                    })
+                    if (!ok) return
+                    setBusy(true)
+                    setError('')
+                    try {
+                      await api.remove(eventId, { version })
+                      await loadList()
+                      select({ evento: null })
+                    } catch (err) {
+                      setError(err.message || 'No se pudo eliminar el evento.')
+                    } finally {
+                      setBusy(false)
+                    }
+                  }}
+                >
+                  Eliminar evento
+                </button>
+              </section>
             </div>
           )}
         </>

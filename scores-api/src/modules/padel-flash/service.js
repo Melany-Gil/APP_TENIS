@@ -95,6 +95,20 @@ exports.createPadelService = (db) => {
         return { ok: true }
       })
     },
+    async remove(eventId, b, actor) {
+      admin(actor)
+      return tx(async (c) => {
+        const e = await event(c, eventId, true)
+        revision(e, b)
+        const [pairs] = await c.query('SELECT foto_url FROM padel_pairs WHERE event_id=?', [e.id])
+        await c.query('DELETE FROM padel_votes WHERE event_id=?', [e.id])
+        await c.query('DELETE FROM padel_fixture WHERE event_id=?', [e.id])
+        await c.query('DELETE FROM padel_audit WHERE event_id=?', [e.id])
+        await c.query('DELETE FROM padel_pairs WHERE event_id=?', [e.id])
+        await c.query('DELETE FROM padel_events WHERE id=?', [e.id])
+        return { fotos: pairs.map((p) => p.foto_url).filter(Boolean) }
+      })
+    },
     async detail(eventId, actor, browserId) {
       return tx(async (c) => {
         const e = await event(c, eventId)

@@ -5,6 +5,7 @@ export const padelFlashService = {
   detail: (id) => api.get(`${base}/${id}`),
   create: (data) => api.post(base, data),
   update: (id, data) => api.put(`${base}/${id}`, data),
+  remove: (id, data) => api.delete(`${base}/${id}`, { data, suppressDeleteAlert: true }),
   pair: (id, pair, data) =>
     pair ? api.put(`${base}/${id}/pairs/${pair}`, data) : api.post(`${base}/${id}/pairs`, data),
   removePair: (id, pair, data) =>

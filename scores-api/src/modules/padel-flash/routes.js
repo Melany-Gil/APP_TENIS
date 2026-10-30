@@ -54,6 +54,16 @@ router.put(
   requireAdmin,
   handle((req) => service.update(req.params.id, req.body, req.user))
 )
+router.delete(
+  '/:id',
+  requireAuth,
+  requireAdmin,
+  handle(async (req) => {
+    const { fotos } = await service.remove(req.params.id, req.body, req.user)
+    for (const url of fotos) await media.delete(url).catch(() => {})
+    return { ok: true }
+  })
+)
 router.get(
   '/:id',
   optionalAuth,
