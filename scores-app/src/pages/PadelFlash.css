@@ -105,6 +105,19 @@
   padding: 10px;
   flex-shrink: 0;
 }
+.pf-spin {
+  animation: pf-spin 0.8s linear infinite;
+}
+@keyframes pf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-spin {
+    animation: none;
+  }
+}
 .pf-link {
   color: var(--color-brand);
   padding-inline: 4px;
@@ -695,52 +708,37 @@
   }
 }
 
-.pf-sorteo-deck {
-  position: relative;
-  width: 150px;
-  height: 92px;
+.pf-padel-spinner {
+  color: var(--color-brand);
+  animation: pf-paddle-wobble 1.3s ease-in-out infinite;
+  transform-origin: 60px 128px;
 }
-.pf-sorteo-card {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 56px;
-  height: 78px;
-  border-radius: 10px;
-  background: linear-gradient(155deg, var(--color-brand) 0%, var(--bg-card) 145%);
-  border: 1px solid var(--border-color);
-  box-shadow: 0 10px 22px -8px rgba(0, 0, 0, 0.45);
-  animation: pf-card-pop 1.2s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+.pf-padel-ball {
+  fill: #ffd23f;
+  animation: pf-ball-hit 1.3s ease-in-out infinite;
+  transform-origin: 60px 52px;
 }
-.pf-sorteo-card:nth-child(1) {
-  --r: -18deg;
-  animation-delay: 0s;
-}
-.pf-sorteo-card:nth-child(2) {
-  --r: -9deg;
-  animation-delay: 0.12s;
-}
-.pf-sorteo-card:nth-child(3) {
-  --r: 0deg;
-  animation-delay: 0.24s;
-}
-.pf-sorteo-card:nth-child(4) {
-  --r: 9deg;
-  animation-delay: 0.36s;
-}
-.pf-sorteo-card:nth-child(5) {
-  --r: 18deg;
-  animation-delay: 0.48s;
-}
-@keyframes pf-card-pop {
+@keyframes pf-paddle-wobble {
   0%,
   100% {
-    transform: rotate(var(--r)) translateY(0) scale(1);
-    filter: brightness(1);
+    transform: rotate(-10deg);
   }
   50% {
-    transform: rotate(var(--r)) translateY(-16px) scale(1.07);
-    filter: brightness(1.18);
+    transform: rotate(10deg);
+  }
+}
+@keyframes pf-ball-hit {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  45% {
+    transform: translate(26px, 36px) scale(0.85);
+  }
+  55% {
+    transform: translate(26px, 36px) scale(0.85);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
   }
 }
 .pf-sorteo-label {
@@ -752,28 +750,100 @@
   font-size: 15px;
   letter-spacing: -0.01em;
 }
-.pf-sorteo-icon {
-  animation: pf-sorteo-spin 1s linear infinite;
-}
-@keyframes pf-sorteo-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .pf-sorteo-card,
-  .pf-sorteo-icon {
+  .pf-padel-spinner,
+  .pf-padel-ball {
     animation: none;
   }
 }
 
 .pf-sorteo-reveal {
   width: 100%;
-  max-width: 760px;
+  max-width: 560px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 22px;
+  gap: 18px;
+}
+.pf-sorteo-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pf-sorteo-group-head h3 {
+  color: #fff;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+  animation: pf-sorteo-pop 0.35s ease-out both;
+}
+.pf-sorteo-ball {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffd23f;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-brand) 55%, transparent);
+  flex-shrink: 0;
+}
+.pf-sorteo-rounds {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+.pf-sorteo-round {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pf-sorteo-round-tag {
+  color: color-mix(in srgb, #fff 55%, transparent);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.pf-sorteo-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0;
+  animation: pf-sorteo-pop 0.4s ease-out forwards;
+}
+.pf-sorteo-item i {
+  flex-shrink: 0;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-brand);
+}
+.pf-sorteo-dots {
+  display: flex;
+  gap: 8px;
+}
+.pf-sorteo-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+}
+.pf-sorteo-dots .pf-sorteo-dot-on {
+  background: var(--color-brand);
+  width: 20px;
+  border-radius: 4px;
+  transition: all 0.25s ease;
 }
 .pf-sorteo-groups {
   width: 100%;
@@ -798,29 +868,23 @@
   text-transform: uppercase;
   margin: 0 0 4px;
 }
-.pf-sorteo-item {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
+.pf-sorteo-group small {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-top: 4px;
+}
+.pf-sorteo-chip {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--color-brand) 12%, var(--bg-input));
   border-radius: 10px;
   padding: 9px 12px;
   font-size: 14px;
   font-weight: 600;
-  opacity: 0;
-  animation: pf-sorteo-pop 0.4s ease-out forwards;
-}
-.pf-sorteo-group .pf-sorteo-item {
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--color-brand) 12%, var(--bg-input));
-}
-.pf-sorteo-summary {
-  font-size: 16px;
-  text-align: center;
-  padding: 14px 20px;
 }
 @keyframes pf-sorteo-pop {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.92);
+    transform: translateY(10px) scale(0.96);
   }
   to {
     opacity: 1;
@@ -828,7 +892,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pf-sorteo-item {
+  .pf-sorteo-item,
+  .pf-sorteo-group-head h3 {
     animation: none;
     opacity: 1;
   }

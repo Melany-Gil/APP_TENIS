@@ -102,6 +102,28 @@ function Timer({ match, now, duracion }) {
     </span>
   )
 }
+function PadelSpinner() {
+  return (
+    <svg
+      className='pf-padel-spinner'
+      viewBox='0 0 120 150'
+      width='84'
+      height='105'
+      aria-hidden='true'
+    >
+      <g className='pf-padel-paddle'>
+        <ellipse cx='60' cy='52' rx='38' ry='44' fill='none' stroke='currentColor' strokeWidth='7' />
+        <rect x='52' y='94' width='16' height='34' rx='8' fill='currentColor' />
+        {[0, 1, 2].map((row) =>
+          [0, 1, 2].map((col) => (
+            <circle key={`${row}-${col}`} cx={43 + col * 17} cy={34 + row * 17} r='3.4' fill='currentColor' />
+          ))
+        )}
+      </g>
+      <circle className='pf-padel-ball' cx='60' cy='18' r='8' />
+    </svg>
+  )
+}
 
 export default function PadelFlash() {
   const { user } = useAuthStore(),
@@ -123,6 +145,7 @@ export default function PadelFlash() {
   const [listReady, setListReady] = useState(false)
   const [turnFilter, setTurnFilter] = useState('todos')
   const [sorteando, setSorteando] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
   const generation = useRef(0),
     busyRef = useRef(false),
     offset = useRef(0)
@@ -222,6 +245,29 @@ export default function PadelFlash() {
     fixture = data?.fixture || []
   const pairMap = new Map(pairs.map((p) => [p.id, p])),
     version = e?.version
+  const revealGroups = [...new Set(pairs.map((p) => p.grupo).filter(Boolean))]
+    .sort((a, b) => a - b)
+    .map((g) => {
+      const ids = pairs.filter((p) => p.grupo === g).map((p) => p.id)
+      const matches = fixture
+        .filter((m) => ids.includes(m.pareja1) && ids.includes(m.pareja2))
+        .sort((a, b) => a.turno - b.turno)
+      const turnos = [...new Set(matches.map((m) => m.turno))]
+      return {
+        group: g,
+        rounds: turnos.map((t, i) => ({ round: i + 1, matches: matches.filter((m) => m.turno === t) })),
+      }
+    })
+  useEffect(() => {
+    if (typeof sorteando !== 'number') return
+    const group = revealGroups[sorteando]
+    const matchCount = group ? group.rounds.reduce((n, r) => n + r.matches.length, 0) : 0
+    const t = setTimeout(
+      () => setSorteando(sorteando + 1 < revealGroups.length ? sorteando + 1 : 'summary'),
+      1100 + matchCount * 220
+    )
+    return () => clearTimeout(t)
+  }, [sorteando]) // revealGroups is derived from state already covered by sorteando's own transitions
   const tabs = [
     ['programa', 'Partidos'],
     ['galeria', 'Disfraces'],
@@ -407,12 +453,13 @@ export default function PadelFlash() {
                             }))
                           )
                             return
+                          const formatoActual = e.formato
                           setSorteando('spinning')
                           await Promise.all([
                             run(() => api.draw(eventId, { version }), 'Cruces sorteados'),
-                            new Promise((r) => setTimeout(r, 1800)),
+                            new Promise((r) => setTimeout(r, 2000)),
                           ])
-                          setSorteando('reveal')
+                          setSorteando(formatoActual === 'grupos' ? 0 : 'summary')
                         }}
                       >
                         <Shuffle size={17} />
@@ -473,11 +520,20 @@ export default function PadelFlash() {
                       </select>
                       <button
                         className='pf-icon'
-                        disabled={busy}
+                        disabled={busy || refreshing}
                         aria-label='Actualizar programación'
-                        onClick={() => run(refresh)}
+                        onClick={async () => {
+                          setRefreshing(true)
+                          try {
+                            await refresh()
+                          } catch (err) {
+                            setError(err.message || 'No se pudo actualizar la programación.')
+                          } finally {
+                            setRefreshing(false)
+                          }
+                        }}
                       >
-                        <RefreshCw size={17} />
+                        <RefreshCw size={17} className={refreshing ? 'pf-spin' : ''} />
                       </button>
                     </div>
                   </div>
@@ -1252,56 +1308,78 @@ export default function PadelFlash() {
           </form>
         </ActionDialog>
       )}
-      {sorteando &&
+      {sorteando !== '' &&
         typeof document !== 'undefined' &&
         createPortal(
           <div
-            className='fixed inset-0 z-[200] flex flex-col items-center justify-center gap-7 bg-black/55 backdrop-blur-sm px-4 py-6 overflow-y-auto'
+            className='fixed inset-0 z-[200] flex flex-col items-center justify-center gap-6 bg-black/70 backdrop-blur-sm px-4 py-6 overflow-y-auto'
             role='status'
             aria-live='polite'
           >
             {sorteando === 'spinning' && (
               <>
-                <div className='pf-sorteo-deck'>
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <span key={i} className='pf-sorteo-card' />
-                  ))}
-                </div>
-                <p className='pf-sorteo-label'>
-                  <Shuffle size={20} className='pf-sorteo-icon' />
-                  Sorteando cruces…
-                </p>
+                <PadelSpinner />
+                <p className='pf-sorteo-label'>Sorteando cruces…</p>
               </>
             )}
-            {sorteando === 'reveal' && (
+            {typeof sorteando === 'number' && revealGroups[sorteando] && (
+              <div className='pf-sorteo-reveal' key={sorteando}>
+                <div className='pf-sorteo-group-head'>
+                  <span className='pf-sorteo-ball' aria-hidden='true' />
+                  <h3>Grupo {revealGroups[sorteando].group}</h3>
+                </div>
+                <div className='pf-sorteo-rounds'>
+                  {revealGroups[sorteando].rounds.map((r) => (
+                    <div className='pf-sorteo-round' key={r.round}>
+                      <span className='pf-sorteo-round-tag'>Ronda {r.round}</span>
+                      {r.matches.map((m, i) => (
+                        <span
+                          className='pf-sorteo-item'
+                          key={m.id ?? `${r.round}-${i}`}
+                          style={{ animationDelay: `${i * 0.12}s` }}
+                        >
+                          {label(pairMap.get(m.pareja1))}
+                          <i>vs</i>
+                          {label(pairMap.get(m.pareja2))}
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <div className='pf-sorteo-dots'>
+                  {revealGroups.map((g, i) => (
+                    <span key={g.group} className={i === sorteando ? 'pf-sorteo-dot-on' : ''} />
+                  ))}
+                </div>
+                <button className='pf-link' onClick={() => setSorteando('summary')}>
+                  Saltar al resumen
+                </button>
+              </div>
+            )}
+            {sorteando === 'summary' && (
               <div className='pf-sorteo-reveal'>
                 <p className='pf-sorteo-label'>
                   <Trophy size={20} />
-                  {e.formato === 'grupos' ? 'Grupos del sorteo' : 'Cruces sorteados'}
+                  {revealGroups.length ? 'Grupos listos' : 'Cruces sorteados'}
                 </p>
-                {e.formato === 'grupos' ? (
+                {revealGroups.length ? (
                   <div className='pf-sorteo-groups'>
-                    {[...new Set(pairs.map((p) => p.grupo).filter(Boolean))]
-                      .sort((a, b) => a - b)
-                      .map((g) => (
-                        <div className='pf-sorteo-group' key={g}>
-                          <h4>Grupo {g}</h4>
-                          {pairs
-                            .filter((p) => p.grupo === g)
-                            .map((p, i) => (
-                              <span
-                                key={p.id}
-                                className='pf-sorteo-item'
-                                style={{ animationDelay: `${i * 0.15}s` }}
-                              >
-                                {label(p)}
-                              </span>
-                            ))}
-                        </div>
-                      ))}
+                    {revealGroups.map(({ group, rounds }) => (
+                      <div className='pf-sorteo-group' key={group}>
+                        <h4>Grupo {group}</h4>
+                        {pairs
+                          .filter((p) => p.grupo === group)
+                          .map((p) => (
+                            <span className='pf-sorteo-chip' key={p.id}>
+                              {label(p)}
+                            </span>
+                          ))}
+                        <small>{rounds.reduce((n, r) => n + r.matches.length, 0)} partidos</small>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <p className='pf-sorteo-item pf-sorteo-summary'>
+                  <p className='pf-sorteo-chip'>
                     {fixture.length} partidos listos · dos encuentros por pareja
                   </p>
                 )}
