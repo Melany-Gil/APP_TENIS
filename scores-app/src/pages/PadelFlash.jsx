@@ -28,6 +28,22 @@ const minutes = (s) => {
   return h * 60 + m
 }
 const label = (p) => (p ? `${p.jugador1} / ${p.jugador2}` : 'Pareja pendiente')
+const shuffleArray = (values) => {
+  const a = [...values]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+const wheelGradient = (n) => {
+  const seg = 360 / n
+  const stops = Array.from({ length: n }, (_, i) => {
+    const color = i % 2 === 0 ? 'var(--color-brand)' : '#0f3a31'
+    return `${color} ${i * seg}deg ${(i + 1) * seg}deg`
+  })
+  return `conic-gradient(${stops.join(',')})`
+}
 const stateLabel = {
   pendiente: 'Próximamente',
   abierta: 'Votación abierta',
@@ -124,6 +140,82 @@ function PadelSpinner() {
     </svg>
   )
 }
+function SkeletonHand({ side }) {
+  return (
+    <svg
+      className={`pf-skel-hand pf-skel-hand-${side}`}
+      viewBox='0 0 70 90'
+      aria-hidden='true'
+    >
+      <g fill='#f4ede1' stroke='#b9ab8f' strokeWidth='1.5' strokeLinejoin='round'>
+        <path d='M17 58 L17 42 Q17 31 28 31 L42 31 Q53 31 53 42 L53 68 Q53 86 35 86 Q17 86 17 68 Z' />
+        <rect x='13' y='13' width='9' height='29' rx='4.5' />
+        <rect x='25' y='4' width='9' height='33' rx='4.5' />
+        <rect x='37' y='4' width='9' height='33' rx='4.5' />
+        <rect x='49' y='11' width='9' height='30' rx='4.5' />
+        <rect x='2' y='46' width='23' height='9' rx='4.5' transform='rotate(-32 13.5 50.5)' />
+      </g>
+      <g stroke='#b9ab8f' strokeWidth='1'>
+        <line x1='17.5' y1='23' x2='17.5' y2='29' />
+        <line x1='29.5' y1='15' x2='29.5' y2='21' />
+        <line x1='41.5' y1='15' x2='41.5' y2='21' />
+        <line x1='53.5' y1='21' x2='53.5' y2='27' />
+      </g>
+    </svg>
+  )
+}
+function RouletteWheel({ pool, targetId, holdMs, onNext }) {
+  const n = pool.length
+  const segAngle = 360 / n
+  const targetIdx = pool.findIndex((p) => p.id === targetId)
+  const [angle, setAngle] = useState(0)
+  const [landed, setLanded] = useState(n === 1)
+  useEffect(() => {
+    if (n === 1) return
+    const center = targetIdx * segAngle + segAngle / 2
+    const spins = 4 + Math.floor(Math.random() * 2)
+    const raf = requestAnimationFrame(() => setAngle(spins * 360 + (360 - center)))
+    const t = setTimeout(() => setLanded(true), 2000)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(t)
+    }
+  }, [targetId]) // a new targetId is a fresh spin; pool/n are fixed for that spin
+  useEffect(() => {
+    if (!landed) return
+    const t = setTimeout(onNext, holdMs)
+    return () => clearTimeout(t)
+  }, [landed]) // onNext/holdMs stay stable for the life of one landed reveal
+  const picked = pool[targetIdx]
+  return (
+    <div className='pf-wheel-wrap'>
+      <SkeletonHand side='left' />
+      <SkeletonHand side='right' />
+      <span className='pf-wheel-pointer' aria-hidden='true' />
+      <div className='pf-wheel' style={{ background: wheelGradient(n), transform: `rotate(${angle}deg)` }}>
+        {pool.map((p, i) => (
+          <span
+            key={p.id}
+            className='pf-wheel-label'
+            style={{ transform: `rotate(${i * segAngle + segAngle / 2}deg)` }}
+          >
+            <b>{p.numero}</b>
+          </span>
+        ))}
+        <span className='pf-wheel-hub' />
+      </div>
+      <p className={`pf-wheel-result ${landed ? 'pf-wheel-result-in' : ''}`}>
+        {landed ? (
+          <>
+            <strong>#{picked.numero}</strong> {label(picked)}
+          </>
+        ) : (
+          ' '
+        )}
+      </p>
+    </div>
+  )
+}
 
 export default function PadelFlash() {
   const { user } = useAuthStore(),
@@ -146,9 +238,11 @@ export default function PadelFlash() {
   const [turnFilter, setTurnFilter] = useState('todos')
   const [sorteando, setSorteando] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [pick, setPick] = useState(0)
   const generation = useRef(0),
     busyRef = useRef(false),
-    offset = useRef(0)
+    offset = useRef(0),
+    drawOrder = useRef([])
   const eventId = params.get('evento') || String(events[0]?.id || '')
   const tab = params.get('vista') || 'programa',
     screen = params.get('pantalla') === '1'
@@ -259,15 +353,26 @@ export default function PadelFlash() {
       }
     })
   useEffect(() => {
-    if (typeof sorteando !== 'number') return
-    const group = revealGroups[sorteando]
-    const matchCount = group ? group.rounds.reduce((n, r) => n + r.matches.length, 0) : 0
-    const t = setTimeout(
-      () => setSorteando(sorteando + 1 < revealGroups.length ? sorteando + 1 : 'summary'),
-      1100 + matchCount * 220
+    if (sorteando !== 'wheel-pending') return
+    const order = revealGroups.flatMap((g) =>
+      shuffleArray(pairs.filter((p) => p.grupo === g.group).map((p) => p.id))
     )
-    return () => clearTimeout(t)
-  }, [sorteando]) // revealGroups is derived from state already covered by sorteando's own transitions
+    drawOrder.current = order
+    setPick(0)
+    setSorteando(order.length ? 'wheel' : 'summary')
+  }, [sorteando, pairs, revealGroups])
+  let pickGroup = null
+  if (sorteando === 'wheel') {
+    let from = 0
+    for (const g of revealGroups) {
+      const size = pairs.filter((p) => p.grupo === g.group).length
+      if (pick < from + size) {
+        pickGroup = { group: g.group, position: pick - from + 1, size, groupStart: from }
+        break
+      }
+      from += size
+    }
+  }
   const tabs = [
     ['programa', 'Partidos'],
     ['galeria', 'Disfraces'],
@@ -459,7 +564,7 @@ export default function PadelFlash() {
                             run(() => api.draw(eventId, { version }), 'Cruces sorteados'),
                             new Promise((r) => setTimeout(r, 2000)),
                           ])
-                          setSorteando(formatoActual === 'grupos' ? 0 : 'summary')
+                          setSorteando(formatoActual === 'grupos' ? 'wheel-pending' : 'summary')
                         }}
                       >
                         <Shuffle size={17} />
@@ -1316,39 +1421,44 @@ export default function PadelFlash() {
             role='status'
             aria-live='polite'
           >
-            {sorteando === 'spinning' && (
+            {(sorteando === 'spinning' || sorteando === 'wheel-pending') && (
               <>
                 <PadelSpinner />
                 <p className='pf-sorteo-label'>Sorteando cruces…</p>
               </>
             )}
-            {typeof sorteando === 'number' && revealGroups[sorteando] && (
-              <div className='pf-sorteo-reveal' key={sorteando}>
+            {sorteando === 'wheel' && pickGroup && (
+              <div className='pf-sorteo-reveal'>
                 <div className='pf-sorteo-group-head'>
                   <span className='pf-sorteo-ball' aria-hidden='true' />
-                  <h3>Grupo {revealGroups[sorteando].group}</h3>
+                  <h3>Grupo {pickGroup.group}</h3>
+                  <span className='pf-sorteo-progress'>
+                    {pickGroup.position} de {pickGroup.size}
+                  </span>
                 </div>
-                <div className='pf-sorteo-rounds'>
-                  {revealGroups[sorteando].rounds.map((r) => (
-                    <div className='pf-sorteo-round' key={r.round}>
-                      <span className='pf-sorteo-round-tag'>Ronda {r.round}</span>
-                      {r.matches.map((m, i) => (
-                        <span
-                          className='pf-sorteo-item'
-                          key={m.id ?? `${r.round}-${i}`}
-                          style={{ animationDelay: `${i * 0.12}s` }}
-                        >
-                          {label(pairMap.get(m.pareja1))}
-                          <i>vs</i>
-                          {label(pairMap.get(m.pareja2))}
-                        </span>
-                      ))}
-                    </div>
-                  ))}
-                </div>
+                <RouletteWheel
+                  key={pick}
+                  pool={drawOrder.current.slice(pick).map((id) => pairMap.get(id))}
+                  targetId={drawOrder.current[pick]}
+                  holdMs={pickGroup.position === pickGroup.size ? 1400 : 650}
+                  onNext={() => {
+                    const next = pick + 1
+                    if (next >= drawOrder.current.length) setSorteando('summary')
+                    else setPick(next)
+                  }}
+                />
+                {pickGroup.position > 1 && (
+                  <div className='pf-sorteo-confirmed'>
+                    {drawOrder.current.slice(pickGroup.groupStart, pick).map((id) => (
+                      <span className='pf-sorteo-chip' key={id}>
+                        {label(pairMap.get(id))}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className='pf-sorteo-dots'>
-                  {revealGroups.map((g, i) => (
-                    <span key={g.group} className={i === sorteando ? 'pf-sorteo-dot-on' : ''} />
+                  {Array.from({ length: pickGroup.size }).map((_, i) => (
+                    <span key={i} className={i < pickGroup.position ? 'pf-sorteo-dot-on' : ''} />
                   ))}
                 </div>
                 <button className='pf-link' onClick={() => setSorteando('summary')}>
