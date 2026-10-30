@@ -31,6 +31,7 @@ const NAV = [
   { to: '/admin/visitas', icon: History, label: 'Visitas' },
   { to: '/admin/equipos', icon: Swords, label: 'Parejas' },
   { to: '/admin/torneos', icon: Trophy, label: 'Torneos' },
+  { to: '/padel', icon: Trophy, label: 'Flash de Pádel' },
   { to: '/admin/partidos', icon: CalendarDays, label: 'Partidos' },
   { to: '/admin/anuncios', icon: Megaphone, label: 'Anuncios' },
   { to: '/admin/tickets', icon: Megaphone, label: 'Tickets' },

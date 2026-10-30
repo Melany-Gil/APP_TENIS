@@ -78,7 +78,7 @@ export default function GestionTorneos() {
   const [editing, setEditing] = useState(null)
   const [search, setSearch] = useState('')
   const [statusTab, setStatusTab] = useState('todos')
-  const [deporteFilter, setDeporteFilter] = useState('todos')
+  const [deporteFilter, setDeporteFilter] = useState(() => searchParams.get('deporte') === 'padel' ? 'padel' : 'todos')
   const [archiveFilter, setArchiveFilter] = useState('activos')
   const [archiveBusy, setArchiveBusy] = useState(null)
   const [loadError, setLoadError] = useState('')
@@ -173,9 +173,9 @@ export default function GestionTorneos() {
   const openCreate = () => {
     reset({
       nombre: '',
-      deporte: 'tenis',
+      deporte: deporteFilter === 'padel' ? 'padel' : 'tenis',
       categoria_id: null,
-      modalidad: 'individual',
+      modalidad: deporteFilter === 'padel' ? 'dobles' : 'individual',
       sistema: 'por_definir',
       estado: 'proximo',
       fecha_inicio: '',
@@ -184,6 +184,15 @@ export default function GestionTorneos() {
     setEditing(null)
     setShowForm(true)
   }
+
+  useEffect(() => {
+    if (searchParams.get('nuevo') !== '1') return
+    const sport = searchParams.get('deporte') === 'padel' ? 'padel' : 'tenis'
+    reset({ nombre:'', deporte:sport, categoria_id:null, modalidad:sport === 'padel' ? 'dobles' : 'individual', sistema:'por_definir', estado:'proximo', fecha_inicio:'', fecha_fin:'' })
+    setEditing(null)
+    setShowForm(true)
+    setSearchParams(current => { const next = new URLSearchParams(current); next.delete('nuevo'); return next }, { replace:true })
+  }, [searchParams, setSearchParams, reset])
 
   const openEdit = (torneo) => {
     setEditing(torneo)

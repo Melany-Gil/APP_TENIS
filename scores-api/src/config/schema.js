@@ -612,5 +612,6 @@ exports.ensureSchema = async () => {
   }
   await require('../modules/support/schema').ensureSupportSchema(db)
   await require('../modules/caddies/schema').ensureCaddieSchema(db)
+  await require('../modules/padel-flash/schema').ensurePadelSchema(db)
   console.log('✅  Esquema de partidos y jueces actualizado')
 }

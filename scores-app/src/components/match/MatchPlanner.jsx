@@ -209,7 +209,7 @@ export default function MatchPlanner({
 
   // Información del bracket para la primera pareja seleccionada (en la ronda activa si existe)
   const firstBracketMatchup = useMemo(() => {
-    if (!first) return null
+    if (!first || !isElimination) return null
     return findBracketMatchupForTeam({
       teamId: first.equipo_id,
       categoryId: first.categoria_id,
@@ -321,7 +321,7 @@ export default function MatchPlanner({
   }, [first, firstBracketMatchup, isElimination, suggestedCrossings])
 
   const groupPhase =
-    useGroups && phase === 'grupos' && !firstBracketMatchup?.hasCategoryBracket
+    useGroups && phase === 'grupos'
 
   const handleCategoryPick = (nextCatId) => {
     const normalizedCat = nextCatId ? String(nextCatId) : ''
@@ -340,7 +340,7 @@ export default function MatchPlanner({
       const pairCatMeta = bracketMetaByCategory.get(String(pair.categoria_id))
       const pairCatHasBracket = Boolean(pairCatMeta?.hasBracket)
       const effectiveTargetRound =
-        pairCatHasBracket && (isElimination || String(categoryFilter) === String(pair.categoria_id))
+        pairCatHasBracket && isElimination
           ? round
           : ''
 
@@ -355,7 +355,7 @@ export default function MatchPlanner({
 
       let reason = ''
       if (side === 1) {
-        if (pairCatHasBracket) {
+        if (isElimination && pairCatHasBracket) {
           // Categoría con bracket eliminatorio activo:
           // Solo mostrar las parejas que están en el bracket (y en la ronda seleccionada si hay ronda)
           if (!pairBracket?.inBracket) {
@@ -380,7 +380,7 @@ export default function MatchPlanner({
         }
       } else if (side === 2 && first) {
         if (
-          !unlockBracketRival &&
+          isElimination && !unlockBracketRival &&
           firstBracketMatchup?.hasCategoryBracket &&
           firstBracketMatchup?.inBracket
         ) {
@@ -398,7 +398,7 @@ export default function MatchPlanner({
           } else if (firstBracketMatchup.opponentType === 'ganador') {
             reason = `Según el bracket (${firstBracketMatchup.ronda}), espera a ${firstBracketMatchup.opponentName}`
           }
-        } else if (!unlockBracketRival && standingCrossingOpponentForFirst?.opponent) {
+        } else if (isElimination && !unlockBracketRival && standingCrossingOpponentForFirst?.opponent) {
           if (Number(pair.categoria_id) !== Number(first.categoria_id)) {
             reason = 'Pertenece a otra categoría'
           } else if (
@@ -468,7 +468,7 @@ export default function MatchPlanner({
 
   const select = (pair, pairBracket = null) => {
     if (side === 1) {
-      const resolvedBracket =
+      const resolvedBracket = isElimination ? (
         pairBracket ||
         findBracketMatchupForTeam({
           teamId: pair.equipo_id,
@@ -477,7 +477,7 @@ export default function MatchPlanner({
           tournamentId,
           system,
           targetRound: isElimination ? round : '',
-        })
+        })) : null
       onFirst(pair, resolvedBracket)
       if (resolvedBracket?.hasCategoryBracket && resolvedBracket?.inBracket) {
         setCategoryFilter(String(pair.categoria_id))
@@ -679,7 +679,7 @@ export default function MatchPlanner({
       )}
 
       {/* Visualizador interactivo del Bracket directamente dentro de Crear Partido */}
-      {activeVisualBracket && activeVisualBracket.rounds.length > 0 && (
+      {isElimination && activeVisualBracket && activeVisualBracket.rounds.length > 0 && (
         <div className='p-3 rounded-2xl border border-emerald-500/35 bg-[var(--bg-input)] space-y-2.5'>
           <div className='flex flex-wrap items-center justify-between gap-2'>
             <div className='flex items-center gap-2'>
@@ -896,7 +896,7 @@ export default function MatchPlanner({
       </div>
 
       {/* Banner informativo cuando la pareja elegida pertenece a un Bracket Eliminatorio */}
-      {first && firstBracketMatchup?.hasCategoryBracket && firstBracketMatchup?.inBracket && (
+      {isElimination && first && firstBracketMatchup?.hasCategoryBracket && firstBracketMatchup?.inBracket && (
         <div className='p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 flex flex-wrap items-center justify-between gap-2 text-xs'>
           <div className='space-y-0.5'>
             <div className='font-extrabold text-[var(--color-brand)] flex items-center gap-1.5'>
@@ -1147,7 +1147,7 @@ export default function MatchPlanner({
                     )
                   })}
                 </select>
-                {useGroups && !activeCategoryBracketMeta?.hasBracket && !isElimination && (
+                {useGroups && !isElimination && (
                   <select
                     aria-label='Filtrar parejas por grupo'
                     className='form-input'

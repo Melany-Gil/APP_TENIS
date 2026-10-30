@@ -295,7 +295,8 @@ export default function GestionPartidos() {
       setValue(field, '')
 
     const currentRound = watch('ronda') || ''
-    const bracketMatchup =
+    const isEliminationMode = selectedPhase === 'eliminacion' || selectedTournament?.sistema === 'eliminacion_directa'
+    const bracketMatchup = isEliminationMode ? (
       precomputedBracket ||
       findBracketMatchupForTeam({
         teamId: pair.equipo_id,
@@ -304,7 +305,7 @@ export default function GestionPartidos() {
         tournamentId: selectedTournamentId,
         system: selectedTournament?.sistema,
         targetRound: selectedPhase === 'eliminacion' ? currentRound : '',
-      })
+      })) : null
 
     setValue('categoria_id', String(pair.categoria_id), { shouldValidate: true })
     setValue('participante1_tipo', 'fijo')
@@ -352,7 +353,7 @@ export default function GestionPartidos() {
       // Categoría en fase de grupos (ej. 4ta): continúa normal
       setLinkedBracketMatchId(null)
       const nextPhase =
-        selectedTournament?.sistema === 'eliminacion_directa' ? 'eliminacion' : 'grupos'
+        selectedTournament?.sistema === 'eliminacion_directa' ? 'eliminacion' : selectedPhase || 'grupos'
       setValue('fase', nextPhase, { shouldValidate: true })
       setValue('grupo', nextPhase === 'grupos' ? pair.grupo || '' : '')
       if (nextPhase === 'grupos') setValue('ronda', '')
@@ -386,7 +387,7 @@ export default function GestionPartidos() {
         normalizedCat,
         selectedTournament?.sistema
       )
-      if (elimMatches.length > 0) {
+      if (selectedPhase === 'eliminacion' || selectedTournament?.sistema === 'eliminacion_directa') {
         setValue('fase', 'eliminacion', { shouldValidate: true })
         setValue('grupo', '')
         const currentRound = watch('ronda') || ''

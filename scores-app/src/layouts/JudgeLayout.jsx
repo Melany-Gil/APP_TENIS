@@ -21,6 +21,7 @@ export default function JudgeLayout() {
   const officialNav = (
     <nav aria-label='Navegación oficial' className='flex flex-wrap items-center gap-1'>
       <NavLink to='/mi-actividad' className='btn-secondary text-xs px-3 py-2'>Mi panel</NavLink>
+      <NavLink to='/padel' className='btn-ghost text-xs px-2 py-2'>Pádel</NavLink>
       <NavLink to='/juez/caddies' className='btn-ghost text-xs px-2 py-2'>Caddies</NavLink>
       {['admin', 'juez_director'].includes(user?.rol) && (
         <NavLink

@@ -34,6 +34,10 @@ const assert = require('node:assert/strict')
         if (ep === '/equipos') data = teams
         if (ep === '/partidos') data = [match]
         if (ep.endsWith('/retiros')) data = { jugadores:[], parejas:[] }
+        if (ep.endsWith('/grupos')) data = {
+          grupos:[{ categoria_id:1, nombre:'Grupo A', equipo_ids:teams.map(t => t.id) }],
+          parejas:teams.map(t => ({ equipo_id:t.id, categoria_id:1, grupo:'Grupo A' }))
+        }
         if (ep.endsWith('/inscripciones')) data = { categorias:[{ id:1, nombre:'Cuarta',
           parejas:teams.map(t => ({ ...t, equipo_id:t.id, categoria_id:1, categoria_nombre:'Cuarta' })) }] }
         if (ep.includes('/posiciones')) data = { categorias:[{id:1,nombre:'Cuarta',grupos:[]}],grupos:{} }
@@ -92,6 +96,29 @@ const assert = require('node:assert/strict')
       assert.equal(writes.at(-1).body.llaves_iniciales.length,1)
       assert.deepEqual(errors,[])
       console.log(`PASS ${width}px: schedules existing match without duplicate, preserves notes/format/version, exports PNG, edits slot and submits versioned bracket`)
+      torneo.sistema = 'grupos_eliminacion'
+      teams.push({ ...teams[0], id:3, nombre:'Pareja 3',
+        jugador1:{id:20,nombre:'Camilo',apellido:'Prueba'},
+        jugador2:{id:21,nombre:'Laura',apellido:'Prueba'} })
+      await page.goto('http://127.0.0.1:4173/admin/partidos?torneo=1')
+      await page.getByRole('button',{name:'Nuevo partido',exact:true}).click()
+      const groupsForm = page.getByRole('dialog',{name:'Nuevo partido',exact:true})
+      await groupsForm.locator('#quick-pair-search').fill('Camilo')
+      await groupsForm.getByRole('button',{name:/Pareja 3.*Camilo/}).click()
+      await groupsForm.locator('#quick-pair-search').fill('Andrés')
+      await groupsForm.getByRole('button',{name:/Pareja 1.*Andrés/}).click()
+      await groupsForm.getByRole('button',{name:'Continuar a programación',exact:true}).click()
+      await groupsForm.locator('[name="fecha_inicio"]').fill('2026-12-03')
+      await groupsForm.locator('[name="hora_inicio"]').fill('14:00')
+      await groupsForm.getByRole('button',{name:'Revisar partido',exact:true}).click()
+      await groupsForm.getByRole('button',{name:'Crear partido',exact:true}).click()
+      await groupsForm.waitFor({state:'detached'})
+      assert.equal(writes.at(-1).method,'POST')
+      assert.equal(writes.at(-1).body.fase,'grupos')
+      assert.equal(writes.at(-1).body.grupo,'Grupo A')
+      assert.equal(Number(writes.at(-1).body.equipo1_id),3)
+      console.log(`PASS ${width}px: group match creation remains available with existing elimination bracket`)
+      await page.goto('http://127.0.0.1:4173/torneo/1?tab=bracket')
       // Guests can read the bracket, but never access its editing controls.
       await page.evaluate(() => {
         sessionStorage.setItem('qa-guest','1')

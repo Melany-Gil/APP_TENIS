@@ -1,9 +1,25 @@
 import { Download, ExternalLink, ScrollText } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import PadelReglamento from './PadelReglamento'
 import './Reglamento.css'
 
 const PDF_URL = '/docs/reglamento-oficial-torneo-dobles-2026-vertical.pdf'
 
 export default function Reglamento() {
+  const [params] = useSearchParams()
+  const padel = params.get('deporte') === 'padel'
+  return (
+    <div className='space-y-4'>
+      <nav aria-label='Reglamentos por deporte' className='flex flex-wrap gap-2'>
+        <Link to='/reglamento' aria-current={!padel ? 'page' : undefined} className={!padel ? 'btn-primary' : 'btn-secondary'}>Tenis</Link>
+        <Link to='/reglamento?deporte=padel' aria-current={padel ? 'page' : undefined} className={padel ? 'btn-primary' : 'btn-secondary'}>Pádel · Flash</Link>
+      </nav>
+      {padel ? <PadelReglamento /> : <TennisReglamento />}
+    </div>
+  )
+}
+
+function TennisReglamento() {
   return (
     <div className='reglamento-page animate-fade-up'>
       <section className='reglamento-toolbar' aria-label='Acciones del reglamento'>

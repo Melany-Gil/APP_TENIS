@@ -9,12 +9,14 @@ import { useHealthCheck } from '../hooks/useHealthCheck'
 
 export default function AppLayout() {
   useHealthCheck()
-  const {pathname}=useLocation()
+  const {pathname,search}=useLocation()
+  const padel=pathname==='/padel' || pathname.startsWith('/padel/') || (pathname==='/reglamento' && new URLSearchParams(search).get('deporte')==='padel')
+  const screen=pathname==='/padel/flash' && new URLSearchParams(search).get('pantalla')==='1'
 
   return (
     <div className='min-h-screen tennis-scene' style={{ backgroundColor: 'var(--bg-primary)' }}>
-      {pathname!=='/ayuda' && <TennisAtmosphere/>}
-      <Header />
+      {pathname!=='/ayuda' && !padel && <TennisAtmosphere/>}
+      {!screen && <Header />}
       <main className='app-main'>
         <div className='max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8'>
           <Suspense fallback={<ContentLoader />}>
@@ -22,7 +24,7 @@ export default function AppLayout() {
           </Suspense>
         </div>
       </main>
-      {!/^\/match\/[^/]+\/?$/.test(pathname) && <SponsorDock />}
+      {!padel && !/^\/match\/[^/]+\/?$/.test(pathname) && <SponsorDock />}
       <ToastContainer />
     </div>
   )

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import ActionDialog from '../common/ActionDialog'
 import { MotionToggle } from '../common/TennisAtmosphere'
@@ -29,6 +29,7 @@ const NAV_ITEMS = [
   { to: '/', icon: Home, label: 'Inicio', exact: true },
   { to: '/live', icon: Radio, label: 'En vivo', dot: true },
   { to: '/tennis', icon: Trophy, label: 'Tenis' },
+  { to: '/padel', icon: Trophy, label: 'Pádel' },
   { to: '/reglamento', icon: ScrollText, label: 'Reglamento' },
   { to: '/sponsors', icon: Handshake, label: 'Patrocinadores' },
   { to: '/anuncios', icon: Megaphone, label: 'Avisos' },
@@ -39,6 +40,8 @@ const NAV_ITEMS = [
 ]
 
 export default function Header() {
+  const { pathname, search } = useLocation()
+  const isPadel = pathname === '/padel' || pathname.startsWith('/padel/') || (pathname === '/reglamento' && new URLSearchParams(search).get('deporte') === 'padel')
   const [menuOpen, setMenuOpen] = useState(false)
   const { user } = useAuthStore()
   const isAdmin = user?.rol === 'admin'
@@ -50,8 +53,8 @@ export default function Header() {
         <div className='top-navigation-brands'>
           <Link to='/' aria-label='Ir al inicio del Club Unión'>
             <img
-              src='/branding/subcomite-tenis-club-union.png'
-              alt='Subcomité de Tenis del Club Unión'
+              src={isPadel ? '/branding/escudo-club-union.png' : '/branding/subcomite-tenis-club-union.png'}
+              alt={isPadel ? 'Club Unión' : 'Subcomité de Tenis del Club Unión'}
               className='top-navigation-club-logo'
             />
           </Link>
@@ -102,23 +105,23 @@ export default function Header() {
               if (e.target.closest('a')) setMenuOpen(false)
             }}
           >
-            <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} />
+            <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} isPadel={isPadel} />
           </nav>
-          <MotionToggle />
+          {!isPadel && <MotionToggle />}
         </ActionDialog>
       )}
       <nav
         className='top-navigation-links top-navigation-links-organized'
         aria-label='Navegación principal'
       >
-        <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} />
-        <MotionToggle />
+        <NavigationLinks isAdmin={isAdmin} isOfficial={isOfficial} isPadel={isPadel} />
+        {!isPadel && <MotionToggle />}
       </nav>
     </header>
   )
 }
 
-function NavigationLinks({ isAdmin, isOfficial }) {
+function NavigationLinks({ isAdmin, isOfficial, isPadel }) {
   const { user } = useAuthStore()
   const isJuez = user?.rol === 'juez'
 
@@ -126,7 +129,7 @@ function NavigationLinks({ isAdmin, isOfficial }) {
   if (isJuez) {
     items = [
       { to: '/mi-actividad', icon: Home, label: 'Mi panel' },
-      ...NAV_ITEMS.filter((item) => ['/reglamento', '/sponsors', '/profile'].includes(item.to)),
+      ...NAV_ITEMS.filter((item) => ['/padel', '/reglamento', '/sponsors', '/profile'].includes(item.to)),
       { to: '/ayuda', icon: BookOpen, label: 'Ayuda' },
       { to: '/juez', icon: Gavel, label: 'Juez' },
     ]
@@ -146,7 +149,7 @@ function NavigationLinks({ isAdmin, isOfficial }) {
   return items.map((item) => (
     <NavLink
       key={item.to}
-      to={item.to}
+      to={item.to === '/reglamento' && isPadel ? '/reglamento?deporte=padel' : item.to}
       end={item.exact}
       className={({ isActive }) => cn('top-navigation-link', isActive && 'active')}
     >

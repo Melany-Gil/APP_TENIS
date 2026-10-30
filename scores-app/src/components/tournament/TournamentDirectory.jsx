@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { tournamentService } from '../../services/tournamentService'
 import { formatDate } from '../../utils/formatDate'
-export default function TournamentDirectory() {
+export default function TournamentDirectory({ deporte = 'tenis' }) {
   const [archive, setArchive] = useState('activos')
   const [items, setItems] = useState([]),
     [error, setError] = useState(''),
@@ -12,7 +12,7 @@ export default function TournamentDirectory() {
     let active = true
     setLoading(true)
     tournamentService
-      .getAll({ deporte: 'tenis', archivo: archive })
+      .getAll({ deporte, archivo: archive })
       .then((r) => {
         if (active) {
           setItems(r.data)
@@ -28,7 +28,7 @@ export default function TournamentDirectory() {
     return () => {
       active = false
     }
-  }, [retry, archive])
+  }, [retry, archive, deporte])
   if (error)
     return (
       <div role='alert'>
