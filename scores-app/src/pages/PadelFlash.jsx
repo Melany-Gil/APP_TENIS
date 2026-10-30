@@ -36,10 +36,11 @@ const shuffleArray = (values) => {
   }
   return a
 }
+const WHEEL_COLORS = ['#ff7a3c', '#2bc6a0', '#8a5cf6', '#ffc857', '#ff4d8d', '#2fa8d6']
 const wheelGradient = (n) => {
   const seg = 360 / n
   const stops = Array.from({ length: n }, (_, i) => {
-    const color = i % 2 === 0 ? 'var(--color-brand)' : '#0f3a31'
+    const color = WHEEL_COLORS[i % WHEEL_COLORS.length]
     return `${color} ${i * seg}deg ${(i + 1) * seg}deg`
   })
   return `conic-gradient(${stops.join(',')})`
@@ -207,7 +208,8 @@ function RouletteWheel({ pool, targetId, holdMs, onNext }) {
       <p className={`pf-wheel-result ${landed ? 'pf-wheel-result-in' : ''}`}>
         {landed ? (
           <>
-            <strong>#{picked.numero}</strong> {label(picked)}
+            <strong>{picked.display ? `Ronda ${picked.numero}` : `#${picked.numero}`}</strong>{' '}
+            {picked.display || label(picked)}
           </>
         ) : (
           ' '
@@ -239,10 +241,13 @@ export default function PadelFlash() {
   const [sorteando, setSorteando] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [pick, setPick] = useState(0)
+  const [matchPick, setMatchPick] = useState(0)
   const generation = useRef(0),
     busyRef = useRef(false),
     offset = useRef(0),
-    drawOrder = useRef([])
+    drawOrder = useRef([]),
+    matchOrder = useRef([]),
+    pendingPick = useRef(0)
   const eventId = params.get('evento') || String(events[0]?.id || '')
   const tab = params.get('vista') || 'programa',
     screen = params.get('pantalla') === '1'
@@ -362,7 +367,7 @@ export default function PadelFlash() {
     setSorteando(order.length ? 'wheel' : 'summary')
   }, [sorteando, pairs, revealGroups])
   let pickGroup = null
-  if (sorteando === 'wheel') {
+  if (sorteando === 'wheel' || sorteando === 'matches') {
     let from = 0
     for (const g of revealGroups) {
       const size = pairs.filter((p) => p.grupo === g.group).length
@@ -1461,27 +1466,66 @@ export default function PadelFlash() {
                 <p className='pf-sorteo-label'>Sorteando cruces…</p>
               </>
             )}
-            {sorteando === 'wheel' && pickGroup && (
+            {(sorteando === 'wheel' || sorteando === 'matches') && pickGroup && (
               <div className='pf-sorteo-reveal'>
                 <div className='pf-sorteo-group-head'>
                   <span className='pf-sorteo-ball' aria-hidden='true' />
                   <h3>Grupo {pickGroup.group}</h3>
                   <span className='pf-sorteo-progress'>
-                    {pickGroup.position} de {pickGroup.size}
+                    {sorteando === 'wheel'
+                      ? `Pareja ${pickGroup.position} de ${pickGroup.size}`
+                      : `Partido ${matchPick + 1} de ${matchOrder.current.length}`}
                   </span>
                 </div>
-                <RouletteWheel
-                  key={pick}
-                  pool={drawOrder.current.slice(pick).map((id) => pairMap.get(id))}
-                  targetId={drawOrder.current[pick]}
-                  holdMs={pickGroup.position === pickGroup.size ? 1400 : 650}
-                  onNext={() => {
-                    const next = pick + 1
-                    if (next >= drawOrder.current.length) setSorteando('summary')
-                    else setPick(next)
-                  }}
-                />
-                {pickGroup.position > 1 && (
+                {sorteando === 'wheel' ? (
+                  <RouletteWheel
+                    key={`p${pick}`}
+                    pool={drawOrder.current.slice(pick).map((id) => pairMap.get(id))}
+                    targetId={drawOrder.current[pick]}
+                    holdMs={pickGroup.position === pickGroup.size ? 1000 : 600}
+                    onNext={() => {
+                      const next = pick + 1
+                      if (pickGroup.position === pickGroup.size) {
+                        const groupData = revealGroups.find((g) => g.group === pickGroup.group)
+                        matchOrder.current = shuffleArray(groupData.rounds)
+                        pendingPick.current = next
+                        setMatchPick(0)
+                        setSorteando('matches')
+                      } else {
+                        setPick(next)
+                      }
+                    }}
+                  />
+                ) : (
+                  <RouletteWheel
+                    key={`m${matchPick}`}
+                    pool={matchOrder.current.slice(matchPick).map((r) => ({
+                      id: r.round,
+                      numero: r.round,
+                      display: r.matches
+                        .map(
+                          (m) =>
+                            `${label(pairMap.get(m.pareja1))} vs ${label(pairMap.get(m.pareja2))}`
+                        )
+                        .join('  ·  '),
+                    }))}
+                    targetId={matchOrder.current[matchPick].round}
+                    holdMs={matchPick + 1 === matchOrder.current.length ? 1100 : 500}
+                    onNext={() => {
+                      const next = matchPick + 1
+                      if (next >= matchOrder.current.length) {
+                        if (pendingPick.current >= drawOrder.current.length) setSorteando('summary')
+                        else {
+                          setPick(pendingPick.current)
+                          setSorteando('wheel')
+                        }
+                      } else {
+                        setMatchPick(next)
+                      }
+                    }}
+                  />
+                )}
+                {sorteando === 'wheel' && pickGroup.position > 1 && (
                   <div className='pf-sorteo-confirmed'>
                     {drawOrder.current.slice(pickGroup.groupStart, pick).map((id) => (
                       <span className='pf-sorteo-chip' key={id}>
@@ -1491,8 +1535,17 @@ export default function PadelFlash() {
                   </div>
                 )}
                 <div className='pf-sorteo-dots'>
-                  {Array.from({ length: pickGroup.size }).map((_, i) => (
-                    <span key={i} className={i < pickGroup.position ? 'pf-sorteo-dot-on' : ''} />
+                  {Array.from({
+                    length: sorteando === 'wheel' ? pickGroup.size : matchOrder.current.length,
+                  }).map((_, i) => (
+                    <span
+                      key={i}
+                      className={
+                        i < (sorteando === 'wheel' ? pickGroup.position : matchPick)
+                          ? 'pf-sorteo-dot-on'
+                          : ''
+                      }
+                    />
                   ))}
                 </div>
                 <button className='pf-link' onClick={() => setSorteando('summary')}>
