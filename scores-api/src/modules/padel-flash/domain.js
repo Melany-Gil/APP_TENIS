@@ -60,6 +60,7 @@ function eventInput(b) {
     fail('Revisa el orden de los horarios')
   return out
 }
+const clock = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 function slots(e, turnsNeeded) {
   const turns = []
   let t = Number(e.inicio)
@@ -71,8 +72,20 @@ function slots(e, turnsNeeded) {
     turns.push(t)
     t += 25
   }
-  if (turns.length < turnsNeeded)
-    fail(`No caben los ${turnsNeeded} turnos de 20 minutos y sus rotaciones en este horario`)
+  if (turns.length < turnsNeeded) {
+    while (turns.length < turnsNeeded) {
+      if (t < e.pausa_fin && t + 25 > e.pausa_inicio) {
+        t = Number(e.pausa_fin)
+        continue
+      }
+      turns.push(t)
+      t += 25
+    }
+    const minCierre = turns[turns.length - 1] + 20
+    fail(
+      `No caben los ${turnsNeeded} turnos de 20 minutos y sus rotaciones en este horario. Amplía el cierre del evento hasta al menos las ${clock(minCierre)}, o reduce la pausa.`
+    )
+  }
   return turns
 }
 function shuffle(values, rng = randomInt) {
