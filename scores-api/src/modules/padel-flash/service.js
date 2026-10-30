@@ -69,7 +69,7 @@ exports.createPadelService = (db) => {
       const data = D.eventInput(b)
       return tx(async (c) => {
         const [r] = await c.query(
-          'INSERT INTO padel_events (nombre,fecha,cancha1,cancha2,inicio,pausa_inicio,pausa_fin,cierre,created_by) VALUES (?,?,?,?,?,?,?,?,?)',
+          'INSERT INTO padel_events (nombre,fecha,cancha1,cancha2,inicio,pausa_inicio,pausa_fin,cierre,formato,duracion_partido,tamano_grupo,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
           [...Object.values(data), actor.id]
         )
         await audit(c, r.insertId, actor, 'crear', data)
@@ -88,7 +88,7 @@ exports.createPadelService = (db) => {
         if (matches.length || e.votacion !== 'pendiente')
           D.fail('El horario y las canchas quedan cerrados después del sorteo', 409)
         await c.query(
-          'UPDATE padel_events SET nombre=?,fecha=?,cancha1=?,cancha2=?,inicio=?,pausa_inicio=?,pausa_fin=?,cierre=?,version=version+1 WHERE id=?',
+          'UPDATE padel_events SET nombre=?,fecha=?,cancha1=?,cancha2=?,inicio=?,pausa_inicio=?,pausa_fin=?,cierre=?,formato=?,duracion_partido=?,tamano_grupo=?,version=version+1 WHERE id=?',
           [...Object.values(data), e.id]
         )
         await audit(c, e.id, actor, 'editar_evento', { antes: e, despues: data })
@@ -99,7 +99,7 @@ exports.createPadelService = (db) => {
       return tx(async (c) => {
         const e = await event(c, eventId)
         const [pairs] = await c.query(
-          'SELECT id,numero,jugador1,jugador2,disfraz,foto_url FROM padel_pairs WHERE event_id=? ORDER BY numero',
+          'SELECT id,numero,jugador1,jugador2,disfraz,foto_url,grupo,no_antes FROM padel_pairs WHERE event_id=? ORDER BY numero',
           [e.id]
         )
         const [fixture] =
@@ -133,6 +133,7 @@ exports.createPadelService = (db) => {
         D.name(b.jugador1, 'Primer jugador'),
         D.name(b.jugador2, 'Segundo jugador'),
         b.disfraz?.trim() ? D.name(b.disfraz, 'Disfraz') : '',
+        b.no_antes === '' || b.no_antes == null ? null : D.integer(b.no_antes, 0, 1439, 'Horario'),
       ]
       if (values[1].toLowerCase() === values[2].toLowerCase())
         D.fail('Los dos integrantes deben ser diferentes')
@@ -162,7 +163,7 @@ exports.createPadelService = (db) => {
         let resultId = pairId
         if (pairId) {
           const [r] = await c.query(
-            'UPDATE padel_pairs SET numero=?,jugador1=?,jugador2=?,disfraz=? WHERE id=? AND event_id=?',
+            'UPDATE padel_pairs SET numero=?,jugador1=?,jugador2=?,disfraz=?,no_antes=? WHERE id=? AND event_id=?',
             [...values, id(pairId), e.id]
           )
           if (!r.affectedRows) D.fail('Pareja no encontrada', 404)
@@ -170,7 +171,7 @@ exports.createPadelService = (db) => {
           if (all.length >= D.MAX_PAREJAS)
             D.fail(`El evento alcanzó el máximo de ${D.MAX_PAREJAS} parejas`, 409)
           const [r] = await c.query(
-            'INSERT INTO padel_pairs (numero,jugador1,jugador2,disfraz,event_id) VALUES (?,?,?,?,?)',
+            'INSERT INTO padel_pairs (numero,jugador1,jugador2,disfraz,no_antes,event_id) VALUES (?,?,?,?,?,?)',
             [...values, e.id]
           )
           resultId = r.insertId
@@ -228,21 +229,33 @@ exports.createPadelService = (db) => {
         if (e.publicado || old.some((m) => m.inicio_real || m.motivo))
           D.fail('El sorteo publicado no se puede reemplazar', 409)
         const [pairs] = await c.query(
-          'SELECT id FROM padel_pairs WHERE event_id=? ORDER BY numero',
+          'SELECT id,no_antes FROM padel_pairs WHERE event_id=? ORDER BY numero',
           [e.id]
         )
-        const fixture = D.generateFixture(
-          pairs.map((p) => p.id),
-          e
-        )
+        let fixture, groupOf
+        if (e.formato === 'grupos') {
+          ;({ fixture, groupOf } = D.generateGroupFixture(pairs, e))
+        } else {
+          fixture = D.generateFixture(
+            pairs.map((p) => p.id),
+            e
+          )
+        }
         await c.query('DELETE FROM padel_fixture WHERE event_id=?', [e.id])
         for (const m of fixture)
           await c.query(
             'INSERT INTO padel_fixture (event_id,turno,cancha,minuto,pareja1,pareja2) VALUES (?,?,?,?,?,?)',
             [e.id, m.turno, m.cancha, m.minuto, m.pareja1, m.pareja2]
           )
+        if (groupOf)
+          for (const [pairId, grupo] of groupOf)
+            await c.query('UPDATE padel_pairs SET grupo=? WHERE id=? AND event_id=?', [
+              grupo,
+              pairId,
+              e.id,
+            ])
         await bump(c, e.id)
-        await audit(c, e.id, actor, 'sorteo', { fixture })
+        await audit(c, e.id, actor, 'sorteo', { fixture, formato: e.formato })
         return { ok: true }
       })
     },
@@ -251,9 +264,12 @@ exports.createPadelService = (db) => {
       return tx(async (c) => {
         const e = await event(c, eventId, true)
         revision(e, b)
-        const [rows] = await c.query('SELECT id FROM padel_fixture WHERE event_id=?', [e.id])
+        const [rows] = await c.query('SELECT pareja1,pareja2 FROM padel_fixture WHERE event_id=?', [
+          e.id,
+        ])
         const [pairs] = await c.query('SELECT id FROM padel_pairs WHERE event_id=?', [e.id])
-        if (!rows.length || rows.length !== pairs.length)
+        const covered = new Set(rows.flatMap((r) => [r.pareja1, r.pareja2]))
+        if (!rows.length || pairs.some((p) => !covered.has(p.id)))
           D.fail('Completa el sorteo antes de publicar')
         await c.query('UPDATE padel_events SET publicado=1,version=version+1 WHERE id=?', [e.id])
         await audit(c, e.id, actor, 'publicar_sorteo', {})
@@ -280,10 +296,11 @@ exports.createPadelService = (db) => {
             'SELECT * FROM padel_fixture WHERE event_id=? AND inicio_real IS NOT NULL AND motivo IS NULL',
             [e.id]
           )
+          const durationMs = (e.duracion_partido || 20) * 60000
           if (
             playing.some(
               (p) =>
-                Number(p.inicio_real) + 1200000 > Date.now() &&
+                Number(p.inicio_real) + durationMs > Date.now() &&
                 (p.cancha === m.cancha ||
                   [p.pareja1, p.pareja2].some((x) => [m.pareja1, m.pareja2].includes(x)))
             )

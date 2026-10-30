@@ -69,6 +69,92 @@ test('pádel: sorteo con el mínimo de parejas permitido', () => {
   assert.equal(matches.length, 4)
   assert.equal(new Set(matches.map((m) => m.turno)).size, 2)
 })
+test('pádel: evento sin pausa, horario corrido y sorteo sin hueco', () => {
+  const sinPausa = D.eventInput({ ...defaults, pausa_inicio: '', pausa_fin: '' })
+  assert.equal(sinPausa.pausa_inicio, null)
+  assert.equal(sinPausa.pausa_fin, null)
+  const event = { ...defaults, pausa_inicio: null, pausa_fin: null, cierre: 1255 }
+  const matches = D.generateFixture(Array.from({ length: 14 }, (_, i) => i + 1), event)
+  assert.equal(matches.length, 14)
+  assert.equal(new Set(matches.map((m) => m.minuto)).size, 7)
+  assert.throws(() => D.eventInput({ ...defaults, pausa_inicio: 1200, pausa_fin: '' }), /inválido/)
+  assert.throws(
+    () => D.generateFixture(Array.from({ length: 14 }, (_, i) => i + 1), { ...event, cierre: 1249 }),
+    /^(?!.*pausa).*turnos.*$/s
+  )
+})
+test('pádel: circleRounds reparte todos contra todos con un descanso por ronda', () => {
+  for (const size of [3, 4, 5]) {
+    const items = Array.from({ length: size }, (_, i) => i + 1)
+    const rounds = D.circleRounds(items)
+    assert.equal(rounds.length, size % 2 === 1 ? size : size - 1)
+    const seen = new Set()
+    const restCount = new Map(items.map((id) => [id, 0]))
+    for (const round of rounds) {
+      const real = round.filter((pair) => !pair.includes(null))
+      const resting = round.find((pair) => pair.includes(null))
+      for (const [a, b] of real) {
+        const key = [a, b].sort((x, y) => x - y).join(':')
+        assert.ok(!seen.has(key), 'no debe repetirse un cruce')
+        seen.add(key)
+      }
+      if (resting) {
+        const restId = resting.find((x) => x !== null)
+        restCount.set(restId, restCount.get(restId) + 1)
+      }
+    }
+    assert.equal(seen.size, (size * (size - 1)) / 2)
+    if (size % 2 === 1) for (const id of items) assert.equal(restCount.get(id), 1)
+  }
+})
+test('pádel: sorteo por grupos, todos contra todos y restricción de horario por pareja', () => {
+  const event = {
+    inicio: 360,
+    pausa_inicio: 525,
+    pausa_fin: 540,
+    cierre: 600,
+    formato: 'grupos',
+    duracion_partido: 15,
+    tamano_grupo: 5,
+  }
+  for (let k = 0; k < 50; k++) {
+    const pairs = Array.from({ length: 15 }, (_, i) => ({
+      id: i + 1,
+      no_antes: i + 1 === 13 ? 390 : null,
+    }))
+    const { fixture, groupOf } = D.generateGroupFixture(pairs, event)
+    assert.equal(fixture.length, 30)
+    assert.equal(new Set(fixture.map((m) => m.turno)).size, 15)
+    assert.equal(groupOf.size, 15)
+    const byGroup = new Map()
+    for (const p of pairs) {
+      const g = groupOf.get(p.id)
+      if (!byGroup.has(g)) byGroup.set(g, [])
+      byGroup.get(g).push(p.id)
+    }
+    assert.equal(byGroup.size, 3)
+    for (const ids of byGroup.values()) {
+      assert.equal(ids.length, 5)
+      const matches = fixture.filter((m) => ids.includes(m.pareja1) && ids.includes(m.pareja2))
+      assert.equal(matches.length, 10)
+      assert.equal(
+        new Set(matches.map((m) => [m.pareja1, m.pareja2].sort((a, b) => a - b).join(':'))).size,
+        10
+      )
+      for (const id of ids)
+        assert.equal(matches.filter((m) => m.pareja1 === id || m.pareja2 === id).length, 4)
+    }
+    for (const t of new Set(fixture.map((m) => m.turno))) {
+      const turn = fixture.filter((m) => m.turno === t)
+      assert.equal(new Set(turn.map((m) => m.cancha)).size, turn.length)
+      assert.equal(new Set(turn.flatMap((m) => [m.pareja1, m.pareja2])).size, turn.length * 2)
+    }
+    const first13 = Math.min(
+      ...fixture.filter((m) => m.pareja1 === 13 || m.pareja2 === 13).map((m) => m.minuto)
+    )
+    assert.ok(first13 >= 390, 'la pareja con restricción no juega antes de las 6:30')
+  }
+})
 test('pádel: validaciones de configuración y marcadores por tiempo', () => {
   const withoutCourts = D.eventInput({ ...defaults, cancha1: '', cancha2: undefined })
   assert.equal(withoutCourts.cancha1, 'Pádel 1')
@@ -342,6 +428,7 @@ function store() {
     desempate_motivo: null,
     created_by: 1,
     ...defaults,
+    formato: 'individual',
     inicio: 480,
     cierre: 1439,
   }
@@ -376,16 +463,35 @@ function store() {
     if (sql === 'SELECT id,jugador1,jugador2 FROM padel_pairs WHERE event_id=?')
       return [pairs.map(({ id, jugador1, jugador2 }) => ({ id, jugador1, jugador2 }))]
     if (
-      sql === 'INSERT INTO padel_pairs (numero,jugador1,jugador2,disfraz,event_id) VALUES (?,?,?,?,?)'
+      sql ===
+      'INSERT INTO padel_pairs (numero,jugador1,jugador2,disfraz,no_antes,event_id) VALUES (?,?,?,?,?,?)'
     ) {
-      const [numero, jugador1, jugador2, disfraz] = args
+      const [numero, jugador1, jugador2, disfraz, no_antes] = args
       if (pairs.some((p) => p.numero === numero)) throw { code: 'ER_DUP_ENTRY' }
-      const row = { id: nextPairId++, numero, jugador1, jugador2, disfraz, foto_url: null }
+      const row = {
+        id: nextPairId++,
+        numero,
+        jugador1,
+        jugador2,
+        disfraz,
+        no_antes: no_antes ?? null,
+        grupo: null,
+        foto_url: null,
+      }
       pairs.push(row)
       return [{ insertId: row.id }]
     }
-    if (sql === 'SELECT id FROM padel_pairs WHERE event_id=? ORDER BY numero')
-      return [[...pairs].sort((a, b) => a.numero - b.numero).map(({ id }) => ({ id }))]
+    if (sql === 'UPDATE padel_pairs SET grupo=? WHERE id=? AND event_id=?') {
+      const p = pairs.find((x) => x.id === args[1])
+      if (p) p.grupo = args[0]
+      return [{ affectedRows: p ? 1 : 0 }]
+    }
+    if (sql === 'SELECT id,no_antes FROM padel_pairs WHERE event_id=? ORDER BY numero')
+      return [
+        [...pairs]
+          .sort((a, b) => a.numero - b.numero)
+          .map(({ id, no_antes }) => ({ id, no_antes })),
+      ]
     if (sql === 'SELECT id FROM padel_pairs WHERE event_id=?') return [pairs.map(({ id }) => ({ id }))]
     if (sql === 'SELECT id,foto_url FROM padel_pairs WHERE event_id=?')
       return [pairs.map(({ id, foto_url }) => ({ id, foto_url }))]
@@ -402,7 +508,8 @@ function store() {
       fixture.push({ id: nextFixtureId++, event_id, turno, cancha, minuto, pareja1, pareja2, version: 0 })
       return [{ insertId: fixture.length }]
     }
-    if (sql === 'SELECT id FROM padel_fixture WHERE event_id=?') return [fixture.map(({ id }) => ({ id }))]
+    if (sql === 'SELECT pareja1,pareja2 FROM padel_fixture WHERE event_id=?')
+      return [fixture.map(({ pareja1, pareja2 }) => ({ pareja1, pareja2 }))]
     throw Error(`Unexpected query: ${sql}`)
   }
   const db = {
@@ -449,4 +556,39 @@ test('pádel: inscripción, sorteo y votación con más de 14 parejas', async ()
   for (const p of f.pairs()) p.foto_url = `/uploads/${p.id}.webp`
   await f.service.voting(1, { version: f.event.version, estado: 'abierta' }, admin)
   assert.equal(f.event.votacion, 'abierta')
+})
+test('pádel: sorteo por grupos desde el servicio asigna grupo a cada pareja', async () => {
+  const f = store()
+  Object.assign(f.event, {
+    formato: 'grupos',
+    duracion_partido: 15,
+    tamano_grupo: 5,
+    pausa_inicio: 525,
+    pausa_fin: 540,
+  })
+  for (let i = 1; i <= 15; i++)
+    await f.service.pair(
+      1,
+      null,
+      { version: f.event.version, numero: i, jugador1: `Uno ${i}`, jugador2: `Dos ${i}` },
+      admin
+    )
+  await f.service.draw(1, { version: f.event.version }, admin)
+  assert.equal(f.fixtureRows().length, 30)
+  const groups = new Map()
+  for (const p of f.pairs()) {
+    assert.ok([1, 2, 3].includes(p.grupo))
+    if (!groups.has(p.grupo)) groups.set(p.grupo, [])
+    groups.get(p.grupo).push(p.id)
+  }
+  assert.equal(groups.size, 3)
+  for (const ids of groups.values()) {
+    assert.equal(ids.length, 5)
+    const matches = f
+      .fixtureRows()
+      .filter((m) => ids.includes(m.pareja1) && ids.includes(m.pareja2))
+    assert.equal(matches.length, 10)
+  }
+  await f.service.publish(1, { version: f.event.version }, admin)
+  assert.equal(f.event.publicado, 1)
 })

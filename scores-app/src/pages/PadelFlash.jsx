@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowRight,
@@ -19,7 +20,9 @@ import { padelFlashService as api } from '../services/padelFlashService'
 import './PadelFlash.css'
 
 const clock = (m) =>
-  `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+  m === '' || m == null
+    ? ''
+    : `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 const minutes = (s) => {
   const [h, m] = s.split(':').map(Number)
   return h * 60 + m
@@ -37,9 +40,12 @@ const newEvent = {
   cancha1: 'Pádel 1',
   cancha2: 'Pádel 2',
   inicio: 1080,
-  pausa_inicio: 1200,
-  pausa_fin: 1230,
+  pausa_inicio: '',
+  pausa_fin: '',
   cierre: 1320,
+  formato: 'individual',
+  duracion_partido: 20,
+  tamano_grupo: 5,
 }
 
 function Field({ title, children }) {
@@ -81,10 +87,13 @@ function CostumePhoto({ pair }) {
     />
   )
 }
-function Timer({ match, now }) {
+function Timer({ match, now, duracion }) {
   if (match.motivo) return <span className='pf-status'>Registrado</span>
   if (!match.inicio_real) return <span className='pf-status'>Programado</span>
-  const remaining = Math.max(0, Math.ceil((Number(match.inicio_real) + 1200000 - now) / 1000))
+  const remaining = Math.max(
+    0,
+    Math.ceil((Number(match.inicio_real) + duracion * 60000 - now) / 1000)
+  )
   return (
     <span className={`pf-status ${remaining ? 'pf-live' : ''}`}>
       {remaining
@@ -113,6 +122,7 @@ export default function PadelFlash() {
     [now, setNow] = useState(Date.now())
   const [listReady, setListReady] = useState(false)
   const [turnFilter, setTurnFilter] = useState('todos')
+  const [sorteando, setSorteando] = useState('')
   const generation = useRef(0),
     busyRef = useRef(false),
     offset = useRef(0)
@@ -376,7 +386,11 @@ export default function PadelFlash() {
                   <div>
                     <span className='pf-eyebrow'>SORTEO DE CRUCES</span>
                     <h2>{pairs.length} parejas inscritas</h2>
-                    <p>Dos encuentros por pareja · Sin repetir rival</p>
+                    <p>
+                      {e.formato === 'grupos'
+                        ? `Grupos de ${e.tamano_grupo || 5} · Todos contra todos`
+                        : 'Dos encuentros por pareja · Sin repetir rival'}
+                    </p>
                   </div>
                   <div className='pf-toolbar'>
                     {!e.publicado && (
@@ -393,7 +407,12 @@ export default function PadelFlash() {
                             }))
                           )
                             return
-                          await run(() => api.draw(eventId, { version }), 'Cruces sorteados')
+                          setSorteando('spinning')
+                          await Promise.all([
+                            run(() => api.draw(eventId, { version }), 'Cruces sorteados'),
+                            new Promise((r) => setTimeout(r, 1800)),
+                          ])
+                          setSorteando('reveal')
                         }}
                       >
                         <Shuffle size={17} />
@@ -476,9 +495,14 @@ export default function PadelFlash() {
                               </p>
                             )}
                             <h3>
-                              <span>Turno {turn}</span>
+                              <span>
+                                Turno {turn}
+                                {e.formato === 'grupos'
+                                  ? ` · Grupo ${pairMap.get(matches[0].pareja1)?.grupo ?? ''}`
+                                  : ''}
+                              </span>
                               <time>
-                                {clock(time)}–{clock(time + 20)}
+                                {clock(time)}–{clock(time + (e.duracion_partido || 20))}
                               </time>
                             </h3>
                             <div className='pf-courts'>
@@ -486,7 +510,7 @@ export default function PadelFlash() {
                                 <article className='pf-match' key={m.id}>
                                   <div className='pf-match-meta'>
                                     <span>{m.cancha === 1 ? e.cancha1 : e.cancha2}</span>
-                                    <Timer match={m} now={now} />
+                                    <Timer match={m} now={now} duracion={e.duracion_partido || 20} />
                                   </div>
                                   <div className='pf-score-labels'>
                                     <span>Pareja</span>
@@ -525,7 +549,7 @@ export default function PadelFlash() {
                                           }
                                         >
                                           <Clock size={15} />
-                                          Iniciar 20 min
+                                          Iniciar {e.duracion_partido || 20} min
                                         </button>
                                       )}
                                       <button
@@ -575,6 +599,7 @@ export default function PadelFlash() {
                         jugador1: '',
                         jugador2: '',
                         disfraz: '',
+                        no_antes: '',
                         version,
                       })
                     }
@@ -602,6 +627,13 @@ export default function PadelFlash() {
                         <h3>{p.jugador1}</h3>
                         <h3>{p.jugador2}</h3>
                         <p>{p.disfraz || 'Disfraz por anunciar'}</p>
+                        {(p.grupo || p.no_antes != null) && (
+                          <p className='pf-muted'>
+                            {p.grupo ? `Grupo ${p.grupo}` : ''}
+                            {p.grupo && p.no_antes != null ? ' · ' : ''}
+                            {p.no_antes != null ? `No antes de ${clock(p.no_antes)}` : ''}
+                          </p>
+                        )}
                       </div>
                       {admin && e.votacion === 'pendiente' && (
                         <button
@@ -927,8 +959,6 @@ export default function PadelFlash() {
                   {[
                     ['inicio', 'Inicio'],
                     ['cierre', 'Fin del evento'],
-                    ['pausa_inicio', 'Inicio de pausa'],
-                    ['pausa_fin', 'Fin de pausa'],
                   ].map(([key, title]) => (
                     <Field key={key} title={title}>
                       <input
@@ -940,8 +970,74 @@ export default function PadelFlash() {
                     </Field>
                   ))}
                 </div>
+                <div className='pf-form-grid'>
+                  <Field title='Formato'>
+                    <select
+                      value={form.formato || 'individual'}
+                      onChange={(x) => setForm({ ...form, formato: x.target.value })}
+                    >
+                      <option value='individual'>Un cruce general (2 rivales por pareja)</option>
+                      <option value='grupos'>Grupos · todos contra todos</option>
+                    </select>
+                  </Field>
+                  <Field title='Duración del partido (min)'>
+                    <input
+                      type='number'
+                      required
+                      min={10}
+                      max={60}
+                      value={form.duracion_partido ?? 20}
+                      onChange={(x) => setForm({ ...form, duracion_partido: x.target.value })}
+                    />
+                  </Field>
+                </div>
+                {form.formato === 'grupos' && (
+                  <Field title='Parejas por grupo'>
+                    <input
+                      type='number'
+                      required
+                      min={3}
+                      max={5}
+                      value={form.tamano_grupo ?? 5}
+                      onChange={(x) => setForm({ ...form, tamano_grupo: x.target.value })}
+                    />
+                  </Field>
+                )}
+                <label className='pf-consent'>
+                  <input
+                    type='checkbox'
+                    checked={form.pausa_inicio !== '' && form.pausa_inicio != null}
+                    onChange={(x) =>
+                      setForm({
+                        ...form,
+                        pausa_inicio: x.target.checked ? form.pausa_inicio || 1200 : '',
+                        pausa_fin: x.target.checked ? form.pausa_fin || 1230 : '',
+                      })
+                    }
+                  />
+                  <span>El evento incluye una pausa</span>
+                </label>
+                {form.pausa_inicio !== '' && form.pausa_inicio != null && (
+                  <div className='pf-form-grid'>
+                    {[
+                      ['pausa_inicio', 'Inicio de pausa'],
+                      ['pausa_fin', 'Fin de pausa'],
+                    ].map(([key, title]) => (
+                      <Field key={key} title={title}>
+                        <input
+                          type='time'
+                          required
+                          value={clock(form[key])}
+                          onChange={(x) => setForm({ ...form, [key]: minutes(x.target.value) })}
+                        />
+                      </Field>
+                    ))}
+                  </div>
+                )}
                 <p className='pf-muted'>
-                  2 partidos por pareja · 20 min de juego + 5 min de rotación
+                  {form.formato === 'grupos'
+                    ? `Todos contra todos dentro de cada grupo de ${form.tamano_grupo || 5} · ${form.duracion_partido || 20} min por partido, canchas seguidas sin rotación`
+                    : `2 partidos por pareja · ${form.duracion_partido || 20} min de juego + 5 min de rotación`}
                 </p>
               </>
             )}
@@ -987,6 +1083,29 @@ export default function PadelFlash() {
                     onChange={(x) => setForm({ ...form, disfraz: x.target.value })}
                   />
                 </Field>
+                <label className='pf-consent'>
+                  <input
+                    type='checkbox'
+                    checked={form.no_antes !== '' && form.no_antes != null}
+                    onChange={(x) =>
+                      setForm({
+                        ...form,
+                        no_antes: x.target.checked ? form.no_antes || e?.inicio || 360 : '',
+                      })
+                    }
+                  />
+                  <span>No programar su primer partido antes de cierta hora</span>
+                </label>
+                {form.no_antes !== '' && form.no_antes != null && (
+                  <Field title='No antes de'>
+                    <input
+                      type='time'
+                      required
+                      value={clock(form.no_antes)}
+                      onChange={(x) => setForm({ ...form, no_antes: minutes(x.target.value) })}
+                    />
+                  </Field>
+                )}
               </>
             )}
             {modal === 'resultado' && (
@@ -1023,8 +1142,8 @@ export default function PadelFlash() {
                   ))}
                 </div>
                 <p className='pf-muted'>
-                  Deja el set 2 vacío si no se jugó. Al cumplir 20 minutos se conserva el marcador,
-                  aunque el set esté incompleto.
+                  Deja el set 2 vacío si no se jugó. Al cumplir los {e.duracion_partido || 20}{' '}
+                  minutos se conserva el marcador, aunque el set esté incompleto.
                 </p>
                 <Field title='Cierre'>
                   <select
@@ -1133,6 +1252,67 @@ export default function PadelFlash() {
           </form>
         </ActionDialog>
       )}
+      {sorteando &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className='fixed inset-0 z-[200] flex flex-col items-center justify-center gap-7 bg-black/55 backdrop-blur-sm px-4 py-6 overflow-y-auto'
+            role='status'
+            aria-live='polite'
+          >
+            {sorteando === 'spinning' && (
+              <>
+                <div className='pf-sorteo-deck'>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <span key={i} className='pf-sorteo-card' />
+                  ))}
+                </div>
+                <p className='pf-sorteo-label'>
+                  <Shuffle size={20} className='pf-sorteo-icon' />
+                  Sorteando cruces…
+                </p>
+              </>
+            )}
+            {sorteando === 'reveal' && (
+              <div className='pf-sorteo-reveal'>
+                <p className='pf-sorteo-label'>
+                  <Trophy size={20} />
+                  {e.formato === 'grupos' ? 'Grupos del sorteo' : 'Cruces sorteados'}
+                </p>
+                {e.formato === 'grupos' ? (
+                  <div className='pf-sorteo-groups'>
+                    {[...new Set(pairs.map((p) => p.grupo).filter(Boolean))]
+                      .sort((a, b) => a - b)
+                      .map((g) => (
+                        <div className='pf-sorteo-group' key={g}>
+                          <h4>Grupo {g}</h4>
+                          {pairs
+                            .filter((p) => p.grupo === g)
+                            .map((p, i) => (
+                              <span
+                                key={p.id}
+                                className='pf-sorteo-item'
+                                style={{ animationDelay: `${i * 0.15}s` }}
+                              >
+                                {label(p)}
+                              </span>
+                            ))}
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className='pf-sorteo-item pf-sorteo-summary'>
+                    {fixture.length} partidos listos · dos encuentros por pareja
+                  </p>
+                )}
+                <button className='pf-primary' onClick={() => setSorteando('')}>
+                  Listo
+                </button>
+              </div>
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

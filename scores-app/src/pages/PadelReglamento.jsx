@@ -59,7 +59,7 @@ export default function PadelReglamento() {
           </section>
           <section className='reglamento-callout'>
             <h2 className='font-bold mb-2'>Programación del evento</h2>
-            <p>Consulta los horarios, la pausa y las canchas en la programación publicada. La creación del evento no requiere asignar las canchas físicas: inicialmente se identifican como Pádel 1 y Pádel 2.</p>
+            <p>Consulta los horarios y las canchas en la programación publicada; si el evento incluye una pausa, también aparece ahí. La creación del evento no requiere asignar las canchas físicas: inicialmente se identifican como Pádel 1 y Pádel 2.</p>
           </section>
           <footer className='reglamento-footer'>
             <span>Legal Branding · Club Unión</span>
