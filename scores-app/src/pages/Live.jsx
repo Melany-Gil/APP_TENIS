@@ -7,6 +7,7 @@ import EmptyState from '../components/common/EmptyState'
 import Tabs from '../components/ui/Tabs'
 import { useMatches } from '../hooks/useMatches'
 import { Radio, Tv } from 'lucide-react'
+import LiveBroadcast from '../components/match/LiveBroadcast'
 
 const TABS = [
   { value: 'all', label: 'Todos' },
@@ -20,7 +21,7 @@ export default function Live() {
   const filtered = tab === 'all' ? matches : matches.filter((m) => m.deporte === tab)
 
   return (
-    <div className='space-y-5 animate-fade-up'>
+    <div className='space-y-5'>
       <div className='flex items-center justify-between gap-3'>
         <div>
           <div className='flex items-center gap-2 mb-0.5'>
@@ -40,6 +41,7 @@ export default function Live() {
         </Link>
       </div>
 
+      <LiveBroadcast />
       <Tabs tabs={TABS} activeTab={tab} onChange={setTab} />
 
       <div className='space-y-3'>

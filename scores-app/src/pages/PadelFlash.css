@@ -711,7 +711,7 @@
 .pf-padel-spinner {
   color: var(--color-brand);
   animation: pf-paddle-wobble 1.3s ease-in-out infinite;
-  transform-origin: 60px 128px;
+  transform-origin: 50% 88%;
 }
 .pf-padel-ball {
   fill: #ffd23f;

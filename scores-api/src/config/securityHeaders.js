@@ -1,7 +1,11 @@
 // Photo previews and canvas exports decode locally created object URLs.
-// Keep Helmet defaults for every other directive; do not allow remote images.
+// Twitch is the only external script/frame origin; images remain local.
 module.exports = {
   contentSecurityPolicy: {
-    directives: { imgSrc: ["'self'", 'data:', 'blob:'] },
+    directives: {
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      scriptSrc: ["'self'", 'https://player.twitch.tv'],
+      frameSrc: ["'self'", 'https://player.twitch.tv'],
+    },
   },
 }
