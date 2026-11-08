@@ -1,4 +1,7 @@
 const fail = (status, message) => { throw { status, message } }
+const PRIOR_MEAN = 3
+const PRIOR_WEIGHT = 5
+const adjusted = (points, count) => count ? (points + PRIOR_MEAN * PRIOR_WEIGHT) / (count + PRIOR_WEIGHT) : null
 exports.standings = async (db, query, user) => {
   if (!['admin','juez_director','juez'].includes(user?.rol)) fail(403,'No tienes permiso para consultar valoraciones')
   const global = ['admin','juez_director'].includes(user.rol)
@@ -17,6 +20,8 @@ exports.standings = async (db, query, user) => {
     SUM(v.estrellas=1) AS e1,SUM(v.estrellas=2) AS e2,SUM(v.estrellas=3) AS e3,
     SUM(v.estrellas=4) AS e4,SUM(v.estrellas=5) AS e5,
     SUM(v.tipo='juez') AS votos_jueces,SUM(v.tipo='jugador') AS votos_jugadores,
+    SUM(CASE WHEN v.tipo='juez' THEN v.estrellas ELSE 0 END) AS puntos_jueces,
+    SUM(CASE WHEN v.tipo='jugador' THEN v.estrellas ELSE 0 END) AS puntos_jugadores,
     AVG(CASE WHEN v.tipo='juez' THEN v.estrellas END) AS promedio_jueces,
     AVG(CASE WHEN v.tipo='jugador' THEN v.estrellas END) AS promedio_jugadores
     FROM caddie_valoraciones v JOIN caddies c ON c.id=v.caddie_id
@@ -27,12 +32,20 @@ exports.standings = async (db, query, user) => {
     promedio:Number(r.puntos)/Number(r.votos),positivas:100*(Number(r.e4)+Number(r.e5))/Number(r.votos),
     estrellas:[1,2,3,4,5].map(n=>Number(r[`e${n}`])),
     votos_jueces:Number(r.votos_jueces),votos_jugadores:Number(r.votos_jugadores),
+    puntos_jueces:Number(r.puntos_jueces),puntos_jugadores:Number(r.puntos_jugadores),
     promedio_jueces:r.promedio_jueces == null ? null : Number(r.promedio_jueces),
     promedio_jugadores:r.promedio_jugadores == null ? null : Number(r.promedio_jugadores),
-  })).sort((a,b)=>b.promedio-a.promedio || b.votos-a.votos || a.nombre.localeCompare(b.nombre,'es'))
+  }))
+  items.forEach(item => {
+    item.puntaje_ajustado = adjusted(item.puntos, item.votos)
+    item.peso_calificaciones = item.votos / (item.votos + PRIOR_WEIGHT)
+    item.puntaje_jueces = adjusted(item.puntos_jueces, item.votos_jueces)
+    item.puntaje_jugadores = adjusted(item.puntos_jugadores, item.votos_jugadores)
+  })
+  items.sort((a,b)=>b.puntaje_ajustado-a.puntaje_ajustado || b.votos-a.votos || a.nombre.localeCompare(b.nombre,'es'))
   items.forEach((item,i)=>{
     const previous=items[i-1]
     item.posicion=previous && item.puntos===previous.puntos && item.votos===previous.votos ? previous.posicion : i+1
   })
-  return {items,alcance:global?'global':'partidos_asignados',votos:items.reduce((sum,r)=>sum+r.votos,0)}
+  return {items,alcance:global?'global':'partidos_asignados',votos:items.reduce((sum,r)=>sum+r.votos,0), metodo:{version:'ponderado-v1',referencia:PRIOR_MEAN,peso:PRIOR_WEIGHT}}
 }

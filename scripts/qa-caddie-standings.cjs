@@ -15,17 +15,19 @@ const assert=require('node:assert/strict')
         let data=[]
         if(ep.endsWith('/me'))data=user
         if(ep==='/caddies/valoraciones')data={items:[],page:1,more:false}
-        if(ep==='/caddies/posiciones')data={alcance:'global',votos:10,items:[{id:1,nombre:'Caddie de prueba',posicion:1,promedio:4.8,votos:10,partidos:3,evaluadores:8,positivas:100,estrellas:[0,0,0,2,8],promedio_jueces:5,promedio_jugadores:4.75,votos_jueces:2,votos_jugadores:8}]}
+        if(ep==='/caddies/posiciones')data={alcance:'global',votos:10,metodo:{version:'ponderado-v1',referencia:3,peso:5},items:[{id:1,nombre:'Caddie de prueba',posicion:1,promedio:4.8,puntos:48,puntaje_ajustado:4.2,peso_calificaciones:10/15,puntaje_jueces:25/7,puntaje_jugadores:53/13,votos:10,partidos:3,evaluadores:8,positivas:100,estrellas:[0,0,0,2,8],promedio_jueces:5,promedio_jugadores:4.75,votos_jueces:2,votos_jugadores:8}]}
         return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,data})})
       })
       await page.goto('http://127.0.0.1:4173/admin/caddies')
-      await page.getByText('Mejor calificado',{exact:true}).waitFor()
+      await page.getByText('Mejor puntaje ajustado',{exact:true}).waitFor()
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
       await page.getByRole('button',{name:'Ver más detalles de Caddie de prueba'}).click()
       const dialog=page.getByRole('dialog',{name:'Resumen de Caddie de prueba'})
       await dialog.waitFor()
       await dialog.getByRole('heading',{name:'Distribución de estrellas'}).waitFor()
       assert.equal(await dialog.getByRole('progressbar').count(),5)
+      assert.doesNotMatch(await dialog.innerText(), /NaN|undefined/)
+      await dialog.getByRole('heading',{name:'Jueces, jugadores y total'}).waitFor()
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
       assert.deepEqual(errors,[])
       console.log(`PASS caddie standings and detail ${width}px`)

@@ -7,15 +7,30 @@ test('caddies: ranking uses all ratings, exact averages, vote-count tie breaker 
   let sql
   const db={query:async q=>{sql=q;return [[row(1,'Ana',4,19),row(2,'Luis',2,10),row(3,'Sara',4,20),row(4,'Juan',4,20)]]}}
   const result=await standings(db,{},admin)
-  assert.deepEqual(result.items.map(r=>[r.nombre,r.posicion]),[['Juan',1],['Sara',1],['Luis',3],['Ana',4]])
+  assert.deepEqual(result.items.map(r=>[r.nombre,r.posicion]),[['Juan',1],['Sara',1],['Ana',3],['Luis',4]])
   assert.equal(result.votos,14)
-  assert.equal(result.items[3].promedio,4.75)
-  assert.equal(result.items[3].positivas,100)
-  assert.deepEqual(result.items[3].estrellas,[0,0,0,1,3])
+  assert.equal(result.items[2].promedio,4.75)
+  assert.equal(result.items[2].positivas,100)
+  assert.deepEqual(result.items[2].estrellas,[0,0,0,1,3])
   assert.match(sql,/COUNT\(DISTINCT v.user_id\)/)
   assert.match(sql,/p.estado='finalizado'/)
   assert.doesNotMatch(sql,/LIMIT/)
   assert.doesNotMatch(JSON.stringify(result),/user_id|comentario/)
+})
+
+test('caddies: a single five-star rating does not beat ten ratings averaging four',async()=>{
+  const rows=[{...row(1,'Una',1,5),votos_jueces:0,puntos_jueces:0,promedio_jueces:null,votos_jugadores:1,puntos_jugadores:5,promedio_jugadores:5},
+    {...row(2,'Diez',10,40),votos_jueces:2,puntos_jueces:10,promedio_jueces:5,votos_jugadores:8,puntos_jugadores:30,promedio_jugadores:3.75}]
+  const result=await standings({query:async()=>[rows]}, {},admin)
+  assert.equal(result.items[0].nombre,'Diez')
+  assert.equal(result.items[0].puntaje_ajustado,55/15)
+  assert.equal(result.items[1].puntaje_ajustado,20/6)
+  assert.equal(result.items[0].puntaje_jueces,25/7)
+  assert.equal(result.items[0].puntaje_jugadores,45/13)
+  assert.equal(result.items[1].puntaje_jueces,null)
+  assert.equal(result.items[0].puntos_jueces+result.items[0].puntos_jugadores,result.items[0].puntos)
+  assert.equal(result.items[0].votos_jueces+result.items[0].votos_jugadores,result.items[0].votos)
+  assert.deepEqual(result.metodo,{version:'ponderado-v1',referencia:3,peso:5})
 })
 test('caddies: date filters and assigned judge scope are enforced server-side',async()=>{
   let call
