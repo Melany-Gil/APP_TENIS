@@ -8,6 +8,7 @@ const handle = work => async (req, res) => {
 }
 router.get('/', requireOfficial, handle(req => service.list(req.user)))
 router.get('/valoraciones', requireOfficial, handle(req => service.report(req.query, req.user)))
+router.get('/posiciones', requireOfficial, handle(req => require('./standings').standings(require('../../config/db'), req.query, req.user)))
 router.post('/', requireAdmin, handle(req => service.save(null, req.body || {}, req.user)))
 router.put('/:id', requireAdmin, handle(req => service.save(req.params.id, req.body || {}, req.user)))
 router.get('/partidos/:id', handle(req => service.status(req.params.id, req.user)))

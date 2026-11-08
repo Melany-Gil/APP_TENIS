@@ -4,6 +4,7 @@ import { UserCheck, Plus, Star } from 'lucide-react'
 import useAuthStore from '../../store/useAuthStore'
 import { caddieService } from '../../services/caddieService'
 import { CaddieRatings } from '../../components/match/MatchCaddie'
+import CaddieStandings from '../../components/match/CaddieStandings'
 
 export default function Caddies() {
   const admin = useAuthStore(s => s.user?.rol === 'admin')
@@ -33,6 +34,7 @@ export default function Caddies() {
   }
   return <div className='space-y-5 max-w-5xl mx-auto min-w-0'>
     <header className='flex flex-wrap items-center justify-between gap-3'><div><h1 className='text-2xl font-bold flex gap-2 items-center'><UserCheck />Caddies</h1><p className='text-sm mt-1' style={{ color: 'var(--text-muted)' }}>Directorio y valoraciones de los partidos</p></div>{admin && <button className='btn-primary min-h-11' disabled={busy} onClick={() => setDraft({ nombre: '', activo: true })}><Plus size={17} />Añadir caddie</button>}</header>
+    <CaddieStandings />
     {error && <div role='alert' className='rounded-xl p-3 bg-red-500/10 text-sm text-red-600'>{error}<button className='underline ml-3' disabled={busy} onClick={() => setAttempt(n => n + 1)}>Actualizar</button></div>}
     {draft && <form onSubmit={save} className='card p-4 space-y-3'><h2 className='font-semibold'>{draft.id ? 'Editar caddie' : 'Nuevo caddie'}</h2><label className='block text-sm'>Nombre<input className='form-input w-full mt-1' autoFocus required maxLength={120} value={draft.nombre} disabled={busy} onChange={e => setDraft(d => ({ ...d, nombre: e.target.value }))} /></label><label className='flex gap-2 text-sm items-center min-h-10'><input type='checkbox' checked={draft.activo} disabled={busy} onChange={e => setDraft(d => ({ ...d, activo: e.target.checked }))} />Disponible para nuevas asignaciones</label><div className='flex gap-2'><button className='btn-primary' disabled={busy || !draft.nombre.trim()}>{busy ? 'Guardando…' : 'Guardar'}</button><button type='button' className='btn-secondary' disabled={busy} onClick={() => setDraft(null)}>Cancelar</button></div></form>}
     {admin && <details className='card p-4' open><summary className='font-semibold cursor-pointer min-h-10'>Directorio ({list.length})</summary><div className='grid sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto'>{list.map(c => <button key={c.id} disabled={busy} className='text-left rounded-xl border p-3 min-w-0' style={{ borderColor: 'var(--border-color)' }} onClick={() => setDraft({ ...c, activo: Boolean(c.activo) })}><strong className='block break-words text-sm'>{c.nombre}</strong><span className='text-xs' style={{ color: 'var(--text-muted)' }}>{c.activo ? 'Disponible' : 'Inactivo · historial conservado'}</span></button>)}</div>{!loading && !list.length && <p className='text-sm'>Aún no hay caddies registrados.</p>}</details>}
