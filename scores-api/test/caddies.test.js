@@ -106,3 +106,29 @@ test('caddie: reporte de juez está filtrado por su asignación, paginado y sin 
   assert.doesNotMatch(call.sql.split('FROM')[0], /user_id/)
   await assert.rejects(f.service.report({}, player), e => e.status === 403)
 })
+
+test('caddie: filtros combinados de evaluador, estrellas y tipo se aplican antes de paginar', async () => {
+  for (const actor of [admin, { id: 55, rol: 'juez_director' }]) {
+    const f = fixture()
+    await f.service.report({ caddie_id: '8', estrellas: '2', tipo: 'jugador', evaluador: ' Ana ', page: '2' }, actor)
+    const call = f.calls.at(-1)
+    assert.deepEqual(call.args, [8, 2, 'jugador', 'Ana', 50])
+    assert.match(call.sql, /v.estrellas=\? AND v.tipo=\? AND LOCATE/)
+    assert.match(call.sql, /AS evaluador_nombre/)
+    assert.match(call.sql, /LEFT JOIN users u ON u.id=v.user_id/)
+    assert.doesNotMatch(call.sql, /email|telefono|numero_documento/)
+  }
+  const f = fixture()
+  await f.service.report({ estrellas: '5', tipo: 'juez' }, judge)
+  assert.deepEqual(f.calls.at(-1).args, [3, 5, 'juez', 0])
+  assert.doesNotMatch(f.calls.at(-1).sql, /evaluador_nombre|JOIN users/)
+  await assert.rejects(f.service.report({ evaluador: 'Ana' }, judge), e => e.status === 403)
+})
+
+test('caddie: rechaza filtros inválidos antes de consultar la base', async () => {
+  const f = fixture()
+  for (const query of [{ estrellas: '0' }, { estrellas: '6' }, { estrellas: '2.5' }, { estrellas: 'abc' }, { tipo: 'admin' }, { evaluador: ['Ana'] }, { evaluador: 'a'.repeat(121) }]) {
+    await assert.rejects(f.service.report(query, admin), e => e.status === 400)
+  }
+  assert.equal(f.calls.length, 0)
+})

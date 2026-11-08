@@ -114,11 +114,27 @@ exports.createCaddieService = db => {
     const where = [], args = []
     if (!director(user)) { where.push('p.juez_id=?'); args.push(user.id) }
     if (query.caddie_id) { where.push('v.caddie_id=?'); args.push(id(query.caddie_id)) }
+    if (query.estrellas != null && query.estrellas !== '') {
+      const stars = Number(query.estrellas)
+      if (!Number.isInteger(stars) || stars < 1 || stars > 5) fail(400, 'Selecciona entre 1 y 5 estrellas')
+      where.push('v.estrellas=?'); args.push(stars)
+    }
+    if (query.tipo) {
+      if (!['juez', 'jugador'].includes(query.tipo)) fail(400, 'Tipo de evaluador inválido')
+      where.push('v.tipo=?'); args.push(query.tipo)
+    }
+    if (query.evaluador != null && query.evaluador !== '') {
+      if (!director(user)) fail(403, 'Solo administración y dirección pueden buscar evaluadores')
+      if (typeof query.evaluador !== 'string' || query.evaluador.length > 120) fail(400, 'Nombre de evaluador inválido')
+      const name = query.evaluador.trim()
+      if (name) { where.push("LOCATE(?, CONCAT_WS(' ',u.nombre,u.apellido))>0"); args.push(name) }
+    }
     const page = query.page ? id(query.page) : 1
     if (page > 10000) fail(400, 'Página fuera de rango')
     const [rows] = await db.query(`SELECT v.partido_id,v.estrellas,v.comentario,v.tipo,v.updated_at,c.nombre AS caddie_nombre,
-      p.fecha_inicio,t.nombre AS torneo_nombre FROM caddie_valoraciones v
+      p.fecha_inicio,t.nombre AS torneo_nombre${director(user) ? ", CONCAT_WS(' ',u.nombre,u.apellido) AS evaluador_nombre, v.user_id AS evaluador_id" : ''} FROM caddie_valoraciones v
       JOIN caddies c ON c.id=v.caddie_id JOIN partidos p ON p.id=v.partido_id LEFT JOIN torneos t ON t.id=p.torneo_id
+      ${director(user) ? 'LEFT JOIN users u ON u.id=v.user_id' : ''}
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY v.updated_at DESC,v.partido_id DESC,v.user_id DESC LIMIT 51 OFFSET ?`, [...args, (page - 1) * 50])
     return { items: rows.slice(0, 50), more: rows.length > 50, page }
   }
